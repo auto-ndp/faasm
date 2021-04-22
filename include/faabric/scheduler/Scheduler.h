@@ -15,6 +15,8 @@
 #include <shared_mutex>
 
 #define AVAILABLE_HOST_SET "available_hosts"
+#define AVAILABLE_STORAGE_HOST_SET "available_storage_hosts"
+#define ALL_STORAGE_HOST_SET "all_storage_hosts"
 
 namespace faabric::scheduler {
 
@@ -135,6 +137,13 @@ class Scheduler
 
     std::set<std::string> getAvailableHosts();
 
+    std::set<std::string> getAvailableHostsForFunction(
+      const faabric::Message& msg);
+
+    const char* getGlobalSetName() const;
+
+    const char* getGlobalSetNameForFunction(const faabric::Message& msg) const;
+
     void addHostToGlobalSet();
 
     void addHostToGlobalSet(const std::string& host);
@@ -215,7 +224,8 @@ class Scheduler
       std::shared_ptr<faabric::BatchExecuteRequest> req,
       std::vector<std::string>& records,
       int offset,
-      faabric::util::SnapshotData* snapshot);
+      faabric::util::SnapshotData* snapshot,
+      bool forceAll = false);
 };
 
 }

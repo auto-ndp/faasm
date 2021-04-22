@@ -28,6 +28,7 @@ class SystemConfig
     // Scheduling
     int noScheduler;
     int overrideCpuCount;
+    bool isStorageNode;
 
     // Worker-related timeouts
     int globalMessageTimeout;

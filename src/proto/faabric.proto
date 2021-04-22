@@ -147,6 +147,10 @@ message Message {
     string sgxTag = 35;
     bytes sgxPolicy = 36;
     bytes sgxResult = 37;
+
+    bool isStorage = 38;
+    bool isOutputMemoryDelta = 39;
+    bytes zygoteDelta = 40;
 }
 
 // ---------------------------------------------

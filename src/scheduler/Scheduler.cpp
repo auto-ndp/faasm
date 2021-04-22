@@ -48,30 +48,53 @@ Scheduler::Scheduler()
     // Set up the initial resources
     int cores = faabric::util::getUsableCores();
     thisHostResources.set_slots(cores);
+
+    if (this->conf.isStorageNode) {
+        redis::Redis& redis = redis::Redis::getQueue();
+        redis.sadd(ALL_STORAGE_HOST_SET, this->thisHost);
+    }
 }
 
 std::set<std::string> Scheduler::getAvailableHosts()
 {
     redis::Redis& redis = redis::Redis::getQueue();
-    return redis.smembers(AVAILABLE_HOST_SET);
+    return redis.smembers(getGlobalSetName());
+}
+
+std::set<std::string> Scheduler::getAvailableHostsForFunction(
+  const faabric::Message& msg)
+{
+    redis::Redis& redis = redis::Redis::getQueue();
+    return redis.smembers(getGlobalSetNameForFunction(msg));
 }
 
 void Scheduler::addHostToGlobalSet(const std::string& host)
 {
     redis::Redis& redis = redis::Redis::getQueue();
-    redis.sadd(AVAILABLE_HOST_SET, host);
+    redis.sadd(getGlobalSetName(), host);
 }
 
 void Scheduler::removeHostFromGlobalSet(const std::string& host)
 {
     redis::Redis& redis = redis::Redis::getQueue();
-    redis.srem(AVAILABLE_HOST_SET, host);
+    redis.srem(getGlobalSetName(), host);
 }
 
 void Scheduler::addHostToGlobalSet()
 {
-    redis::Redis& redis = redis::Redis::getQueue();
-    redis.sadd(AVAILABLE_HOST_SET, thisHost);
+    this->addHostToGlobalSet(thisHost);
+}
+
+const char* Scheduler::getGlobalSetName() const
+{
+    return this->conf.isStorageNode ? AVAILABLE_STORAGE_HOST_SET
+                                    : AVAILABLE_HOST_SET;
+}
+
+const char* Scheduler::getGlobalSetNameForFunction(
+  const faabric::Message& msg) const
+{
+    return msg.isstorage() ? AVAILABLE_STORAGE_HOST_SET : AVAILABLE_HOST_SET;
 }
 
 void Scheduler::resetThreadLocalCache()
@@ -125,7 +148,11 @@ void Scheduler::shutdown()
 {
     reset();
 
-    removeHostFromGlobalSet(thisHost);
+    this->removeHostFromGlobalSet(thisHost);
+    if (this->conf.isStorageNode) {
+        redis::Redis& redis = redis::Redis::getQueue();
+        redis.srem(ALL_STORAGE_HOST_SET, thisHost);
+    }
 }
 
 long Scheduler::getFunctionExecutorCount(const faabric::Message& msg)
@@ -207,7 +234,8 @@ std::vector<std::string> Scheduler::callFunctions(
   std::shared_ptr<faabric::BatchExecuteRequest> req,
   bool forceLocal)
 {
-    // Extract properties of the request
+    auto& config = faabric::util::getSystemConfig();
+
     int nMessages = req->messages_size();
     bool isThreads = req->type() == faabric::BatchExecuteRequest::THREADS;
     std::vector<std::string> executed(nMessages);
@@ -222,6 +250,9 @@ std::vector<std::string> Scheduler::callFunctions(
         SPDLOG_ERROR("Request {} has no master host", funcStrWithId);
         throw std::runtime_error("Message with no master host");
     }
+    bool isStorage = firstMsg.isstorage();
+    bool iAmStorage = config.isStorageNode;
+    bool hostKindDifferent = (isStorage != iAmStorage);
 
     // TODO - more granular locking, this is incredibly conservative
     faabric::util::FullLock lock(mx);
@@ -260,7 +291,7 @@ std::vector<std::string> Scheduler::callFunctions(
         std::vector<faabric::util::SnapshotDiff> snapshotDiffs;
         std::string snapshotKey = firstMsg.snapshotkey();
         bool snapshotNeeded =
-          req->type() == req->THREADS || req->type() == req->PROCESSES;
+          req->type() == req->THREADS || req->type() == req->PROCESSES || !snapshotKey.empty();
 
         if (snapshotNeeded && snapshotKey.empty()) {
             SPDLOG_ERROR("No snapshot provided for {}", funcStr);
@@ -276,21 +307,22 @@ std::vector<std::string> Scheduler::callFunctions(
             // Do the snapshot diff pushing
             if (!snapshotDiffs.empty()) {
                 for (const auto& h : thisRegisteredHosts) {
-                    SPDLOG_DEBUG("Pushing {} snapshot diffs for {} to {}",
+                    SPDLOG_DEBUG("Pushing {} snapshot diffs for {} to {} (snapshot size up to {} bytes)",
                                  snapshotDiffs.size(),
                                  funcStr,
-                                 h);
+                                 h,
+                                 snapshotData.size);
                     SnapshotClient& c = getSnapshotClient(h);
                     c.pushSnapshotDiffs(snapshotKey, snapshotDiffs);
                 }
-            }
 
-            // Now reset the dirty page tracking, as we want the next batch of
-            // diffs to contain everything from now on (including the updates
-            // sent back from all the threads)
-            SPDLOG_DEBUG("Resetting dirty tracking after pushing diffs {}",
-                         funcStr);
-            faabric::util::resetDirtyTracking();
+                // Now reset the dirty page tracking, as we want the next batch
+                // of diffs to contain everything from now on (including the
+                // updates sent back from all the threads)
+                SPDLOG_DEBUG("Resetting dirty tracking after pushing diffs {}",
+                             funcStr);
+                faabric::util::resetDirtyTracking();
+            }
         }
 
         // Work out how many we can handle locally
@@ -306,6 +338,29 @@ std::vector<std::string> Scheduler::callFunctions(
             nLocally = std::min<int>(available, nMessages);
         }
 
+        // Make sure we don't execute the wrong kind (storage/compute) of
+        // call locally
+        if (hostKindDifferent) {
+            nLocally = 0;
+        }
+
+        if (isThreads && nLocally > 0) {
+            SPDLOG_DEBUG("Returning {} of {} {} for local threads",
+                         nLocally,
+                         nMessages,
+                         funcStr);
+        } else if (nLocally > 0) {
+            SPDLOG_DEBUG(
+              "Executing {} of {} {} locally", nLocally, nMessages, funcStr);
+        } else if (hostKindDifferent) {
+            SPDLOG_DEBUG("Requested host kind different, distributing {} x {}",
+                         nMessages,
+                         funcStr);
+        } else {
+            SPDLOG_DEBUG(
+              "No local capacity, distributing {} x {}", nMessages, funcStr);
+        }
+
         // Add those that can be executed locally
         if (nLocally > 0) {
             SPDLOG_DEBUG(
@@ -316,13 +371,53 @@ std::vector<std::string> Scheduler::callFunctions(
             }
         }
 
-        // If some are left, we need to distribute
         int offset = nLocally;
-        if (offset < nMessages) {
+
+        if (hostKindDifferent) {
+            std::set<std::string> allHosts =
+              getAvailableHostsForFunction(firstMsg);
+
+            if (allHosts.empty()) {
+                throw std::runtime_error(
+                  "No hosts can execute function requesting different "
+                  "kind");
+            }
+
+            for (auto& h : allHosts) {
+                // Schedule functions on this host
+                int nOnThisHost = scheduleFunctionsOnHost(
+                  h, req, executed, offset, &snapshotData);
+
+                offset += nOnThisHost;
+
+                // Stop if we've scheduled all functions
+                if (offset >= nMessages) {
+                    break;
+                }
+            }
+
+            if (offset < nMessages) {
+                // offload the rest onto the first host available
+                std::string h = *allHosts.begin();
+                int nOnThisHost = scheduleFunctionsOnHost(
+                  h, req, executed, offset, &snapshotData, true);
+
+                offset += nOnThisHost;
+
+                if (offset != nMessages) {
+                    throw std::logic_error(
+                      "Not all other host kind messages could be "
+                      "scheduled.");
+                }
+            }
+        }
+
+        // If some are left, we need to distribute
+        if (offset < nMessages && !hostKindDifferent) {
             // Schedule first to already registered hosts
             for (const auto& h : thisRegisteredHosts) {
-                int nOnThisHost =
-                  scheduleFunctionsOnHost(h, req, executed, offset, nullptr);
+                int nOnThisHost = scheduleFunctionsOnHost(
+                  h, req, executed, offset, &snapshotData);
 
                 offset += nOnThisHost;
                 if (offset >= nMessages) {
@@ -366,7 +461,6 @@ std::vector<std::string> Scheduler::callFunctions(
                          nMessages - offset,
                          nMessages,
                          funcStr);
-
             for (; offset < nMessages; offset++) {
                 localMessageIdxs.emplace_back(offset);
                 executed.at(offset) = thisHost;
@@ -384,16 +478,17 @@ std::vector<std::string> Scheduler::callFunctions(
         }
     }
 
-    // Schedule messages locally if necessary. For threads we only need one
-    // executor, for anything else we want one Executor per function in flight
+    // Schedule messages locally if necessary. For threads we only need
+    // one executor, for anything else we want one Executor per function
+    // in flight
     if (!localMessageIdxs.empty()) {
         // Update slots
         thisHostResources.set_usedslots(thisHostResources.usedslots() +
                                         localMessageIdxs.size());
 
         if (isThreads) {
-            // Threads use the existing executor. We assume there's only one
-            // running at a time.
+            // Threads use the existing executor. We assume there's only
+            // one running at a time.
             std::vector<std::shared_ptr<Executor>>& thisExecutors =
               executors[funcStr];
 
@@ -490,7 +585,8 @@ int Scheduler::scheduleFunctionsOnHost(
   std::shared_ptr<faabric::BatchExecuteRequest> req,
   std::vector<std::string>& records,
   int offset,
-  faabric::util::SnapshotData* snapshot)
+  faabric::util::SnapshotData* snapshot,
+  bool forceAll)
 {
     const faabric::Message& firstMsg = req->messages().at(0);
     std::string funcStr = faabric::util::funcToString(firstMsg, false);
@@ -498,9 +594,14 @@ int Scheduler::scheduleFunctionsOnHost(
     int nMessages = req->messages_size();
     int remainder = nMessages - offset;
 
-    // Work out how many we can put on the host
-    faabric::HostResources r = getHostResources(host);
-    int available = r.slots() - r.usedslots();
+    // Execute as many as possible to this host
+    int available{};
+    if (forceAll) {
+        available = remainder;
+    } else {
+        faabric::HostResources r = getHostResources(host);
+        available = r.slots() - r.usedslots();
+    }
 
     // Drop out if none available
     if (available <= 0) {
@@ -637,7 +738,9 @@ std::string Scheduler::getThisHost()
 void Scheduler::broadcastFlush()
 {
     // Get all hosts
-    std::set<std::string> allHosts = getAvailableHosts();
+    redis::Redis& redis = redis::Redis::getQueue();
+    std::set<std::string> allHosts = redis.smembers(AVAILABLE_HOST_SET);
+    allHosts.merge(redis.smembers(AVAILABLE_STORAGE_HOST_SET));
 
     // Remove this host from the set
     allHosts.erase(thisHost);
@@ -691,8 +794,8 @@ void Scheduler::setFunctionResult(faabric::Message& msg)
 
 void Scheduler::registerThread(uint32_t msgId)
 {
-    // Here we need to ensure the promise is registered locally so callers can
-    // start waiting
+    // Here we need to ensure the promise is registered locally so
+    // callers can start waiting
     threadResults[msgId];
 }
 
@@ -755,13 +858,13 @@ faabric::Message Scheduler::getFunctionResult(unsigned int messageId,
     faabric::Message msgResult;
 
     if (isBlocking) {
-        // Blocking version will throw an exception when timing out which is
-        // handled by the caller.
+        // Blocking version will throw an exception when timing out
+        // which is handled by the caller.
         std::vector<uint8_t> result = redis.dequeueBytes(resultKey, timeoutMs);
         msgResult.ParseFromArray(result.data(), (int)result.size());
     } else {
-        // Non-blocking version will tolerate empty responses, therefore we
-        // handle the exception here
+        // Non-blocking version will tolerate empty responses, therefore
+        // we handle the exception here
         std::vector<uint8_t> result;
         try {
             result = redis.dequeueBytes(resultKey, timeoutMs);
