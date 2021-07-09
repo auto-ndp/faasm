@@ -9,21 +9,18 @@ pushd ${PROJ_ROOT} > /dev/null
 
 source ./bin/cluster_env.sh
 
-if [[ -z "$1" ]]; then
-    CLI_CONTAINER="faasm-cli"
-else
-    CLI_CONTAINER="$1"
-fi
-
 docker-compose -f docker-compose.yml \
     up \
-    --no-recreate \
+    --force-recreate \
+    --timeout 1 \
     -d \
-    faasm-cli cpp
+    worker worker-storage
+
+sleep 0.1
 
 docker-compose -f docker-compose.yml \
-    exec \
-    ${CLI_CONTAINER} \
-    ${INNER_SHELL}
+    restart \
+    --timeout 1 \
+    nginx
 
 popd > /dev/null

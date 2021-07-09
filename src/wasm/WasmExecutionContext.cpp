@@ -22,6 +22,15 @@ WasmExecutionContext::~WasmExecutionContext()
     contexts.pop();
 }
 
+WasmExecutionContext* getCurrentWasmExecutionContext()
+{
+    if (contexts.empty()) {
+        return nullptr;
+    }
+
+    return contexts.top();
+}
+
 WasmModule* getExecutingModule()
 {
     if (contexts.empty()) {
@@ -39,4 +48,5 @@ faabric::Message* getExecutingCall()
 
     return contexts.top()->executingCall;
 }
+
 }

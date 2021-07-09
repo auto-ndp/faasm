@@ -6,8 +6,10 @@
 
 #include <faabric/scheduler/Scheduler.h>
 #include <faabric/snapshot/SnapshotRegistry.h>
+#include <faabric/state/State.h>
 #include <faabric/util/bytes.h>
 #include <faabric/util/config.h>
+#include <faabric/util/delta.h>
 #include <faabric/util/environment.h>
 #include <faabric/util/func.h>
 #include <faabric/util/gids.h>
@@ -137,8 +139,102 @@ void WasmModule::restore(const std::string& snapshotKey)
     // Map the snapshot into memory
     uint8_t* memoryBase = getMemoryBase();
     reg.mapSnapshot(snapshotKey, memoryBase);
+}
 
-    PROF_END(wasmSnapshotRestore)
+void WasmModule::zygoteDeltaRestore(const std::vector<uint8_t>& zygoteDelta)
+{
+    PROF_START(wasmZygoteDeltaRestore)
+    faabric::state::State& state = faabric::state::getGlobalState();
+    const auto zKey = "$" + this->getBoundFunction();
+    size_t zygSnapSize = state.getStateSize(this->getBoundUser(), zKey);
+    if (zygSnapSize == 0) {
+        SPDLOG_ERROR("Couldn't find zygote snapshot for restore {}/{}",
+                     this->getBoundUser(),
+                     zKey);
+        throw std::runtime_error("Missing zygote snapshot");
+    }
+    size_t memSize = getCurrentBrk();
+    if (zygSnapSize > memSize) {
+        SPDLOG_DEBUG("Growing memory to fit zygote");
+        size_t bytesRequired = zygSnapSize - memSize;
+        this->growMemory(bytesRequired);
+    } else {
+        SPDLOG_DEBUG("Shrinking memory to fit zygote");
+        size_t shrinkBy = memSize - zygSnapSize;
+        this->shrinkMemory(shrinkBy);
+    }
+    uint8_t* memoryBase = getMemoryBase();
+    auto kv = state.getKV(this->getBoundUser(), zKey, zygSnapSize);
+    kv->get(memoryBase);
+    this->deltaRestore(zygoteDelta);
+}
+
+std::shared_ptr<faabric::state::StateKeyValue> WasmModule::getZygoteSnapshot()
+{
+    faabric::state::State& state = faabric::state::getGlobalState();
+    const auto zKey = "$" + this->getBoundFunction();
+    size_t zygSnapSize = state.getStateSize(this->getBoundUser(), zKey);
+    if (zygSnapSize == 0) {
+        SPDLOG_ERROR(
+          "Couldn't find zygote snapshot {}/{}", this->getBoundUser(), zKey);
+        throw std::runtime_error("Couldn't find zygote snapshot " + zKey);
+    }
+    SPDLOG_DEBUG("Found zygote snapshot {} of size {}", zKey, zygSnapSize);
+    return state.getKV(this->getBoundUser(), zKey, zygSnapSize);
+}
+
+void WasmModule::storeZygoteSnapshot()
+{
+    faabric::state::State& state = faabric::state::getGlobalState();
+    const auto zKey = "$" + this->getBoundFunction();
+    size_t zygSnapSize = state.getStateSize(this->getBoundUser(), zKey);
+    if (zygSnapSize != 0) {
+        SPDLOG_DEBUG(
+          "Existing zygote snapshot of {}/{} found, doing nothing (size {})",
+          this->getBoundUser(),
+          zKey,
+          zygSnapSize);
+        return; // no-op
+    }
+    size_t memorySize = getCurrentBrk();
+    uint8_t* memoryBase = getMemoryBase();
+    SPDLOG_DEBUG("Uploading zygote snapshot of {}/{}, size {}",
+                 this->getBoundUser(),
+                 zKey,
+                 memorySize);
+    auto kv = state.getKV(this->getBoundUser(), zKey, memorySize);
+    kv->set(memoryBase);
+    kv->pushFull();
+    SPDLOG_DEBUG("State size confirmation: {}", kv->size());
+}
+
+std::vector<uint8_t> WasmModule::deltaSnapshot(
+  const faabric::util::SnapshotData& oldMemory)
+{
+    auto newMemData = getMemoryBase();
+    auto newMemSize = getCurrentBrk();
+    for (const auto& [ptr, len] : this->snapshotExcludedPtrLens) {
+        std::fill_n(newMemData + ptr, len, uint8_t(0));
+    }
+    const auto& cfg = faabric::util::getSystemConfig();
+    faabric::util::DeltaSettings dcfg(cfg.deltaSnapshotEncoding);
+    return faabric::util::serializeDelta(
+      dcfg, oldMemory.data, oldMemory.size, newMemData, newMemSize);
+}
+
+void WasmModule::deltaRestore(const std::vector<uint8_t>& delta)
+{
+    auto memSize = getCurrentBrk();
+
+    faabric::util::applyDelta(
+      delta,
+      [&](uint32_t newSize) {
+          if (newSize > memSize) {
+              this->growMemory(newSize - memSize);
+              memSize = newSize;
+          }
+      },
+      [&]() { return getMemoryBase(); });
 }
 
 std::string WasmModule::getBoundUser()
@@ -337,13 +433,17 @@ int32_t WasmModule::executeTask(
     // Set up context for this task
     WasmExecutionContext ctx(this, &msg);
 
-    // Modules must have provisioned their own thread stacks
-    assert(!threadStacks.empty());
-    uint32_t stackTop = threadStacks.at(threadPoolIdx);
+    const auto& zygoteDelta = msg.zygotedelta();
+    if (!zygoteDelta.empty()) {
+        this->zygoteDeltaRestore(faabric::util::stringToBytes(zygoteDelta));
+    }
 
     // Perform the appropriate type of execution
     int returnValue;
     if (req->type() == faabric::BatchExecuteRequest::THREADS) {
+        // Modules must have provisioned their own thread stacks
+        assert(!threadStacks.empty());
+        uint32_t stackTop = threadStacks.at(threadPoolIdx);
         // Pthreads or openmp
         if (req->subtype() == ThreadRequestType::PTHREAD) {
             returnValue = executePthread(threadPoolIdx, stackTop, msg);
@@ -358,14 +458,14 @@ int32_t WasmModule::executeTask(
         returnValue = executeFunction(msg);
     }
 
-    if (returnValue != 0) {
+    if (returnValue != 0 && !msg.isstorage()) {
         msg.set_outputdata(
           fmt::format("Call failed (return value={})", returnValue));
     }
 
     // Add captured stdout if necessary
     conf::FaasmConfig& conf = conf::getFaasmConfig();
-    if (conf.captureStdout == "on") {
+    if (conf.captureStdout == "on" && !msg.isstorage()) {
         std::string moduleStdout = getCapturedStdout();
         if (!moduleStdout.empty()) {
             std::string newOutput = moduleStdout + "\n" + msg.outputdata();

@@ -33,7 +33,8 @@ int awaitChainedCall(unsigned int messageId)
 int makeChainedCall(const std::string& functionName,
                     int wasmFuncPtr,
                     const char* pyFuncName,
-                    const std::vector<uint8_t>& inputData)
+                    const std::vector<uint8_t>& inputData,
+                    bool isStorage)
 {
     faabric::scheduler::Scheduler& sch = faabric::scheduler::getScheduler();
     faabric::Message* originalCall = getExecutingCall();
@@ -49,6 +50,7 @@ int makeChainedCall(const std::string& functionName,
     faabric::Message& msg = req->mutable_messages()->at(0);
     msg.set_inputdata(inputData.data(), inputData.size());
     msg.set_funcptr(wasmFuncPtr);
+    msg.set_isstorage(isStorage);
 
     msg.set_pythonuser(originalCall->pythonuser());
     msg.set_pythonfunction(originalCall->pythonfunction());
@@ -142,4 +144,67 @@ int awaitChainedCallOutput(unsigned int messageId,
 
     return result.returnvalue();
 }
+
+faabric::Message awaitChainedCallMessage(unsigned int messageId)
+{
+    int callTimeoutMs = conf::getFaasmConfig().chainedCallTimeout;
+
+    faabric::scheduler::Scheduler& sch = faabric::scheduler::getScheduler();
+    const faabric::Message result =
+      sch.getFunctionResult(messageId, callTimeoutMs);
+
+    if (result.type() == faabric::Message_MessageType_EMPTY) {
+        SPDLOG_ERROR("Cannot find output for {}", messageId);
+    }
+
+    return result;
+}
+
+int chainNdpCall(const std::string& zygoteDelta,
+                 const std::string& inputData,
+                 int funcPtr,
+                 const char* pyFuncName)
+{
+    faabric::scheduler::Scheduler& sch = faabric::scheduler::getScheduler();
+
+    faabric::Message* originalCall = getExecutingCall();
+    faabric::Message call = faabric::util::messageFactory(
+      originalCall->user(), originalCall->function());
+    call.set_isasync(true);
+
+    // Snapshot details
+    call.set_snapshotkey("");
+    call.set_zygotedelta(zygoteDelta);
+
+    // Function pointer and args
+    call.set_funcptr(funcPtr);
+    call.set_inputdata(inputData);
+    call.set_isstorage(true);
+    call.set_isoutputmemorydelta(true);
+    call.set_cmdline(originalCall->cmdline());
+
+    call.set_pythonuser(originalCall->pythonuser());
+    call.set_pythonfunction(originalCall->pythonfunction());
+    if (pyFuncName != nullptr && pyFuncName[0] != '\0') {
+        call.set_pythonentry(pyFuncName);
+    }
+    call.set_ispython(originalCall->ispython());
+
+    const std::string origStr =
+      faabric::util::funcToString(*originalCall, false);
+    const std::string chainedStr = faabric::util::funcToString(call, false);
+
+    // Schedule the call
+    sch.callFunction(call);
+    SPDLOG_DEBUG(
+      "Chained NDP call {} ({}) -> {} {}() py?:{}",
+      origStr,
+      faabric::util::getSystemConfig().endpointHost,
+      chainedStr,
+      funcPtr,
+      pyFuncName ? pyFuncName : "wasmptr");
+
+    return call.id();
+}
+
 }

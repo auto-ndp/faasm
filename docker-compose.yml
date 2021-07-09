@@ -20,8 +20,9 @@ services:
       - ./dev/container/machine-code/:/usr/local/faasm/object/
       - ./dev/container/shared_store/:/usr/local/faasm/shared_store/
     environment:
+      - DELTA_SNAPSHOT_ENCODING=pages=64
       - FUNCTION_STORAGE=local
-      - LOG_LEVEL=info
+      - LOG_LEVEL=debug
       - PYTHON_CODEGEN=off
       - REDIS_QUEUE_HOST=redis-queue
       - REDIS_STATE_HOST=redis-state
@@ -35,18 +36,52 @@ services:
       - "8080"
     privileged: yes
     volumes:
+      - ./:/usr/local/code/faasm/
       - ./dev/faasm/build/:${FAASM_BUILD_MOUNT}
+      - ./dev/container/shared_store/:/usr/local/faasm/debug_shared_store/
+      - ./bin/entrypoint_worker.sh:/entrypoint.sh
     environment:
-      - CAPTURE_STDOUT=on
-      - CGROUP_MODE=on
+      - CAPTURE_STDOUT=off
+      - CGROUP_MODE=off
+      - DELTA_SNAPSHOT_ENCODING=pages=64
       - FILESERVER_URL=http://${UPLOAD_HOST:-upload}:8002
       - FUNCTION_STORAGE=fileserver
       - GLOBAL_MESSAGE_TIMEOUT=600000
-      - LOG_LEVEL=info
+      - LOG_LEVEL=debug
       - NETNS_MODE=off
       - REDIS_QUEUE_HOST=redis-queue
       - REDIS_STATE_HOST=redis-state
       - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
+      - ENDPOINT_HOST=worker
+      - OVERRIDE_CPU_COUNT=1
+
+  worker-storage:
+    image: faasm/worker:${FAASM_VERSION}
+    depends_on:
+      - upload
+    expose:
+      - "8080"
+    privileged: yes
+    volumes:
+      - ./:/usr/local/code/faasm/
+      - ./dev/faasm/build/:${FAASM_BUILD_MOUNT}
+      - ./dev/container/shared_store/:/usr/local/faasm/shared_store/
+      - ./bin/entrypoint_worker.sh:/entrypoint.sh
+    environment:
+      - CAPTURE_STDOUT=off
+      - CGROUP_MODE=off
+      - DELTA_SNAPSHOT_ENCODING=pages=64
+      - FILESERVER_URL=http://${UPLOAD_HOST:-upload}:8002
+      - FUNCTION_STORAGE=fileserver
+      - IS_STORAGE_NODE=1
+      - GLOBAL_MESSAGE_TIMEOUT=600000
+      - LOG_LEVEL=debug
+      - NETNS_MODE=off
+      - REDIS_QUEUE_HOST=redis-queue
+      - REDIS_STATE_HOST=redis-state
+      - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
+      - ENDPOINT_HOST=worker-storage
+      - OVERRIDE_CPU_COUNT=1
 
   nginx:
     image: nginx:latest
@@ -54,6 +89,7 @@ services:
       - ./deploy/conf/nginx-local.conf:/etc/nginx/nginx.conf:ro
     depends_on:
       - worker
+      - worker-storage
     ports:
       - "8080:8080"
 
@@ -65,6 +101,8 @@ services:
     privileged: true
     depends_on:
       - worker
+      - worker-storage
+      - nginx
     environment:
       - UPLOAD_HOST=${UPLOAD_HOST:-upload}
       - INVOKE_HOST=${INVOKE_HOST:-nginx}
@@ -86,7 +124,7 @@ services:
     tty: true
     privileged: true
     depends_on:
-      - worker
+      - faasm-cli
     volumes:
       - ./clients/cpp:/code/cpp
       - ./dev/cpp/build:/build/cpp

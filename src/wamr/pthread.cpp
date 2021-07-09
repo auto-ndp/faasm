@@ -23,13 +23,13 @@ static int32_t pthread_mutex_init_wrapper(wasm_exec_env_t exec_env,
 
 static int32_t pthread_mutex_lock_wrapper(wasm_exec_env_t exec_env, int32_t a)
 {
-    SPDLOG_DEBUG("S - pthread_mutex_lock {}", a);
+    //SPDLOG_DEBUG("S - pthread_mutex_lock {}", a);
     return 0;
 }
 
 static int32_t pthread_mutex_unlock_wrapper(wasm_exec_env_t exec_env, int32_t a)
 {
-    SPDLOG_DEBUG("S - pthread_mutex_unlock {}", a);
+    //SPDLOG_DEBUG("S - pthread_mutex_unlock {}", a);
     return 0;
 }
 

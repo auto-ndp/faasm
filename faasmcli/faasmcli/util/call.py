@@ -114,6 +114,8 @@ def invoke_impl(
     if mpi_world_size:
         msg["mpi_world_size"] = mpi_world_size
 
+    msg["master_host"] = "worker"
+
     # Knative must pass custom headers
     if knative:
         headers = get_knative_headers()

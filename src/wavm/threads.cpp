@@ -239,7 +239,7 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
                                pthread_mutex_lock,
                                I32 mx)
 {
-    SPDLOG_TRACE("S - pthread_mutex_lock {}", mx);
+    //SPDLOG_TRACE("S - pthread_mutex_lock {}", mx);
     getExecutingWAVMModule()->getMutexes().lockMutex(mx);
     return 0;
 }
@@ -250,7 +250,7 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
                                s__pthread_mutex_trylock,
                                I32 mx)
 {
-    SPDLOG_TRACE("S - pthread_mutex_trylock {}", mx);
+    //SPDLOG_TRACE("S - pthread_mutex_trylock {}", mx);
     bool success = getExecutingWAVMModule()->getMutexes().tryLockMutex(mx);
     if (success) {
         return 0;
@@ -265,7 +265,7 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
                                pthread_mutex_unlock,
                                I32 mx)
 {
-    SPDLOG_TRACE("S - pthread_mutex_unlock {}", mx);
+    //SPDLOG_TRACE("S - pthread_mutex_unlock {}", mx);
     getExecutingWAVMModule()->getMutexes().unlockMutex(mx);
     return 0;
 }

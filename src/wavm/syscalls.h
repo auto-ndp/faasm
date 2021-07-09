@@ -378,6 +378,8 @@ void messagesLink();
 
 void mpiLink();
 
+void ndpLink();
+
 void networkLink();
 
 void ompLink();

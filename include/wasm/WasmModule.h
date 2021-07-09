@@ -146,12 +146,24 @@ class WasmModule
 
     void restore(const std::string& snapshotKey);
 
+    void zygoteDeltaRestore(const std::vector<uint8_t>& zygoteDelta);
+
+    std::shared_ptr<faabric::state::StateKeyValue> getZygoteSnapshot();
+
+    std::vector<std::pair<uint32_t, uint32_t>> snapshotExcludedPtrLens;
+
+    std::vector<uint8_t> deltaSnapshot(const faabric::util::SnapshotData& oldMemory);
+
+    void deltaRestore(const std::vector<uint8_t>& delta);
+
     // ----- Debugging -----
     virtual void printDebugInfo();
 
     threads::MutexManager& getMutexes();
 
   protected:
+    void storeZygoteSnapshot();
+
     uint32_t currentBrk = 0;
 
     std::string boundUser;

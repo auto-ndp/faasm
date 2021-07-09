@@ -158,6 +158,8 @@ class WAVMWasmModule final
     WAVM::Runtime::GCPointer<WAVM::Runtime::Instance> wasiModule;
     WAVM::Runtime::GCPointer<WAVM::Runtime::Instance> moduleInstance;
 
+    std::string preExecuteMemoryData;
+
     // Map of dynamically loaded modules
     std::unordered_map<std::string, int> dynamicPathToHandleMap;
     std::unordered_map<int, LoadedDynamicModule> dynamicModuleMap;

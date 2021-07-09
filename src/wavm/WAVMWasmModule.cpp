@@ -1,10 +1,13 @@
 #include "syscalls.h"
 
+#include <algorithm>
 #include <boost/filesystem.hpp>
+#include <functional>
 #include <stdexcept>
 #include <sys/mman.h>
 #include <sys/types.h>
 
+#include <faabric/snapshot/SnapshotRegistry.h>
 #include <faabric/util/bytes.h>
 #include <faabric/util/config.h>
 #include <faabric/util/func.h>
@@ -12,6 +15,7 @@
 #include <faabric/util/logging.h>
 #include <faabric/util/macros.h>
 #include <faabric/util/memory.h>
+#include <faabric/util/snapshot.h>
 #include <faabric/util/timing.h>
 
 #include <storage/SharedFiles.h>
@@ -148,6 +152,7 @@ void WAVMWasmModule::clone(const WAVMWasmModule& other)
     _isBound = other._isBound;
     boundUser = other.boundUser;
     boundFunction = other.boundFunction;
+    preExecuteMemoryData = other.preExecuteMemoryData;
 
     currentBrk = other.currentBrk;
 
@@ -467,6 +472,12 @@ void WAVMWasmModule::doBindToFunctionInternal(faabric::Message& msg,
                  Runtime::getTableNumElements(defaultTable));
 
     PROF_END(wasmBind)
+
+    if (executeZygote) {
+        PROF_START(wasmNdpZygoteSnapshot)
+        this->storeZygoteSnapshot();
+        PROF_END(wasmNdpZygoteSnapshot)
+    }
 }
 
 void WAVMWasmModule::writeStringArrayToMemory(
@@ -823,6 +834,10 @@ int32_t WAVMWasmModule::executeFunction(faabric::Message& msg)
     Runtime::Function* funcInstance;
     IR::FunctionType funcType;
 
+    if (msg.isoutputmemorydelta()) {
+        this->preExecuteMemoryData = this->snapshot(true);
+    }
+
     // Run a specific function if requested
     if (funcPtr > 0) {
         // Get the function this pointer refers to
@@ -886,6 +901,19 @@ int32_t WAVMWasmModule::executeFunction(faabric::Message& msg)
 
     // Record the return value
     msg.set_returnvalue(returnValue);
+
+    if (returnValue == 0 && msg.isoutputmemorydelta()) {
+        faabric::snapshot::SnapshotRegistry& reg =
+          faabric::snapshot::getSnapshotRegistry();
+        auto oldDataSnap = reg.getSnapshot(this->preExecuteMemoryData);
+        uint8_t* oldMemory = reg.mapSnapshot(this->preExecuteMemoryData, nullptr);
+        oldDataSnap.data = oldMemory;
+        auto delta = this->deltaSnapshot(oldDataSnap);
+        munmap(oldMemory, oldDataSnap.size);
+        reg.deleteSnapshot(this->preExecuteMemoryData);
+        this->preExecuteMemoryData.clear();
+        msg.set_outputdata(delta.data(), delta.size());
+    }
 
     return returnValue;
 }

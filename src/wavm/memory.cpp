@@ -146,7 +146,7 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
  */
 WAVM_DEFINE_INTRINSIC_FUNCTION(env, "__sbrk", I32, __sbrk, I32 increment)
 {
-    SPDLOG_DEBUG("S - sbrk - {}", increment);
+    SPDLOG_TRACE("S - sbrk - {}", increment);
 
     WAVMWasmModule* module = getExecutingWAVMModule();
     I32 result;

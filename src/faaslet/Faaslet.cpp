@@ -7,6 +7,7 @@
 #include <threads/ThreadState.h>
 #include <wamr/WAMRWasmModule.h>
 #include <wavm/WAVMWasmModule.h>
+#include <wavm/NdpBuiltinModule.h>
 
 #include <faabric/scheduler/Scheduler.h>
 #include <faabric/util/config.h>
@@ -28,6 +29,11 @@
 using namespace isolation;
 
 namespace faaslet {
+
+static bool isBuiltin(const std::string& funcName)
+{
+    return !funcName.empty() && funcName.at(0) == '!';
+}
 
 void preloadPythonRuntime()
 {
@@ -56,7 +62,9 @@ Faaslet::Faaslet(faabric::Message& msg)
     conf::FaasmConfig& conf = conf::getFaasmConfig();
 
     // Instantiate the right wasm module for the chosen runtime
-    if (conf.wasmVm == "wamr") {
+    if (isBuiltin(msg.function())) {
+        module = std::make_unique<wasm::NDPBuiltinModule>();
+    } else if (conf.wasmVm == "wamr") {
 #if (FAASM_SGX)
         // When SGX is enabled, we may still be running with vanilla WAMR
         if (msg.issgx()) {
@@ -128,7 +136,7 @@ void Faaslet::restore(faabric::Message& msg)
     const std::string snapshotKey = msg.snapshotkey();
 
     // Restore from snapshot if necessary
-    if (conf.wasmVm == "wavm") {
+    if (conf.wasmVm == "wavm" && !isBuiltin(msg.function())) {
         if (!snapshotKey.empty() && !msg.issgx()) {
             PROF_START(snapshotOverride)
 
