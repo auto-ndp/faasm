@@ -2,13 +2,13 @@ version: "3"
 
 services:
   redis-state:
-    image: faasm/redis:${FAASM_VERSION}
+    image: kubasz51/faasm-redis:${FAASM_VERSION}
 
   redis-queue:
-    image: faasm/redis:${FAASM_VERSION}
+    image: kubasz51/faasm-redis:${FAASM_VERSION}
 
   upload:
-    image: faasm/upload:${FAASM_VERSION}
+    image: kubasz51/faasm-upload:${FAASM_VERSION}
     ports:
       - "8002:8002"
     depends_on:
@@ -29,7 +29,7 @@ services:
       - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
 
   worker:
-    image: faasm/worker:${FAASM_VERSION}
+    image: kubasz51/faasm-worker:${FAASM_VERSION}
     depends_on:
       - upload
     expose:
@@ -56,7 +56,7 @@ services:
       - OVERRIDE_CPU_COUNT=1
 
   worker-storage:
-    image: faasm/worker:${FAASM_VERSION}
+    image: kubasz51/faasm-worker-storage:${FAASM_VERSION}
     depends_on:
       - upload
     expose:

@@ -12,19 +12,19 @@ export CPP_VERSION=$(cat clients/cpp/VERSION)
 export PYTHON_VERSION=$(cat clients/python/VERSION)
 
 if [[ -z "$FAABRIC_CLI_IMAGE" ]]; then
-    export FAABRIC_CLI_IMAGE=faasm/faabric:${FAABRIC_VERSION}
+    export FAABRIC_CLI_IMAGE=kubasz51/faasm-faabric:${FAABRIC_VERSION}
 fi
 
 if [[ -z "$FAASM_CLI_IMAGE" ]]; then
-    export FAASM_CLI_IMAGE=faasm/cli:${FAASM_VERSION}
+    export FAASM_CLI_IMAGE=kubasz51/faasm-cli:${FAASM_VERSION}
 fi
 
 if [[ -z "$CPP_CLI_IMAGE" ]]; then
-    export CPP_CLI_IMAGE=faasm/cpp-sysroot:${CPP_VERSION}
+    export CPP_CLI_IMAGE=kubasz51/faasm-cpp-sysroot:${CPP_VERSION}
 fi
 
 if [[ -z "$PYTHON_CLI_IMAGE" ]]; then
-    export PYTHON_CLI_IMAGE=faasm/cpython:${PYTHON_VERSION}
+    export PYTHON_CLI_IMAGE=kubasz51/faasm-cpython:${PYTHON_VERSION}
 fi
 
 if [[ -z "$1" ]]; then
@@ -64,7 +64,7 @@ docker-compose -f docker-compose-dev.yml \
     up \
     --no-recreate \
     -d \
-    ${CLI_CONTAINER}    
+    ${CLI_CONTAINER}
 
 # Attach to the CLI container
 docker-compose -f docker-compose-dev.yml \

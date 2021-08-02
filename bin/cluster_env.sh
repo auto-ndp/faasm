@@ -9,11 +9,11 @@ export CPP_VERSION=$(cat ${PROJ_ROOT}/clients/cpp/VERSION)
 export FAASM_BUILD_MOUNT=/build/faasm
 
 if [[ -z "$FAASM_CLI_IMAGE" ]]; then
-    export FAASM_CLI_IMAGE=faasm/cli:${FAASM_VERSION}
+    export FAASM_CLI_IMAGE=kubasz51/faasm-cli:${FAASM_VERSION}
 fi
 
 if [[ -z "$CPP_CLI_IMAGE" ]]; then
-    export CPP_CLI_IMAGE=faasm/cpp-sysroot:${CPP_VERSION}
+    export CPP_CLI_IMAGE=kubasz51/faasm-cpp-sysroot:${CPP_VERSION}
 fi
 
 export INNER_SHELL=/bin/bash

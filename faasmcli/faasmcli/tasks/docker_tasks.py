@@ -45,7 +45,7 @@ def _check_valid_containers(containers):
 
 def _do_push(container, version):
     run(
-        "docker push faasm/{}:{}".format(container, version),
+        "docker push kubasz/faasm-{}:{}".format(container, version),
         shell=True,
         cwd=PROJ_ROOT,
         check=True,
@@ -69,7 +69,7 @@ def build(ctx, c, nocache=False, push=False):
         # Check if we need to template a special dockerignore file It seems the
         # dockerignore file needs to be at <dockerfile_path>.dockerignore
         dockerfile = join("docker", "{}.dockerfile".format(container))
-        tag_name = "faasm/{}:{}".format(container, faasm_ver)
+        tag_name = "kubasz51/faasm-{}:{}".format(container, faasm_ver)
 
         faasm_ver = get_faasm_version()
 
@@ -107,7 +107,7 @@ def pull(ctx, c):
 
     for container in c:
         run(
-            "docker pull faasm/{}:{}".format(container, faasm_ver),
+            "docker pull kubasz51/faasm-{}:{}".format(container, faasm_ver),
             shell=True,
             check=True,
             cwd=PROJ_ROOT,
@@ -125,7 +125,7 @@ def delete_old(ctx):
     images = dock.images.list()
     for image in images:
         for t in image.tags:
-            if not t.startswith("faasm/"):
+            if not t.startswith("kubasz51/faasm-"):
                 continue
 
             tag_ver = t.split(":")[-1]

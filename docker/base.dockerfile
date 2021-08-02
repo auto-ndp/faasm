@@ -1,11 +1,11 @@
 # Stage to extract Python runtime files
-FROM faasm/cpython:0.0.12 as python
+FROM kubasz51/faasm-cpython:0.0.12 as python
 
 # Import from SGX container
-FROM faasm/sgx:0.5.3 as sgx
+FROM kubasz51/faasm-sgx:0.5.3 as sgx
 
 # Note - we don't often rebuild cpp-root so this dep may be behind
-FROM faasm/cpp-root:0.6.0
+FROM kubasz51/faasm-cpp-root:0.6.0
 ARG FAASM_VERSION
 
 # Flag to say we're in a container
@@ -23,7 +23,7 @@ WORKDIR /usr/local/code
 RUN rm -rf faasm
 RUN git clone \
     -b v${FAASM_VERSION} \
-    https://github.com/faasm/faasm
+    https://github.com/auto-ndp/faasm
 WORKDIR /usr/local/code/faasm
 
 RUN git submodule update --init

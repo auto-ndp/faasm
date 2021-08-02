@@ -2,7 +2,7 @@ version: "3"
 
 services:
   redis:
-    image: faasm/redis:${FAASM_VERSION}
+    image: kubasz51/faasm-redis:${FAASM_VERSION}
 
   faabric-cli:
     image: ${FAABRIC_CLI_IMAGE}
