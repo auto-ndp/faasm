@@ -27,7 +27,7 @@ RUN rm -r /tmp/wabt
 # Install faasm cpp Python module
 # TODO - include this via multi-stage Docker build
 WORKDIR /usr/local/code
-RUN git clone https://github.com/auto-ndp/faasm-cpp
+RUN git clone https://github.com/auto-ndp/faasm-cpp cpp
 WORKDIR /usr/local/code/cpp
 RUN pip3 install -e .
 

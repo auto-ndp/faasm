@@ -45,7 +45,7 @@ def _check_valid_containers(containers):
 
 def _do_push(container, version):
     run(
-        "docker push kubasz/faasm-{}:{}".format(container, version),
+        "docker push kubasz51/faasm-{}:{}".format(container, version),
         shell=True,
         cwd=PROJ_ROOT,
         check=True,

@@ -2,10 +2,10 @@
 FROM kubasz51/faasm-cpython:0.0.12 as python
 
 # Import from SGX container
-FROM kubasz51/faasm-sgx:0.5.3 as sgx
+FROM kubasz51/faasm-sgx:0.6.1 as sgx
 
 # Note - we don't often rebuild cpp-root so this dep may be behind
-FROM kubasz51/faasm-cpp-root:0.6.0
+FROM kubasz51/faasm-cpp-root:0.6.1
 ARG FAASM_VERSION
 
 # Flag to say we're in a container
