@@ -1,4 +1,4 @@
-FROM faasm/faabric-base:0.1.0
+FROM kubasz51/faasm-faabric-base:0.1.1
 ARG FAABRIC_VERSION
 
 # faabic-base image is not re-built often, so tag may be behind
@@ -10,7 +10,7 @@ RUN apt-get update
 
 # Put the code in place
 WORKDIR /code
-RUN git clone -b v${FAABRIC_VERSION} https://github.com/faasm/faabric
+RUN git clone -b v${FAABRIC_VERSION} https://github.com/auto-ndp/faabric
 
 WORKDIR /code/faabric
 RUN pip3 install -r requirements.txt

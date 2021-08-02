@@ -20,6 +20,8 @@ RUN apt install -y \
     python3-pip \
     python3-venv \
     redis-tools \
+    gdb \
+    zsh \
     wget
 
 # CMake
@@ -27,7 +29,7 @@ RUN apt remove --purge --auto-remove cmake
 WORKDIR /setup
 RUN wget -q -O \
     cmake-linux.sh \
-    https://github.com/Kitware/CMake/releases/download/v3.18.2/cmake-3.18.2-Linux-x86_64.sh
+    https://github.com/Kitware/CMake/releases/download/v3.21.1/cmake-3.21.1-Linux-x86_64.sh
 RUN sh cmake-linux.sh -- --skip-license --prefix=/usr/local
 
 # Tidy up

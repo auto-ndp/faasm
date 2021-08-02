@@ -11,7 +11,7 @@ MPI_NATIVE_IMAGE_NAME = "faabric-mpi-native"
 
 def _get_docker_tag(img_name):
     ver = get_version()
-    return "faasm/{}:{}".format(img_name, ver)
+    return "kubasz51/faasm-{}:{}".format(img_name, ver)
 
 
 def _do_container_build(name, nocache=False, push=False):
