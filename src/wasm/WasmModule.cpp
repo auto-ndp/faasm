@@ -84,7 +84,7 @@ faabric::util::SnapshotData WasmModule::getSnapshotData()
     // of the allocated memory
     faabric::util::SnapshotData data;
     data.data = getMemoryBase();
-    data.size = getCurrentBrk();
+    data.size = getMemorySizeBytes();
 
     return data;
 }
@@ -196,7 +196,7 @@ void WasmModule::storeZygoteSnapshot()
           zygSnapSize);
         return; // no-op
     }
-    size_t memorySize = getCurrentBrk();
+    size_t memorySize = getMemorySizeBytes();
     uint8_t* memoryBase = getMemoryBase();
     SPDLOG_DEBUG("Uploading zygote snapshot of {}/{}, size {}",
                  this->getBoundUser(),
@@ -212,7 +212,7 @@ std::vector<uint8_t> WasmModule::deltaSnapshot(
   const faabric::util::SnapshotData& oldMemory)
 {
     auto newMemData = getMemoryBase();
-    auto newMemSize = getCurrentBrk();
+    auto newMemSize = getMemorySizeBytes();
     for (const auto& [ptr, len] : this->snapshotExcludedPtrLens) {
         std::fill_n(newMemData + ptr, len, uint8_t(0));
     }
@@ -224,13 +224,13 @@ std::vector<uint8_t> WasmModule::deltaSnapshot(
 
 void WasmModule::deltaRestore(const std::vector<uint8_t>& delta)
 {
-    auto memSize = getCurrentBrk();
+    auto memSize = getMemorySizeBytes();
 
     faabric::util::applyDelta(
       delta,
       [&](uint32_t newSize) {
-          if (newSize > memSize) {
-              this->growMemory(newSize - memSize);
+          if (newSize > getCurrentBrk()) {
+              this->growMemory(newSize - getCurrentBrk());
               memSize = newSize;
           }
       },
