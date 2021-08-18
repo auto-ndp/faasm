@@ -3,6 +3,7 @@ find_package(RapidJSON)
 file(GLOB HEADERS "${FAABRIC_INCLUDE_DIR}/faabric/util/*.h")
 
 set(LIB_FILES
+        barrier.cpp
         bytes.cpp
         config.cpp
         clock.cpp
@@ -11,7 +12,6 @@ set(LIB_FILES
         files.cpp
         func.cpp
         gids.cpp
-        http.cpp
         json.cpp
         latch.cpp
         logging.cpp

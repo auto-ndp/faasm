@@ -1,5 +1,6 @@
 #include <faabric/proto/faabric.pb.h>
 #include <faabric/scheduler/Scheduler.h>
+#include <faabric/snapshot/SnapshotRegistry.h>
 #include <faabric/state/State.h>
 #include <faabric/util/clock.h>
 #include <faabric/util/config.h>
@@ -7,6 +8,7 @@
 #include <faabric/util/func.h>
 #include <faabric/util/gids.h>
 #include <faabric/util/logging.h>
+#include <faabric/util/macros.h>
 #include <faabric/util/memory.h>
 #include <faabric/util/queue.h>
 #include <faabric/util/timing.h>
@@ -15,12 +17,24 @@
 
 namespace faabric::scheduler {
 
+ExecutorTask::ExecutorTask(int messageIndexIn,
+                           std::shared_ptr<faabric::BatchExecuteRequest> reqIn,
+                           std::shared_ptr<std::atomic<int>> batchCounterIn,
+                           bool needsSnapshotPushIn,
+                           bool skipResetIn)
+  : messageIndex(messageIndexIn)
+  , req(reqIn)
+  , batchCounter(batchCounterIn)
+  , needsSnapshotPush(needsSnapshotPushIn)
+  , skipReset(skipResetIn)
+{}
+
 // TODO - avoid the copy of the message here?
 Executor::Executor(faabric::Message& msg)
   : boundMessage(msg)
   , threadPoolSize(faabric::util::getUsableCores())
   , threadPoolThreads(threadPoolSize)
-  , threadQueues(threadPoolSize)
+  , threadTaskQueues(threadPoolSize)
 {
     faabric::util::SystemConfig& conf = faabric::util::getSystemConfig();
 
@@ -46,7 +60,8 @@ void Executor::finish()
 
         // Send a kill message
         SPDLOG_TRACE("Executor {} killing thread pool {}", id, i);
-        threadQueues.at(i).enqueue(std::make_pair(POOL_SHUTDOWN, nullptr));
+        threadTaskQueues[i].enqueue(
+          ExecutorTask(POOL_SHUTDOWN, nullptr, nullptr, false, false));
 
         // Await the thread
         if (threadPoolThreads.at(i)->joinable()) {
@@ -66,14 +81,13 @@ void Executor::finish()
 
     // Reset variables
     boundMessage.Clear();
-    executingTaskCount = 0;
 
     lastSnapshot = "";
 
     claimed = false;
 
     threadPoolThreads.clear();
-    threadQueues.clear();
+    threadTaskQueues.clear();
 }
 
 void Executor::executeTasks(std::vector<int> msgIdxs,
@@ -106,8 +120,7 @@ void Executor::executeTasks(std::vector<int> msgIdxs,
 
     if (isSnapshot && !alreadyRestored) {
         if ((!isMaster && isThreads) || !isThreads) {
-            SPDLOG_DEBUG(
-              "Performing snapshot restore {} [{}]", funcStr, snapshotKey);
+            SPDLOG_DEBUG("Restoring {} from snapshot {}", funcStr, snapshotKey);
             lastSnapshot = snapshotKey;
             restore(firstMsg);
         } else {
@@ -122,12 +135,20 @@ void Executor::executeTasks(std::vector<int> msgIdxs,
 
     // Reset dirty page tracking if we're executing threads.
     // Note this must be done after the restore has happened
-    if (isThreads && isSnapshot) {
+    bool needsSnapshotPush = false;
+    if (isThreads && isSnapshot && !isMaster) {
         faabric::util::resetDirtyTracking();
+        needsSnapshotPush = true;
     }
 
-    // Set executing task count
-    executingTaskCount += msgIdxs.size();
+    // Set up shared counter for this batch of tasks
+    auto batchCounter =
+      std::make_shared<std::atomic<int>>(req->messages_size());
+
+    // Work out if we should skip the reset after this batch. This only needs to
+    // happen when we're executing threads on the master host, in which case the
+    // original function call will cause a reset
+    bool skipReset = isMaster && isThreads;
 
     // Iterate through and invoke tasks
     for (int msgIdx : msgIdxs) {
@@ -146,7 +167,8 @@ void Executor::executeTasks(std::vector<int> msgIdxs,
         // Enqueue the task
         SPDLOG_TRACE(
           "Assigning app index {} to thread {}", msg.appindex(), threadPoolIdx);
-        threadQueues[threadPoolIdx].enqueue(std::make_pair(msgIdx, req));
+        threadTaskQueues[threadPoolIdx].enqueue(ExecutorTask(
+          msgIdx, req, batchCounter, needsSnapshotPush, skipReset));
 
         // Lazily create the thread
         if (threadPoolThreads.at(threadPoolIdx) == nullptr) {
@@ -161,16 +183,17 @@ void Executor::threadPoolThread(int threadPoolIdx)
     SPDLOG_DEBUG("Thread pool thread {}:{} starting up", id, threadPoolIdx);
 
     auto& sch = faabric::scheduler::getScheduler();
-    auto& conf = faabric::util::getSystemConfig();
+    const auto& conf = faabric::util::getSystemConfig();
 
     bool selfShutdown = false;
 
     for (;;) {
         SPDLOG_TRACE("Thread starting loop {}:{}", id, threadPoolIdx);
-        std::pair<int, std::shared_ptr<faabric::BatchExecuteRequest>> task;
+
+        ExecutorTask task;
 
         try {
-            task = threadQueues[threadPoolIdx].dequeue(conf.boundTimeout);
+            task = threadTaskQueues[threadPoolIdx].dequeue(conf.boundTimeout);
         } catch (faabric::util::QueueTimeoutException& ex) {
             // If the thread has had no messages, it needs to
             // remove itself
@@ -182,67 +205,84 @@ void Executor::threadPoolThread(int threadPoolIdx)
             break;
         }
 
-        int msgIdx = task.first;
-
         // If the thread is being killed, the executor itself
         // will handle the clean-up
-        if (msgIdx == POOL_SHUTDOWN) {
+        if (task.messageIndex == POOL_SHUTDOWN) {
             SPDLOG_DEBUG("Killing thread pool thread {}:{}", id, threadPoolIdx);
             selfShutdown = false;
             break;
         }
 
-        std::shared_ptr<faabric::BatchExecuteRequest> req = task.second;
-        assert(req->messages_size() >= msgIdx + 1);
-        faabric::Message& msg = req->mutable_messages()->at(msgIdx);
+        assert(task.req->messages_size() >= task.messageIndex + 1);
+        faabric::Message& msg =
+          task.req->mutable_messages()->at(task.messageIndex);
 
-        SPDLOG_TRACE("Thread {}:{} executing task {} ({})",
+        bool isThreads =
+          task.req->type() == faabric::BatchExecuteRequest::THREADS;
+        SPDLOG_TRACE("Thread {}:{} executing task {} ({}, thread={})",
                      id,
                      threadPoolIdx,
-                     msgIdx,
-                     msg.id());
+                     task.messageIndex,
+                     msg.id(),
+                     isThreads);
 
         int32_t returnValue;
         try {
-            returnValue = executeTask(threadPoolIdx, msgIdx, req);
+            returnValue =
+              executeTask(threadPoolIdx, task.messageIndex, task.req);
         } catch (const std::exception& ex) {
             returnValue = 1;
 
-            msg.set_outputdata(fmt::format(
-              "Task {} threw exception. What: {}", msg.id(), ex.what()));
+            std::string errorMessage = fmt::format(
+              "Task {} threw exception. What: {}", msg.id(), ex.what());
+            SPDLOG_ERROR(errorMessage);
+            msg.set_outputdata(errorMessage);
         }
 
         // Set the return value
         msg.set_returnvalue(returnValue);
 
         // Decrement the task count
-        int oldTaskCount = executingTaskCount.fetch_sub(1);
+        int oldTaskCount = task.batchCounter->fetch_sub(1);
         assert(oldTaskCount >= 0);
-        bool isLastTask = oldTaskCount == 1;
+        bool isLastInBatch = oldTaskCount == 1;
 
         SPDLOG_TRACE("Task {} finished by thread {}:{} ({} left)",
-                     msg.id(),
+                     faabric::util::funcToString(msg, true),
                      id,
                      threadPoolIdx,
-                     executingTaskCount);
+                     oldTaskCount - 1);
 
-        // Get snapshot diffs _before_ we reset the executor
-        bool isThreads = req->type() == faabric::BatchExecuteRequest::THREADS;
-        std::vector<faabric::util::SnapshotDiff> diffs;
-        if (isLastTask && isThreads) {
-            // Get diffs
-            faabric::util::SnapshotData d = snapshot();
-            diffs = d.getDirtyPages();
+        // Handle snapshot diffs _before_ we reset the executor
+        if (isLastInBatch && task.needsSnapshotPush) {
+            // Get diffs between original snapshot and after execution
+            faabric::util::SnapshotData snapshotPostExecution = snapshot();
 
-            // Reset dirty page tracking now that we've got the diffs
+            faabric::util::SnapshotData snapshotPreExecution =
+              faabric::snapshot::getSnapshotRegistry().getSnapshot(
+                msg.snapshotkey());
+
+            std::vector<faabric::util::SnapshotDiff> diffs =
+              snapshotPreExecution.getChangeDiffs(snapshotPostExecution.data,
+                                                  snapshotPostExecution.size);
+
+            sch.pushSnapshotDiffs(msg, diffs);
+
+            // Reset dirty page tracking now that we've pushed the diffs
             faabric::util::resetDirtyTracking();
         }
 
         // If this batch is finished, reset the executor and release its claim.
         // Note that we have to release the claim _after_ resetting, otherwise
         // the executor won't be ready for reuse.
-        if (isLastTask) {
-            reset(msg);
+        if (isLastInBatch) {
+            if (task.skipReset) {
+                SPDLOG_TRACE("Skipping reset for {}",
+                             faabric::util::funcToString(msg, true));
+            } else {
+                reset(msg);
+            }
+
             releaseClaim();
         }
 
@@ -255,14 +295,7 @@ void Executor::threadPoolThread(int threadPoolIdx)
         // on its result to continue execution, therefore must be done once the
         // executor has been reset, otherwise the executor may not be reused for
         // a repeat invocation.
-        if (isLastTask && isThreads) {
-            // Send diffs along with thread result
-            SPDLOG_DEBUG("Task {} finished, returning {} snapshot diffs",
-                         msg.id(),
-                         diffs.size());
-
-            sch.setThreadResult(msg, returnValue, diffs);
-        } else if (isThreads) {
+        if (isThreads) {
             // Set non-final thread result
             sch.setThreadResult(msg, returnValue);
         } else {

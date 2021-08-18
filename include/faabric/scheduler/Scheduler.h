@@ -24,6 +24,24 @@ class Scheduler;
 
 Scheduler& getScheduler();
 
+class ExecutorTask
+{
+  public:
+    ExecutorTask() = default;
+
+    ExecutorTask(int messageIndexIn,
+                 std::shared_ptr<faabric::BatchExecuteRequest> reqIn,
+                 std::shared_ptr<std::atomic<int>> batchCounterIn,
+                 bool needsSnapshotPushIn,
+                 bool skipResetIn);
+
+    int messageIndex = 0;
+    std::shared_ptr<faabric::BatchExecuteRequest> req;
+    std::shared_ptr<std::atomic<int>> batchCounter;
+    bool needsSnapshotPush = false;
+    bool skipReset = false;
+};
+
 class Executor
 {
   public:
@@ -67,15 +85,11 @@ class Executor
 
     std::atomic<bool> claimed = false;
 
-    std::atomic<int> executingTaskCount = 0;
-
     std::mutex threadsMutex;
     std::vector<std::shared_ptr<std::thread>> threadPoolThreads;
     std::vector<std::shared_ptr<std::thread>> deadThreads;
 
-    std::vector<faabric::util::Queue<
-      std::pair<int, std::shared_ptr<faabric::BatchExecuteRequest>>>>
-      threadQueues;
+    std::vector<faabric::util::Queue<ExecutorTask>> threadTaskQueues;
 
     void threadPoolThread(int threadPoolIdx);
 };
@@ -111,17 +125,15 @@ class Scheduler
 
     void flushLocally();
 
-    std::string getMessageStatus(unsigned int messageId);
-
     void setFunctionResult(faabric::Message& msg);
 
     faabric::Message getFunctionResult(unsigned int messageId, int timeout);
 
     void setThreadResult(const faabric::Message& msg, int32_t returnValue);
 
-    void setThreadResult(const faabric::Message& msg,
-                         int32_t returnValue,
-                         const std::vector<faabric::util::SnapshotDiff>& diffs);
+    void pushSnapshotDiffs(
+      const faabric::Message& msg,
+      const std::vector<faabric::util::SnapshotDiff>& diffs);
 
     void setThreadResultLocally(uint32_t msgId, int32_t returnValue);
 
