@@ -1,5 +1,5 @@
 ARG FAABRIC_VERSION
-FROM faasm/faabric:${FAABRIC_VERSION}
+FROM kubasz51/faasm-faabric:${FAABRIC_VERSION}
 
 WORKDIR /code/faabric
 
