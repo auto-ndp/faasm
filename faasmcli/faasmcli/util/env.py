@@ -9,9 +9,6 @@ def _get_dir(variable, default):
     return env_val if env_val else default
 
 
-FAABRIC_MSG_TYPE_CALL = 0
-FAABRIC_MSG_TYPE_FLUSH = 4
-
 HOME_DIR = expanduser("~")
 PROJ_ROOT = dirname(dirname(dirname(dirname(realpath(__file__)))))
 ANSIBLE_ROOT = join(PROJ_ROOT, "ansible")
@@ -23,8 +20,6 @@ FAASM_HOME = join(HOME_DIR, "faasm")
 FAASM_DATA_DIR = join(HOME_DIR, "faasm", "data")
 FAASM_MACHINE_CODE_DIR = join(FAASM_LOCAL_DIR, "object")
 FAASM_RUNTIME_ROOT = join(FAASM_LOCAL_DIR, "runtime_root")
-FAASM_SHARED_ROOT = join(FAASM_LOCAL_DIR, "shared")
-FAASM_SHARED_STORAGE_ROOT = join(FAASM_LOCAL_DIR, "shared_store")
 FAASM_SHARED_ROOT = join(FAASM_LOCAL_DIR, "shared")
 WASM_DIR = join(FAASM_LOCAL_DIR, "wasm")
 

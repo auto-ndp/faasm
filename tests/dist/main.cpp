@@ -5,6 +5,7 @@
 #include <catch2/catch.hpp>
 
 #include <faaslet/Faaslet.h>
+#include <storage/S3Wrapper.h>
 
 #include <faabric/endpoint/FaabricEndpoint.h>
 #include <faabric/runner/FaabricMain.h>
@@ -18,8 +19,9 @@ FAABRIC_CATCH_LOGGER
 
 int main(int argc, char* argv[])
 {
-    faabric::transport::initGlobalMessageContext();
     faabric::util::initLogging();
+    storage::initFaasmS3();
+    faabric::transport::initGlobalMessageContext();
 
     // Start everything up
     SPDLOG_INFO("Starting distributed test server on master");
@@ -47,5 +49,6 @@ int main(int argc, char* argv[])
     }
 
     faabric::transport::closeGlobalMessageContext();
+    storage::shutdownFaasmS3();
     return result;
 }

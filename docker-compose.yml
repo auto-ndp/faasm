@@ -2,31 +2,50 @@ version: "3"
 
 services:
   redis-state:
-    image: kubasz51/faasm-redis:${FAASM_VERSION}
+    image: kubasz51/faasm-redis:0.6.1
 
   redis-queue:
-    image: kubasz51/faasm-redis:${FAASM_VERSION}
+    image: kubasz51/faasm-redis:0.6.1
+
+  minio:
+    image: faasm/minio:0.6.6
+    expose:
+      - "9000"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
+    volumes:
+      - ./dev/minio/data:/data/minio
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
 
   upload:
     image: kubasz51/faasm-upload:${FAASM_VERSION}
     ports:
       - "8002:8002"
+    expose:
+      - "5000"
     depends_on:
       - redis-queue
       - redis-state
+      - minio
     volumes:
       - ./dev/faasm/build/:${FAASM_BUILD_MOUNT}
-      - ./dev/wasm/:/usr/local/code/faasm/wasm/
-      - ./dev/container/machine-code/:/usr/local/faasm/object/
-      - ./dev/container/shared_store/:/usr/local/faasm/shared_store/
     environment:
       - DELTA_SNAPSHOT_ENCODING=pages=64
-      - FUNCTION_STORAGE=local
       - LOG_LEVEL=debug
-      - PYTHON_CODEGEN=off
+      - PYTHON_CODEGEN=${PYTHON_CODEGEN}
       - REDIS_QUEUE_HOST=redis-queue
       - REDIS_STATE_HOST=redis-state
       - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   worker:
     image: kubasz51/faasm-worker:${FAASM_VERSION}
@@ -34,7 +53,8 @@ services:
       - upload
     expose:
       - "8080"
-    privileged: yes
+      - "5000"
+    privileged: true
     volumes:
       - ./:/usr/local/code/faasm/
       - ./dev/faasm/build/:${FAASM_BUILD_MOUNT}
@@ -44,8 +64,6 @@ services:
       - CAPTURE_STDOUT=off
       - CGROUP_MODE=off
       - DELTA_SNAPSHOT_ENCODING=pages=64
-      - FILESERVER_URL=http://${UPLOAD_HOST:-upload}:8002
-      - FUNCTION_STORAGE=fileserver
       - GLOBAL_MESSAGE_TIMEOUT=600000
       - LOG_LEVEL=debug
       - NETNS_MODE=off
@@ -61,7 +79,8 @@ services:
       - upload
     expose:
       - "8080"
-    privileged: yes
+      - "5000"
+    privileged: true
     volumes:
       - ./:/usr/local/code/faasm/
       - ./dev/faasm/build/:${FAASM_BUILD_MOUNT}
@@ -71,8 +90,6 @@ services:
       - CAPTURE_STDOUT=off
       - CGROUP_MODE=off
       - DELTA_SNAPSHOT_ENCODING=pages=64
-      - FILESERVER_URL=http://${UPLOAD_HOST:-upload}:8002
-      - FUNCTION_STORAGE=fileserver
       - IS_STORAGE_NODE=1
       - GLOBAL_MESSAGE_TIMEOUT=600000
       - LOG_LEVEL=debug
@@ -93,6 +110,30 @@ services:
     ports:
       - "8080:8080"
 
+  cpp:
+    image: ${CPP_CLI_IMAGE}
+    working_dir: /code/cpp
+    stdin_open: true
+    tty: true
+    depends_on:
+      - worker
+      - upload
+    volumes:
+      - ./clients/cpp:/code/cpp
+
+  python:
+    image: ${PYTHON_CLI_IMAGE}
+    working_dir: /code/python
+    stdin_open: true
+    tty: true
+    depends_on:
+      - worker
+      - upload
+    volumes:
+      - ./clients/python:/code/python
+
+  # --- Local cluster dev ---
+  # The following containers are only needed for local cluster dev
   faasm-cli:
     image: ${FAASM_CLI_IMAGE}
     working_dir: /usr/local/code/faasm
@@ -114,17 +155,3 @@ services:
       - ./:/usr/local/code/faasm/
       - ./dev/faasm/build/:/build/faasm/
       - ./dev/faasm-local:/usr/local/faasm
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /usr/bin/docker:/usr/bin/docker
-
-  cpp:
-    image: ${CPP_CLI_IMAGE}
-    working_dir: /code/cpp
-    stdin_open: true
-    tty: true
-    privileged: true
-    depends_on:
-      - faasm-cli
-    volumes:
-      - ./clients/cpp:/code/cpp
-      - ./dev/cpp/build:/build/cpp

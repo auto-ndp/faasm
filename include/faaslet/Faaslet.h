@@ -3,8 +3,8 @@
 #include <faabric/scheduler/ExecutorFactory.h>
 #include <faabric/scheduler/Scheduler.h>
 #include <faabric/util/func.h>
-#include <system/NetworkNamespace.h>
 
+#include <system/NetworkNamespace.h>
 #include <wasm/WasmModule.h>
 
 #include <string>
@@ -27,10 +27,10 @@ class Faaslet final : public faabric::scheduler::Executor
 
     faabric::util::SnapshotData snapshot() override;
 
+    void restore(faabric::Message& call) override;
+
   protected:
     void postFinish() override;
-
-    void restore(faabric::Message& call) override;
 
   private:
     bool isIsolated = false;

@@ -26,7 +26,7 @@ namespace wasm {
 static fs::path userObjectDirPath(const std::string& user)
 {
     auto& conf = conf::getFaasmConfig();
-    fs::path p(conf.sharedFilesStorageDir);
+    fs::path p(conf.sharedFilesDir);
     p /= "objstore";
     p /= user;
     fs::create_directories(p);

@@ -12,7 +12,7 @@ jobs:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-20.04
     container:
-      image: faasm/cli:0.6.1
+      image: faasm/cli:0.6.4
     defaults:
       run:
         working-directory: /usr/local/code/faasm
@@ -38,7 +38,7 @@ jobs:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-20.04
     container:
-      image: faasm/cpp-sysroot:0.0.24
+      image: faasm/cpp-sysroot:0.0.27
     defaults:
       run:
         working-directory: /__w/faasm/faasm/clients/cpp
@@ -80,7 +80,7 @@ jobs:
       - name: "Build CPython function"
         run: inv func
       - name: "Put Python functions in place"
-        run: inv func.uploadpy --local
+        run: inv func.upload-all --local
       - name: "Upload python wasm"
         uses: actions/upload-artifact@v2
         with:
@@ -90,7 +90,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: py-funcs
-          path: /usr/local/faasm/shared_store
+          path: /usr/local/faasm/shared
 
   build:
     if: github.event.pull_request.draft == false
@@ -99,21 +99,28 @@ jobs:
     env:
       CGROUP_MODE: off
       HOST_TYPE: ci
-      LOG_LEVEL: info
+      LOG_LEVEL: trace
       MAX_FAASLETS: 5
       NETNS_MODE: off
       REDIS_QUEUE_HOST: redis
       REDIS_STATE_HOST: redis
     container:
-      image: faasm/cli:0.6.1
+      image: faasm/cli:0.6.4
     defaults:
       run:
         working-directory: /usr/local/code/faasm
     services:
       redis:
-        image: faasm/redis:0.6.1
+        image: faasm/redis:0.6.4
         ports:
           - 6379:6379
+      minio:
+        image: faasm/minio:0.6.4
+        env:
+          MINIO_ROOT_USER: minio
+          MINIO_ROOT_PASSWORD: minio123
+        ports:
+          - 9000:9000
     steps:
       - name: "Fetch ref"
         run: git fetch origin ${GITHUB_REF}:ci-branch
@@ -121,6 +128,11 @@ jobs:
         run: git checkout --force ci-branch
       - name: "Update faabric submodule"
         run: git submodule update faabric
+      # --- Checks ---
+      - name: "Ping redis"
+        run: redis-cli -h redis ping
+      - name: "Ping minio"
+        run: curl -f http://minio:9000/minio/health/live
       # --- Get artifacts from other steps ---
       - name: "Download CPP wasm"
         uses: actions/download-artifact@v2
@@ -141,8 +153,8 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           name: py-funcs
-          path: /usr/local/faasm/shared_store
-      # --- CPU information ---
+          path: /usr/local/faasm/shared
+      # --- Host information ---
       - name: "CPU info"
         run: cat /proc/cpuinfo
       - name: "Get CPU model name"
@@ -179,6 +191,8 @@ jobs:
         uses: actions/checkout@v2
       - name: "Update faabric submodule"
         run: git submodule update --init faabric
+      - name: "Update cpp client submodule"
+        run: git submodule update --init clients/cpp
         # --- Set up and run ---
       - name: "Set up directory for wasm"
         run: mkdir -p ./dist-test/build/faasm-local
@@ -192,3 +206,40 @@ jobs:
       - name: "Run the distributed tests"
         run: ./dist-test/run.sh
 
+  quick-start:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    env:
+      PYTHON_CODEGEN: "on"
+    steps:
+      # --- Code update ---
+      - name: "Check out code"
+        uses: actions/checkout@v2
+      - name: "CPP submodule"
+        run: git submodule update --init clients/cpp
+      - name: "Python submodule"
+        run: git submodule update --init clients/python
+      # --- Setup ---
+      - name: "Start docker-compose"
+        run: docker-compose up -d
+      - name: "Wait for upload server to be available"
+        run: docker-compose exec -T worker /usr/local/code/faasm/bin/wait_for_upload.sh upload 8002
+      # --- CPP ---
+      - name: "Build cpp function"
+        run: docker-compose exec -T cpp inv func demo hello
+      - name: "Upload cpp function"
+        run: docker-compose exec -T cpp inv func.upload demo hello
+      - name: "Invoke cpp function"
+        run: docker-compose exec -T cpp inv func.invoke demo hello
+      # --- Python ---
+      - name: "Build python function"
+        run: docker-compose exec -T python inv func
+      - name: "Upload python runtime function"
+        run: docker-compose exec -T python inv func.upload
+      - name: "Upload python hello function"
+        run: docker-compose exec -T python inv func.uploadpy hello
+      - name: "Invoke python hello function"
+        run: docker-compose exec -T python inv func.invoke python hello
+      # --- Shutdown ---
+      - name: "Stop docker-compose"
+        run: docker-compose down

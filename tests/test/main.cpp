@@ -7,20 +7,24 @@
 #include <faabric/transport/context.h>
 #include <faabric/util/logging.h>
 
+#include <storage/S3Wrapper.h>
+
 FAABRIC_CATCH_LOGGER
 
 int main(int argc, char* argv[])
 {
-    faabric::transport::initGlobalMessageContext();
     faabric::util::initLogging();
+    storage::initFaasmS3();
+    faabric::transport::initGlobalMessageContext();
 
-    // Clean the system
     tests::cleanSystem();
 
     int result = Catch::Session().run(argc, argv);
 
     fflush(stdout);
     faabric::transport::closeGlobalMessageContext();
+
+    storage::shutdownFaasmS3();
 
     return result;
 }

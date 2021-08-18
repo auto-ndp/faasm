@@ -8,6 +8,7 @@
 #include <sys/types.h>
 
 #include <faabric/snapshot/SnapshotRegistry.h>
+#include <faabric/scheduler/Scheduler.h>
 #include <faabric/util/bytes.h>
 #include <faabric/util/config.h>
 #include <faabric/util/func.h>
@@ -922,10 +923,10 @@ int32_t WAVMWasmModule::executePthread(int threadPoolIdx,
                                        uint32_t stackTop,
                                        faabric::Message& msg)
 {
-
     std::string funcStr = faabric::util::funcToString(msg, false);
 
-    SPDLOG_DEBUG("Executing pthread {} for {}", threadPoolIdx, funcStr);
+    SPDLOG_DEBUG(
+      "WAVM module executing pthread {} for {}", threadPoolIdx, funcStr);
 
     Runtime::Function* funcInstance = getFunctionFromPtr(msg.funcptr());
 
@@ -1009,7 +1010,6 @@ U32 WAVMWasmModule::mmapFile(U32 fd, U32 length)
 
 U32 WAVMWasmModule::growMemory(U32 nBytes)
 {
-
     U64 maxPages = getMemoryType(defaultMemory).size.max;
 
     // Check if we just need the size
@@ -1567,8 +1567,7 @@ void WAVMWasmModule::executeWasmConstructorsFunction(Runtime::Instance* module)
                      result.i32);
         throw std::runtime_error(std::string(WASM_CTORS_FUNC_NAME) + " failed");
     }
-    SPDLOG_DEBUG("{} Successfully executed {} for {}/{}",
-                 gettid(),
+    SPDLOG_DEBUG("Successfully executed {} for {}/{}",
                  WASM_CTORS_FUNC_NAME,
                  boundUser,
                  boundFunction);

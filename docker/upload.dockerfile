@@ -1,13 +1,14 @@
 ARG FAASM_VERSION
 FROM kubasz51/faasm-base:${FAASM_VERSION}
 
-COPY . /usr/local/code/faasm
-
 # Build the upload and codegen targets
 WORKDIR /build/faasm
 RUN cmake --build . --target upload
 RUN cmake --build . --target codegen_shared_obj
 RUN cmake --build . --target codegen_func
+
+# Install hoststats
+RUN pip3 install hoststats
 
 # Set up entrypoint
 COPY bin/entrypoint_codegen.sh /entrypoint_codegen.sh

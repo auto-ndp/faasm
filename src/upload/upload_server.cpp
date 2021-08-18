@@ -1,3 +1,4 @@
+#include <storage/S3Wrapper.h>
 #include <upload/UploadServer.h>
 
 #include <faabric/state/StateServer.h>
@@ -7,6 +8,7 @@
 
 int main()
 {
+    storage::initFaasmS3();
     faabric::transport::initGlobalMessageContext();
     faabric::util::initLogging();
 
@@ -29,6 +31,7 @@ int main()
     }
 
     faabric::transport::closeGlobalMessageContext();
+    storage::shutdownFaasmS3();
 
     return 0;
 }

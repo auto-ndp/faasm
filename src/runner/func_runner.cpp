@@ -1,6 +1,6 @@
 #include <conf/FaasmConfig.h>
-#include <conf/function_utils.h>
 #include <faaslet/Faaslet.h>
+#include <storage/FileLoader.h>
 #include <wasm/WasmModule.h>
 
 #include <faabric/redis/Redis.h>
@@ -66,7 +66,13 @@ int doRunner(int argc, char* argv[])
     redis.flushAll();
 
     if (user == "python") {
-        conf::convertMessageToPython(msg);
+        msg.set_pythonuser(msg.user());
+        msg.set_pythonfunction(msg.function());
+        msg.set_ispython(true);
+
+        msg.set_user(PYTHON_USER);
+        msg.set_function(PYTHON_FUNC);
+
         SPDLOG_INFO("Running Python function {}/{}",
                     msg.pythonuser(),
                     msg.pythonfunction());
@@ -112,6 +118,7 @@ int doRunner(int argc, char* argv[])
 
 int main(int argc, char* argv[])
 {
+    storage::initFaasmS3();
     faabric::transport::initGlobalMessageContext();
 
     // WARNING: All 0MQ-related operations must take place in a self-contined
@@ -119,5 +126,6 @@ int main(int argc, char* argv[])
     int result = doRunner(argc, argv);
 
     faabric::transport::closeGlobalMessageContext();
+    storage::shutdownFaasmS3();
     return result;
 }

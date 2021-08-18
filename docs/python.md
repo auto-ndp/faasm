@@ -1,4 +1,4 @@
-# Python 
+# Python
 
 Faasm executes functions compiled to WebAssembly, which rules out _directly_
 executing languages which can't be compiled to WebAssembly. However, we can
@@ -11,29 +11,52 @@ repo](https://github.com/faasm/python).
 
 A separate Python library, [Pyfaasm](https://github.com/faasm/pyfaasm),
 contains the custom C-extensions and decorators to support the [Faasm host
-interface](host_interface.md). 
+interface](host_interface.md).
 
 ## Enabling Python support
 
 Full Python support is **not enabled by default**. To enable the Python runtime
-you must set up the relevant environment variables:
+you must set up the relevant environment variables for the `upload` container:
 
 ```bash
-# On the "upload" container/ endpoint (see docker-compose.yml locally)
-PYTHON_CODEGEN=on
+export PYTHON_CODEGEN=on
 ```
 
 The first time the system runs it will generate machine code for python and all
-the Python C-extensions. This can take around a minute. 
+the Python C-extensions. This can take up to a couple of minutes depending on
+your machine, but is a one-off job.
+
+In a local environment the `upload` container has a health check which you can
+inspect with:
+
+```bash
+docker ps
+```
+
+Or explicitly await with:
+
+```bash
+docker-compose exec worker /usr/local/code/faasm/bin/wait_for_upload.sh upload 8002
+```
 
 ## Running a Python function
 
 An example Python function is found at `func/python/hello.py`. This can be
-uploaded and invoked from the Faasm CLI with:
+uploaded and invoked from the Python CLI with:
 
 ```bash
-inv upload python hello --py
-inv invoke python hello --py
+# Run the Python CLI
+docker-compose exec python /bin/bash
+
+# Build and upload the Python runtime
+inv func
+inv func.upload
+
+# Upload the hello function
+inv func.uploadpy hello
+
+# Invoke the hello function
+inv func.invoke python hello
 ```
 
 This should give a message and the version of Python being run.

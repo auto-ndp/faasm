@@ -2,18 +2,32 @@ version: "3"
 
 services:
   redis:
-    image: kubasz51/faasm-redis:${FAASM_VERSION}
+    image: kubasz51/faasm-redis:0.6.1
+
+  minio:
+    image: faasm/minio:0.6.6
+    expose:
+      - "9000"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
+    volumes:
+      - ./dev/minio/data:/data/minio
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
 
   faabric-cli:
     image: ${FAABRIC_CLI_IMAGE}
     working_dir: /code/faabric
     stdin_open: true
     tty: true
-    privileged: true
     depends_on:
       - redis
+      - minio
     environment:
-      - FUNCTION_STORAGE=local
       - LOG_LEVEL=debug
       - REDIS_STATE_HOST=redis
       - REDIS_QUEUE_HOST=redis
@@ -21,8 +35,6 @@ services:
       - ./faabric:/code/faabric
       - ./dev/faabric/build:/build/faabric
       - ./dev/faasm-local:/usr/local/faasm
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /usr/bin/docker:/usr/bin/docker
 
   faasm-cli:
     image: ${FAASM_CLI_IMAGE}
@@ -32,6 +44,7 @@ services:
     privileged: true
     depends_on:
       - redis
+      - minio
     environment:
       - LOG_LEVEL=debug
       - REDIS_QUEUE_HOST=redis
@@ -41,17 +54,15 @@ services:
       - ./:/usr/local/code/faasm/
       - ./dev/faasm/build:/build/faasm/
       - ./dev/faasm-local:/usr/local/faasm
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /usr/bin/docker:/usr/bin/docker
 
   cpp-cli:
     image: ${CPP_CLI_IMAGE}
     working_dir: /code/cpp
     stdin_open: true
     tty: true
-    privileged: true
     depends_on:
       - redis
+      - minio
     environment:
       - LOG_LEVEL=debug
       - REDIS_STATE_HOST=redis
@@ -60,17 +71,15 @@ services:
       - ./clients/cpp:/code/cpp
       - ./dev/cpp/build:/build/cpp
       - ./dev/faasm-local:/usr/local/faasm
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /usr/bin/docker:/usr/bin/docker
 
   python-cli:
     image: ${PYTHON_CLI_IMAGE}
     working_dir: /code/python
     stdin_open: true
     tty: true
-    privileged: true
     depends_on:
       - redis
+      - minio
     environment:
       - LOG_LEVEL=debug
       - REDIS_STATE_HOST=redis
@@ -78,13 +87,10 @@ services:
     volumes:
       - ./clients/python:/code/python
       - ./dev/faasm-local:/usr/local/faasm
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /usr/bin/docker:/usr/bin/docker
 
   vector:
     image: netflixoss/vector:latest
     depends_on:
       - faasm-cli
-    network_mode: host
     ports:
       - "80:80"
