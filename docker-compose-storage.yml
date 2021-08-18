@@ -1,16 +1,17 @@
 version: "3"
 
 services:
+  # Storage
   redis-state:
     image: kubasz51/faasm-redis:${FAASM_VERSION}
+    ports:
+      - "6379:6379"
 
-  redis-queue:
-    image: kubasz51/faasm-redis:${FAASM_VERSION}
-
+  # Storage
   minio:
     image: kubasz51/faasm-minio:${FAASM_VERSION}
-    expose:
-      - "9000"
+    ports:
+      - "9000:9000"
     environment:
       MINIO_ROOT_USER: minio
       MINIO_ROOT_PASSWORD: minio123
@@ -22,12 +23,12 @@ services:
       timeout: 3s
       retries: 3
 
+  # Storage
   upload:
     image: kubasz51/faasm-upload:${FAASM_VERSION}
     ports:
       - "8002:8002"
-    expose:
-      - "5000"
+#      - "5000:5000"
     depends_on:
       - redis-queue
       - redis-state
@@ -38,8 +39,8 @@ services:
       - DELTA_SNAPSHOT_ENCODING=pages=64
       - LOG_LEVEL=debug
       - PYTHON_CODEGEN=${PYTHON_CODEGEN}
-      - REDIS_QUEUE_HOST=redis-queue
-      - REDIS_STATE_HOST=redis-state
+      - REDIS_QUEUE_HOST=${COMPUTE_NODE}
+      - REDIS_STATE_HOST=${STORAGE_NODE}
       - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8002/ping"]
@@ -47,45 +48,15 @@ services:
       timeout: 3s
       retries: 10
 
-  worker:
-    image: kubasz51/faasm-worker:${FAASM_VERSION}
-    depends_on:
-      - upload
-    expose:
-      - "8080"
-      - "5000"
-      - "8003-8010"
-    ports:
-      - "8080"
-    privileged: true
-    volumes:
-      - ./:/usr/local/code/faasm/
-      - ./dev/faasm/build/:${FAASM_BUILD_MOUNT}
-      - ./dev/container/shared_store/:/usr/local/faasm/debug_shared_store/
-      - ./bin/entrypoint_worker.sh:/entrypoint.sh
-    environment:
-      - CAPTURE_STDOUT=off
-      - CGROUP_MODE=off
-      - DELTA_SNAPSHOT_ENCODING=pages=64
-      - GLOBAL_MESSAGE_TIMEOUT=600000
-      - LOG_LEVEL=debug
-      - NETNS_MODE=off
-      - REDIS_QUEUE_HOST=redis-queue
-      - REDIS_STATE_HOST=redis-state
-      - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
-      - ENDPOINT_HOST=worker
-      - OVERRIDE_CPU_COUNT=1
-
+  # Storage
   worker-storage:
     image: kubasz51/faasm-worker-storage:${FAASM_VERSION}
     depends_on:
       - upload
-    expose:
-      - "8080"
-      - "5000"
-      - "8003-8010"
     ports:
-      - "8080"
+      - "8080:8080"
+      - "5000:5000"
+      - "8003-8010:8003-8010"
     privileged: true
     volumes:
       - ./:/usr/local/code/faasm/
@@ -100,22 +71,13 @@ services:
       - GLOBAL_MESSAGE_TIMEOUT=600000
       - LOG_LEVEL=debug
       - NETNS_MODE=off
-      - REDIS_QUEUE_HOST=redis-queue
-      - REDIS_STATE_HOST=redis-state
+      - REDIS_QUEUE_HOST=${COMPUTE_NODE}
+      - REDIS_STATE_HOST=${STORAGE_NODE}
       - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
-      - ENDPOINT_HOST=worker-storage
+      - ENDPOINT_HOST=${STORAGE_NODE}
       - OVERRIDE_CPU_COUNT=1
 
-  nginx:
-    image: nginx:latest
-    volumes:
-      - ./deploy/conf/nginx-local.conf:/etc/nginx/nginx.conf:ro
-    depends_on:
-      - worker
-      - worker-storage
-    ports:
-      - "8080:8080"
-
+  # Both
   cpp:
     image: ${CPP_CLI_IMAGE}
     working_dir: /code/cpp
@@ -124,9 +86,13 @@ services:
     depends_on:
       - worker
       - upload
+    environment:
+      - UPLOAD_HOST=${STORAGE_NODE}
+      - INVOKE_HOST=${COMPUTE_NODE}
     volumes:
       - ./clients/cpp:/code/cpp
 
+  # Both
   python:
     image: ${PYTHON_CLI_IMAGE}
     working_dir: /code/python
@@ -135,11 +101,15 @@ services:
     depends_on:
       - worker
       - upload
+    environment:
+      - UPLOAD_HOST=${STORAGE_NODE}
+      - INVOKE_HOST=${COMPUTE_NODE}
     volumes:
       - ./clients/python:/code/python
 
   # --- Local cluster dev ---
   # The following containers are only needed for local cluster dev
+  # Both
   faasm-cli:
     image: ${FAASM_CLI_IMAGE}
     working_dir: /usr/local/code/faasm
@@ -151,11 +121,11 @@ services:
       - worker-storage
       - nginx
     environment:
-      - UPLOAD_HOST=${UPLOAD_HOST:-upload}
-      - INVOKE_HOST=${INVOKE_HOST:-nginx}
+      - UPLOAD_HOST=${STORAGE_NODE}
+      - INVOKE_HOST=${COMPUTE_NODE}
       - LOG_LEVEL=debug
-      - REDIS_QUEUE_HOST=redis-queue
-      - REDIS_STATE_HOST=redis-state
+      - REDIS_QUEUE_HOST=${COMPUTE_NODE}
+      - REDIS_STATE_HOST=${STORAGE_NODE}
       - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
     volumes:
       - ./:/usr/local/code/faasm/
