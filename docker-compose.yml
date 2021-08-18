@@ -2,13 +2,13 @@ version: "3"
 
 services:
   redis-state:
-    image: kubasz51/faasm-redis:0.6.1
+    image: kubasz51/faasm-redis:${FAASM_VERSION}
 
   redis-queue:
-    image: kubasz51/faasm-redis:0.6.1
+    image: kubasz51/faasm-redis:${FAASM_VERSION}
 
   minio:
-    image: faasm/minio:0.6.6
+    image: kubasz51/faasm-minio:${FAASM_VERSION}
     expose:
       - "9000"
     environment:

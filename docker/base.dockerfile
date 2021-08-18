@@ -1,5 +1,5 @@
 # Stage to extract Python runtime files
-FROM kubasz51/faasm-cpython:0.0.12 as python
+FROM kubasz51/faasm-cpython:0.0.13 as python
 
 # Import from SGX container
 FROM kubasz51/faasm-sgx:0.6.1 as sgx
