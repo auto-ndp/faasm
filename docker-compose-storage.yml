@@ -28,9 +28,7 @@ services:
     image: kubasz51/faasm-upload:${FAASM_VERSION}
     ports:
       - "8002:8002"
-#      - "5000:5000"
     depends_on:
-#      - redis-queue
       - redis-state
       - minio
     volumes:
@@ -84,7 +82,6 @@ services:
     stdin_open: true
     tty: true
     depends_on:
-#      - worker
       - upload
     environment:
       - UPLOAD_HOST=${STORAGE_NODE}
@@ -99,7 +96,6 @@ services:
     stdin_open: true
     tty: true
     depends_on:
-#      - worker
       - upload
     environment:
       - UPLOAD_HOST=${STORAGE_NODE}
@@ -117,9 +113,7 @@ services:
     tty: true
     privileged: true
     depends_on:
-#      - worker
       - worker-storage
-#      - nginx
     environment:
       - UPLOAD_HOST=${STORAGE_NODE}
       - INVOKE_HOST=${COMPUTE_NODE}
