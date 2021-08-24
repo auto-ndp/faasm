@@ -11,7 +11,7 @@ services:
   worker:
     image: kubasz51/faasm-worker:${FAASM_VERSION}
     depends_on:
-      - upload
+#      - upload
     ports:
       - "8080:8080"
 #      - "5000:5000"
@@ -42,7 +42,7 @@ services:
       - ./deploy/conf/nginx-local.conf:/etc/nginx/nginx.conf:ro
     depends_on:
       - worker
-      - worker-storage
+#      - worker-storage
     ports:
       - "8081:8080"
 
@@ -54,7 +54,7 @@ services:
     tty: true
     depends_on:
       - worker
-      - upload
+#      - upload
     environment:
       - UPLOAD_HOST=${STORAGE_NODE}
       - INVOKE_HOST=${COMPUTE_NODE}
@@ -69,7 +69,7 @@ services:
     tty: true
     depends_on:
       - worker
-      - upload
+#      - upload
     environment:
       - UPLOAD_HOST=${STORAGE_NODE}
       - INVOKE_HOST=${COMPUTE_NODE}
@@ -87,7 +87,7 @@ services:
     privileged: true
     depends_on:
       - worker
-      - worker-storage
+#      - worker-storage
       - nginx
     environment:
       - UPLOAD_HOST=${STORAGE_NODE}
