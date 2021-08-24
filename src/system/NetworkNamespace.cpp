@@ -36,7 +36,7 @@ std::shared_ptr<NetworkNamespace> claimNetworkNamespace()
             // Note that the availability of namespaces depends on the Faasm
             // configuration for the relevant host
             // TODO - connect these two up properly
-            int nNamespaces = faabric::util::getUsableCores() * 10;
+            int nNamespaces = 1024;
 
             for (int i = 0; i < nNamespaces; i++) {
                 std::string netnsName = BASE_NETNS_NAME + std::to_string(i);
