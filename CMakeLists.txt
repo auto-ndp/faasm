@@ -120,8 +120,8 @@ if(BUILD_SHARED_LIBS)
 elseif(FAABRIC_BUILD_TESTS)
     add_subdirectory(tests/dist)
     add_subdirectory(tests/test)
-    add_subdirectory(tests/utils)
 endif()
+add_subdirectory(tests/utils)
 
 # Install headers
 install(

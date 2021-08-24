@@ -272,6 +272,18 @@ void Executor::threadPoolThread(int threadPoolIdx)
             faabric::util::resetDirtyTracking();
         }
 
+        // Finally set the result of the task, this will allow anything waiting
+        // on its result to continue execution, therefore must be done once the
+        // executor has been reset, otherwise the executor may not be reused for
+        // a repeat invocation.
+        if (isThreads) {
+            // Set non-final thread result
+            sch.setThreadResult(msg, returnValue);
+        } else {
+            // Set normal function result
+            sch.setFunctionResult(msg);
+        }
+
         // If this batch is finished, reset the executor and release its claim.
         // Note that we have to release the claim _after_ resetting, otherwise
         // the executor won't be ready for reuse.
@@ -290,18 +302,6 @@ void Executor::threadPoolThread(int threadPoolIdx)
         // releasing the claim on this executor, otherwise the scheduler may try
         // to schedule another function and be unable to reuse this executor.
         sch.vacateSlot();
-
-        // Finally set the result of the task, this will allow anything waiting
-        // on its result to continue execution, therefore must be done once the
-        // executor has been reset, otherwise the executor may not be reused for
-        // a repeat invocation.
-        if (isThreads) {
-            // Set non-final thread result
-            sch.setThreadResult(msg, returnValue);
-        } else {
-            // Set normal function result
-            sch.setFunctionResult(msg);
-        }
     }
 
     if (selfShutdown) {
