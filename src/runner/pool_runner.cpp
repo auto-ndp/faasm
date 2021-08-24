@@ -1,9 +1,11 @@
+#include <conf/FaasmConfig.h>
 #include <faaslet/Faaslet.h>
 #include <storage/S3Wrapper.h>
 
 #include <faabric/endpoint/FaabricEndpoint.h>
 #include <faabric/runner/FaabricMain.h>
 #include <faabric/transport/context.h>
+#include <faabric/util/config.h>
 #include <faabric/util/logging.h>
 
 int main()
@@ -18,6 +20,9 @@ int main()
         auto fac = std::make_shared<faaslet::FaasletFactory>();
         faabric::runner::FaabricMain m(fac);
         m.startBackground();
+
+        faabric::util::getSystemConfig().print();
+        conf::getFaasmConfig().print();
 
         // Start endpoint (will also have multiple threads)
         SPDLOG_INFO("Starting endpoint");

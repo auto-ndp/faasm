@@ -317,7 +317,6 @@ endif ()
 
 
 add_library(faasm_sgx STATIC
-        ${FAASM_SGX_HEADERS}
         ${FAASM_SGX_SRC}
         ${FAASM_SGX_ASM_SRC}
         )
@@ -358,22 +357,24 @@ target_link_options(faasm_sgx PUBLIC
         )
 
 if (FAASM_SGX_SIM_MODE)
-    target_link_libraries(faasm_sgx
+    target_link_libraries(faasm_sgx PUBLIC
             ${SGX_SDK_LIB_PATH}/libsgx_urts_sim.so
             ${SGX_SDK_LIB_PATH}/libsgx_uae_service_sim.so
             )
 else ()
-    target_link_libraries(faasm_sgx
+    target_link_libraries(faasm_sgx PUBLIC
             ${SGX_SDK_LIB_PATH}/libsgx_urts.so
             ${SGX_SDK_LIB_PATH}/libsgx_uae_service.so
             )
 endif ()
 
-target_link_libraries(faasm_sgx
+target_link_libraries(faasm_sgx PUBLIC
         Threads::Threads
         wamr_sgx_untrusted
         wasm
         )
+
+add_library(faasm::sgx ALIAS faasm_sgx)
 
 # --------------------------------------------------------
 # Trusted enclave build + Signature

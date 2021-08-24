@@ -9,6 +9,7 @@ endif()
 include_directories(
         ${CMAKE_CURRENT_LIST_DIR}
         ${CMAKE_CURRENT_LIST_DIR}/../utils
+        ${CMAKE_CURRENT_LIST_DIR}/../../faabric/tests/utils
 )
 
 add_executable(

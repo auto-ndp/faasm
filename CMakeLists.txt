@@ -159,6 +159,11 @@ include_directories(
     ${FAASM_PYTHON_LIB_DIR}
 )
 
+# Faasm SGX support
+if (SGX_FOUND)
+    add_subdirectory(src/sgx)
+endif ()
+
 # Faasm runtime
 add_subdirectory(src/codegen)
 add_subdirectory(src/conf)
@@ -171,11 +176,6 @@ add_subdirectory(src/upload)
 add_subdirectory(src/wasm)
 add_subdirectory(src/wamr)
 add_subdirectory(src/wavm)
-
-# Faasm SGX support
-if (SGX_FOUND)
-    add_subdirectory(src/sgx)
-endif ()
 
 # Tests
 add_subdirectory(tests/test)

@@ -8,7 +8,7 @@ include_directories(${CMAKE_INSTALL_PREFIX}/include)
 # Tightly-coupled dependencies
 set(FETCHCONTENT_QUIET OFF)
 FetchContent_Declare(wavm_ext
-    GIT_REPOSITORY "https://github.com/faasm/WAVM.git"
+    GIT_REPOSITORY "https://github.com/auto-ndp/WAVM.git"
     GIT_TAG "faasm"
     CMAKE_ARGS "-DDLL_EXPORT= \
         -DDLL_IMPORT="

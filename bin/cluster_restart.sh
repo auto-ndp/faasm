@@ -9,6 +9,8 @@ pushd ${PROJ_ROOT} > /dev/null
 
 source ./bin/cluster_env.sh
 
+echo FAASM_BUILD_MOUNT: $FAASM_BUILD_MOUNT
+
 docker-compose -f docker-compose.yml \
     up \
     --force-recreate \
