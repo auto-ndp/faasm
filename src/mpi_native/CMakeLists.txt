@@ -37,7 +37,7 @@ set(FAABRIC_LIB_DIR "/build/faabric/install/lib")
 target_link_libraries(faabricmpi_native 
     faabric
     faabricmpi
-    ${FAABRIC_LIB_DIR}/libpistache.so
+    ${FAABRIC_LIB_DIR}/${PISTACHE_LIBNAME}
     ${FAABRIC_LIB_DIR}/libprotobuf.so
     ${FAABRIC_LIB_DIR}/libzmq.so
 )

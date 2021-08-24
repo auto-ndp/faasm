@@ -45,7 +45,8 @@ set_target_properties(flatbuffers_imported
 )
 
 # Pistache
-set(PISTACHE_LIBRARY ${CMAKE_INSTALL_PREFIX}/lib/libpistache-0.0.002-git20210107.so)
+set(PISTACHE_LIBNAME libpistache-0.0.002-git20210107.so)
+set(PISTACHE_LIBRARY ${CMAKE_INSTALL_PREFIX}/lib/${PISTACHE_LIBNAME})
 ExternalProject_Add(pistache_ext
     GIT_REPOSITORY "https://github.com/pistacheio/pistache.git"
     GIT_TAG "cfd5322e80a31f00e966c23f6bbb9cae67b48bfd"

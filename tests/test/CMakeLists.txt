@@ -12,7 +12,7 @@ add_executable(
 )
 
 target_link_libraries(faabric_tests 
-    faabric_test_utils
+    faabric::test_utils
 )
 
 add_test(NAME faabric_tests COMMAND "tests/test/faabric_tests")
