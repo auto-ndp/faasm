@@ -61,7 +61,7 @@ services:
     volumes:
       - ./:/usr/local/code/faasm/
       - ./dev/faasm/build/:${FAASM_BUILD_MOUNT}
-      - ./dev/container/shared_store/:/usr/local/faasm/shared_store/
+      - ./dev/container/shared_store/:/usr/local/faasm/shared/
       - ./bin/entrypoint_worker.sh:/entrypoint.sh
     environment:
       - CAPTURE_STDOUT=off

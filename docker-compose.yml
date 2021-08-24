@@ -72,7 +72,7 @@ services:
       - NETNS_MODE=off
       - REDIS_QUEUE_HOST=redis-queue
       - REDIS_STATE_HOST=redis-state
-      - STATE_MODE=redis
+      - STATE_MODE=inmemory
       - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
       - ENDPOINT_HOST=worker
       - OVERRIDE_CPU_COUNT=1
@@ -91,7 +91,7 @@ services:
     volumes:
       - ./:/usr/local/code/faasm/
       - ./dev/faasm/build/:${FAASM_BUILD_MOUNT}
-      - ./dev/container/shared_store/:/usr/local/faasm/shared_store/
+      - ./dev/container/shared_store/:/usr/local/faasm/shared/
       - ./bin/entrypoint_worker.sh:/entrypoint.sh
     environment:
       - CAPTURE_STDOUT=off
@@ -103,7 +103,7 @@ services:
       - NETNS_MODE=off
       - REDIS_QUEUE_HOST=redis-queue
       - REDIS_STATE_HOST=redis-state
-      - STATE_MODE=redis
+      - STATE_MODE=inmemory
       - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
       - ENDPOINT_HOST=worker-storage
       - OVERRIDE_CPU_COUNT=1
