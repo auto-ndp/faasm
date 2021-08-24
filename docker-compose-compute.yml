@@ -29,6 +29,7 @@ services:
       - NETNS_MODE=off
       - REDIS_QUEUE_HOST=${COMPUTE_NODE}
       - REDIS_STATE_HOST=${STORAGE_NODE}
+      - S3_HOST=${STORAGE_NODE}
       - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
       - ENDPOINT_HOST=${COMPUTE_NODE}
       - OVERRIDE_CPU_COUNT=1
@@ -54,6 +55,7 @@ services:
     environment:
       - UPLOAD_HOST=${STORAGE_NODE}
       - INVOKE_HOST=${COMPUTE_NODE}
+      - S3_HOST=${STORAGE_NODE}
     volumes:
       - ./clients/cpp:/code/cpp
 
@@ -68,6 +70,7 @@ services:
     environment:
       - UPLOAD_HOST=${STORAGE_NODE}
       - INVOKE_HOST=${COMPUTE_NODE}
+      - S3_HOST=${STORAGE_NODE}
     volumes:
       - ./clients/python:/code/python
 
@@ -89,6 +92,7 @@ services:
       - LOG_LEVEL=debug
       - REDIS_QUEUE_HOST=${COMPUTE_NODE}
       - REDIS_STATE_HOST=${STORAGE_NODE}
+      - S3_HOST=${STORAGE_NODE}
       - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
     volumes:
       - ./:/usr/local/code/faasm/
