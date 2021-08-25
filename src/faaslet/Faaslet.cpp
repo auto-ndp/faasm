@@ -69,14 +69,14 @@ Faaslet::Faaslet(faabric::Message& msg)
         if (msg.issgx()) {
             module = std::make_unique<wasm::SGXWAMRWasmModule>();
         } else {
-            module = std::make_unique<wasm::WAMRWasmModule>(threadPoolSize);
+            module = std::make_unique<wasm::WAMRWasmModule>(1);
         }
 #else
         // Vanilla WAMR
-        module = std::make_unique<wasm::WAMRWasmModule>(threadPoolSize);
+        module = std::make_unique<wasm::WAMRWasmModule>(1);
 #endif
     } else if (conf.wasmVm == "wavm") {
-        module = std::make_unique<wasm::WAVMWasmModule>(threadPoolSize);
+        module = std::make_unique<wasm::WAVMWasmModule>(1);
     } else {
 
         SPDLOG_ERROR("Unrecognised wasm VM: {}", conf.wasmVm);
