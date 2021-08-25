@@ -6,6 +6,7 @@
 
 #include <faabric/util/bytes.h>
 #include <faabric/util/gids.h>
+#include <faabric/util/timing.h>
 #include <thread>
 
 namespace faabric::redis {
@@ -119,6 +120,7 @@ long getLongFromReply(redisReply* reply)
 
 std::vector<uint8_t> getBytesFromReply(redisReply* reply)
 {
+    ZoneScopedNS("Redis::getBytesFromReply", 6);
     // We have to be careful here to handle the bytes properly
     char* resultArray = reply->str;
     int resultLen = reply->len;
@@ -133,6 +135,7 @@ void getBytesFromReply(const std::string& key,
                        uint8_t* buffer,
                        size_t bufferLen)
 {
+    ZoneScopedNS("Redis::getBytesFromReplyCopy", 6);
     // We have to be careful here to handle the bytes properly
     char* resultArray = reply->str;
     int resultLen = reply->len;
@@ -188,6 +191,7 @@ void Redis::ping()
 
 size_t Redis::strlen(const std::string& key)
 {
+    ZoneScopedNS("Redis::strlen", 6);
     auto reply = (redisReply*)redisCommand(context, "STRLEN %s", key.c_str());
 
     size_t result = reply->integer;
@@ -197,6 +201,7 @@ size_t Redis::strlen(const std::string& key)
 
 void Redis::get(const std::string& key, uint8_t* buffer, size_t size)
 {
+    ZoneScopedNS("Redis::get", 6);
     auto reply = (redisReply*)redisCommand(context, "GET %s", key.c_str());
 
     getBytesFromReply(key, reply, buffer, size);
@@ -205,6 +210,7 @@ void Redis::get(const std::string& key, uint8_t* buffer, size_t size)
 
 std::vector<uint8_t> Redis::get(const std::string& key)
 {
+    ZoneScopedNS("Redis::get", 6);
     auto reply = (redisReply*)redisCommand(context, "GET %s", key.c_str());
 
     const std::vector<uint8_t> replyBytes = getBytesFromReply(reply);
@@ -215,6 +221,7 @@ std::vector<uint8_t> Redis::get(const std::string& key)
 
 long Redis::getCounter(const std::string& key)
 {
+    ZoneScopedNS("Redis::get", 6);
     auto reply = (redisReply*)redisCommand(context, "GET %s", key.c_str());
 
     if (reply == nullptr || reply->type == REDIS_REPLY_NIL || reply->len == 0) {
@@ -226,6 +233,7 @@ long Redis::getCounter(const std::string& key)
 
 long Redis::incr(const std::string& key)
 {
+    ZoneScopedNS("Redis::incr", 6);
     auto reply = (redisReply*)redisCommand(context, "INCR %s", key.c_str());
 
     long result = reply->integer;
@@ -236,6 +244,7 @@ long Redis::incr(const std::string& key)
 
 long Redis::decr(const std::string& key)
 {
+    ZoneScopedNS("Redis::decr", 6);
     auto reply = (redisReply*)redisCommand(context, "DECR %s", key.c_str());
     long result = reply->integer;
     freeReplyObject(reply);
@@ -245,6 +254,7 @@ long Redis::decr(const std::string& key)
 
 long Redis::incrByLong(const std::string& key, long val)
 {
+    ZoneScopedNS("Redis::incrBy", 6);
     // Format is NOT printf compatible contrary to what the docs say, hence %i
     // instead of %l.
     auto reply =
@@ -258,6 +268,7 @@ long Redis::incrByLong(const std::string& key, long val)
 
 long Redis::decrByLong(const std::string& key, long val)
 {
+    ZoneScopedNS("Redis::decrBy", 6);
     // Format is NOT printf compatible contrary to what the docs say, hence %i
     // instead of %l.
     auto reply =
@@ -276,6 +287,7 @@ void Redis::set(const std::string& key, const std::vector<uint8_t>& value)
 
 void Redis::set(const std::string& key, const uint8_t* value, size_t size)
 {
+    ZoneScopedNS("Redis::set", 6);
     auto reply =
       (redisReply*)redisCommand(context, "SET %s %b", key.c_str(), value, size);
 
@@ -288,6 +300,7 @@ void Redis::set(const std::string& key, const uint8_t* value, size_t size)
 
 void Redis::del(const std::string& key)
 {
+    ZoneScopedNS("Redis::del", 6);
     auto reply = (redisReply*)redisCommand(context, "DEL %s", key.c_str());
     freeReplyObject(reply);
 }
@@ -336,6 +349,7 @@ void Redis::flushPipeline(long pipelineLength)
 
 void Redis::sadd(const std::string& key, const std::string& value)
 {
+    ZoneScopedNS("Redis::sadd", 6);
     auto reply = (redisReply*)redisCommand(
       context, "SADD %s %s", key.c_str(), value.c_str());
     if (reply->type == REDIS_REPLY_ERROR) {
@@ -348,6 +362,7 @@ void Redis::sadd(const std::string& key, const std::string& value)
 
 void Redis::srem(const std::string& key, const std::string& value)
 {
+    ZoneScopedNS("Redis::srem", 6);
     auto reply = (redisReply*)redisCommand(
       context, "SREM %s %s", key.c_str(), value.c_str());
     freeReplyObject(reply);
@@ -366,6 +381,7 @@ long Redis::scard(const std::string& key)
 
 bool Redis::sismember(const std::string& key, const std::string& value)
 {
+    ZoneScopedNS("Redis::sismember", 6);
     auto reply = (redisReply*)redisCommand(
       context, "SISMEMBER %s %s", key.c_str(), value.c_str());
 
@@ -378,6 +394,7 @@ bool Redis::sismember(const std::string& key, const std::string& value)
 
 std::string Redis::srandmember(const std::string& key)
 {
+    ZoneScopedNS("Redis::srandmember", 6);
     auto reply =
       (redisReply*)redisCommand(context, "SRANDMEMBER %s", key.c_str());
 
@@ -403,6 +420,7 @@ std::set<std::string> extractStringSetFromReply(redisReply* reply)
 
 std::set<std::string> Redis::smembers(const std::string& key)
 {
+    ZoneScopedNS("Redis::smembers", 6);
     auto reply = (redisReply*)redisCommand(context, "SMEMBERS %s", key.c_str());
     std::set<std::string> result = extractStringSetFromReply(reply);
 
@@ -413,6 +431,7 @@ std::set<std::string> Redis::smembers(const std::string& key)
 std::set<std::string> Redis::sinter(const std::string& keyA,
                                     const std::string& keyB)
 {
+    ZoneScopedNS("Redis::sinter", 6);
     auto reply = (redisReply*)redisCommand(
       context, "SINTER %s %s", keyA.c_str(), keyB.c_str());
     std::set<std::string> result = extractStringSetFromReply(reply);
@@ -424,6 +443,7 @@ std::set<std::string> Redis::sinter(const std::string& keyA,
 std::set<std::string> Redis::sdiff(const std::string& keyA,
                                    const std::string& keyB)
 {
+    ZoneScopedNS("Redis::sdiff", 6);
     auto reply = (redisReply*)redisCommand(
       context, "SDIFF %s %s", keyA.c_str(), keyB.c_str());
     std::set<std::string> result = extractStringSetFromReply(reply);
@@ -434,6 +454,7 @@ std::set<std::string> Redis::sdiff(const std::string& keyA,
 
 int Redis::lpushLong(const std::string& key, long value)
 {
+    ZoneScopedNS("Redis::lpushLong", 6);
     auto reply =
       (redisReply*)redisCommand(context, "LPUSH %s %i", key.c_str(), value);
     long long int result = reply->integer;
@@ -444,6 +465,7 @@ int Redis::lpushLong(const std::string& key, long value)
 
 int Redis::rpushLong(const std::string& key, long value)
 {
+    ZoneScopedNS("Redis::rpushLong", 6);
     auto reply =
       (redisReply*)redisCommand(context, "RPUSH %s %i", key.c_str(), value);
     long long int result = reply->integer;
@@ -459,6 +481,7 @@ void Redis::flushAll()
 
 long Redis::listLength(const std::string& queueName)
 {
+    ZoneScopedNS("Redis::listLength", 6);
     auto reply =
       (redisReply*)redisCommand(context, "LLEN %s", queueName.c_str());
 
@@ -474,6 +497,7 @@ long Redis::listLength(const std::string& queueName)
 
 long Redis::getTtl(const std::string& key)
 {
+    ZoneScopedNS("Redis::getTtl", 6);
     auto reply = (redisReply*)redisCommand(context, "TTL %s", key.c_str());
 
     long ttl = reply->integer;
@@ -484,6 +508,7 @@ long Redis::getTtl(const std::string& key)
 
 void Redis::expire(const std::string& key, long expiry)
 {
+    ZoneScopedNS("Redis::expire", 6);
     auto reply =
       (redisReply*)redisCommand(context, "EXPIRE %s %d", key.c_str(), expiry);
     freeReplyObject(reply);
@@ -503,6 +528,7 @@ void Redis::getRange(const std::string& key,
                      long start,
                      long end)
 {
+    ZoneScopedNS("Redis::getRange", 6);
     size_t rangeLen = (size_t)end - start;
     if (rangeLen > bufferLen) {
         throw std::runtime_error(
@@ -525,6 +551,7 @@ void Redis::getRange(const std::string& key,
 
 uint32_t Redis::acquireLock(const std::string& key, int expirySeconds)
 {
+    ZoneScopedNS("Redis::acquireLock", 6);
     // Implementation of single host redlock algorithm
     // https://redis.io/topics/distlock
     uint32_t lockId = faabric::util::generateGid();
@@ -541,6 +568,7 @@ uint32_t Redis::acquireLock(const std::string& key, int expirySeconds)
 
 void Redis::releaseLock(const std::string& key, uint32_t lockId)
 {
+    ZoneScopedNS("Redis::releaseLock", 6);
     std::string lockKey = key + "_lock";
     this->delIfEq(lockKey, lockId);
 }
@@ -580,6 +608,7 @@ bool Redis::setnxex(const std::string& key, long value, int expirySeconds)
 
 long Redis::getLong(const std::string& key)
 {
+    ZoneScopedNS("Redis::getLong", 6);
     auto reply = (redisReply*)redisCommand(context, "GET %s", key.c_str());
 
     long res = getLongFromReply(reply);
@@ -590,6 +619,7 @@ long Redis::getLong(const std::string& key)
 
 void Redis::setLong(const std::string& key, long value)
 {
+    ZoneScopedNS("Redis::setLong", 6);
     // Format is NOT printf compatible contrary to what the docs say, hence %i
     // instead of %l.
     auto reply =
@@ -619,6 +649,7 @@ void Redis::enqueueBytes(const std::string& queueName,
                          const uint8_t* buffer,
                          size_t bufferLen)
 {
+    ZoneScopedNS("Redis::enqueueBytes", 6);
     // NOTE: Here we must be careful with the input and specify bytes rather
     // than a string otherwise an encoded false boolean can be treated as a
     // string terminator
@@ -638,6 +669,7 @@ void Redis::enqueueBytes(const std::string& queueName,
 
 redisReply* Redis::dequeueBase(const std::string& queueName, int timeoutMs)
 {
+    ZoneScopedNS("Redis::dequeueBase", 6);
     // NOTE - we contradict the default redis behaviour here by doing a
     // non-blocking pop when timeout is zero (rather than infinite as in Redis)
     bool isBlocking = timeoutMs > 0;

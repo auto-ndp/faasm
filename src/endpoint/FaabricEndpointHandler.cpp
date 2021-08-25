@@ -9,6 +9,9 @@
 #include <syscall.h>
 
 namespace faabric::endpoint {
+
+thread_local bool registered_with_tracy = false;
+
 void FaabricEndpointHandler::onTimeout(const Pistache::Http::Request& request,
                                        Pistache::Http::ResponseWriter writer)
 {
@@ -18,6 +21,10 @@ void FaabricEndpointHandler::onTimeout(const Pistache::Http::Request& request,
 void FaabricEndpointHandler::onRequest(const Pistache::Http::Request& request,
                                        Pistache::Http::ResponseWriter response)
 {
+    if (!registered_with_tracy) {
+        registered_with_tracy = true;
+        tracy::SetThreadName("Pistache HTTP thread");
+    }
     SPDLOG_DEBUG("Faabric handler received request");
     ZoneScopedNS("HTTP request", 4);
 

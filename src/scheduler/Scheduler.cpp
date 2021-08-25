@@ -876,6 +876,7 @@ faabric::Message Scheduler::getFunctionResult(unsigned int messageId,
     }
 
     redis::Redis& redis = redis::Redis::getQueue();
+    TracyMessageL("Got redis queue");
 
     bool isBlocking = timeoutMs > 0;
 
@@ -886,6 +887,7 @@ faabric::Message Scheduler::getFunctionResult(unsigned int messageId,
     if (isBlocking) {
         // Blocking version will throw an exception when timing out
         // which is handled by the caller.
+        TracyMessageL("Dequeueing bytes");
         std::vector<uint8_t> result = redis.dequeueBytes(resultKey, timeoutMs);
         ZoneScopedN("Parse result message");
         msgResult.ParseFromArray(result.data(), (int)result.size());
