@@ -9,6 +9,7 @@ ninja-build/
 faasm.ini
 perf.data
 perf.data.*
+/wrk-*.lua
 
 # Ignore the top-level wasm directory (note the leading slash)
 /wasm/
