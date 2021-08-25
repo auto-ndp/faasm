@@ -189,10 +189,12 @@ I32 storageCallAndAwaitImpl(I32 wasmFuncPtr, I32 pyFuncNamePtr)
         zygoteSnap.fd = -1;
         zygoteSnap.data = zygoteSnapshot;
         zygoteSnap.size = zygoteSnapshotKV->size();
-        auto zygoteDelta = faabric::util::bytesToString(thisModule->deltaSnapshot(zygoteSnap));
+        auto zygoteDelta =
+          faabric::util::bytesToString(thisModule->deltaSnapshot(zygoteSnap));
 
-        SPDLOG_DEBUG("NDP sending snapshot of {} bytes",
-                     zygoteDelta.size());
+        SPDLOG_INFO("{} - NDP sending snapshot of {} bytes",
+                    call->id(),
+                    zygoteDelta.size());
         int ndpCallId = chainNdpCall(
           zygoteDelta, call->inputdata(), wasmFuncPtr, pyFuncName.c_str());
         faabric::Message ndpResult = awaitChainedCallMessage(ndpCallId);
@@ -204,8 +206,9 @@ I32 storageCallAndAwaitImpl(I32 wasmFuncPtr, I32 pyFuncNamePtr)
             return ndpResult.returnvalue();
         }
 
-        SPDLOG_DEBUG("NDP delta restore from {} bytes",
-                     ndpResult.outputdata().size());
+        SPDLOG_INFO("{} - NDP delta restore from {} bytes",
+                    call->id(),
+                    ndpResult.outputdata().size());
         // faabric::util::writeBytesToFile(
         //   "/usr/local/faasm/debug_shared_store/debug_delta.bin",
         //   faabric::util::stringToBytes(ndpResult.outputdata()));
