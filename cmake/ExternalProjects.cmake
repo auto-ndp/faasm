@@ -135,6 +135,7 @@ target_compile_definitions(TracyClient PUBLIC
     TRACY_NO_BROADCAST
     TRACY_NO_FRAME_IMAGE
     TRACY_NO_VSYNC_CAPTURE
+    TRACY_DELAYED_INIT
     TRACY_PORT=8086 # 8086 is the default
 )
 if(BUILD_SHARED_LIBS)
