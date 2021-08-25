@@ -187,7 +187,7 @@ void Executor::executeTasks(std::vector<int> msgIdxs,
 void Executor::threadPoolThread(int threadPoolIdx)
 {
     SPDLOG_DEBUG("Thread pool thread {}:{} starting up", id, threadPoolIdx);
-    tracy::SetThreadName(("Executor threadPoolThread: "+this->id).c_str());
+    tracy::SetThreadName(("Executor threadPoolThread: "+this->id+" "+faabric::util::funcToString(this->boundMessage, false)).c_str());
 
     auto& sch = faabric::scheduler::getScheduler();
     const auto& conf = faabric::util::getSystemConfig();
