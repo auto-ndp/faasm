@@ -91,6 +91,7 @@ faabric::util::SnapshotData WasmModule::getSnapshotData()
 
 std::string WasmModule::snapshot(bool locallyRestorable)
 {
+    ZoneScopedNS("WasmModule::snapshot", 6);
     PROF_START(wasmSnapshot)
 
     // Create snapshot key
@@ -111,6 +112,7 @@ std::string WasmModule::snapshot(bool locallyRestorable)
 
 void WasmModule::restore(const std::string& snapshotKey)
 {
+    ZoneScopedNS("WasmModule::restore", 6);
     PROF_START(wasmSnapshotRestore)
 
     if (!isBound()) {
@@ -145,6 +147,7 @@ void WasmModule::restore(const std::string& snapshotKey)
 
 void WasmModule::zygoteDeltaRestore(const std::vector<uint8_t>& zygoteDelta)
 {
+    ZoneScopedNS("WasmModule::zygoteDeltaRestore", 6);
     PROF_START(wasmZygoteDeltaRestore)
     faabric::state::State& state = faabric::state::getGlobalState();
     const auto zKey = "$" + this->getBoundFunction();
@@ -173,6 +176,7 @@ void WasmModule::zygoteDeltaRestore(const std::vector<uint8_t>& zygoteDelta)
 
 std::shared_ptr<faabric::state::StateKeyValue> WasmModule::getZygoteSnapshot()
 {
+    ZoneScopedNS("WasmModule::getZygoteSnapshot", 6);
     faabric::state::State& state = faabric::state::getGlobalState();
     const auto zKey = "$" + this->getBoundFunction();
     size_t zygSnapSize = state.getStateSize(this->getBoundUser(), zKey);
@@ -187,6 +191,7 @@ std::shared_ptr<faabric::state::StateKeyValue> WasmModule::getZygoteSnapshot()
 
 void WasmModule::storeZygoteSnapshot()
 {
+    ZoneScopedNS("WasmModule::storeZygoteSnapshot", 6);
     faabric::state::State& state = faabric::state::getGlobalState();
     const auto zKey = "$" + this->getBoundFunction();
     size_t zygSnapSize = state.getStateSize(this->getBoundUser(), zKey);
@@ -213,6 +218,7 @@ void WasmModule::storeZygoteSnapshot()
 std::vector<uint8_t> WasmModule::deltaSnapshot(
   const faabric::util::SnapshotData& oldMemory)
 {
+    ZoneScopedNS("WasmModule::deltaSnapshot", 6);
     auto newMemData = getMemoryBase();
     auto newMemSize = getMemorySizeBytes();
     for (const auto& [ptr, len] : this->snapshotExcludedPtrLens) {
@@ -226,6 +232,7 @@ std::vector<uint8_t> WasmModule::deltaSnapshot(
 
 void WasmModule::deltaRestore(const std::vector<uint8_t>& delta)
 {
+    ZoneScopedNS("WasmModule::deltaRestore", 6);
     auto memSize = getMemorySizeBytes();
 
     faabric::util::applyDelta(
@@ -330,6 +337,7 @@ uint32_t WasmModule::getArgvBufferSize()
 
 void WasmModule::bindToFunction(faabric::Message& msg, bool cache)
 {
+    ZoneScopedNS("WasmModule::bindToFunction", 6);
     if (_isBound) {
         throw std::runtime_error("Cannot bind a module twice");
     }
@@ -422,6 +430,7 @@ int32_t WasmModule::executeTask(
   int msgIdx,
   std::shared_ptr<faabric::BatchExecuteRequest> req)
 {
+    ZoneScopedNS("WasmModule::executeTask", 6);
     faabric::Message& msg = req->mutable_messages()->at(msgIdx);
     std::string funcStr = faabric::util::funcToString(msg, true);
 
@@ -468,6 +477,7 @@ int32_t WasmModule::executeTask(
         }
     } else {
         // Vanilla function
+        ZoneScopedN("WasmModule::execute Standard function execute");
         SPDLOG_TRACE("Executing {} as standard function", funcStr);
         returnValue = executeFunction(msg);
     }
@@ -494,7 +504,7 @@ int32_t WasmModule::executeTask(
 
 uint32_t WasmModule::createMemoryGuardRegion(uint32_t wasmOffset)
 {
-
+    ZoneScopedNS("WasmModule::createMemoryGuardRegion", 6);
     uint32_t regionSize = GUARD_REGION_SIZE;
     uint8_t* nativePtr = wasmPointerToNative(wasmOffset);
 
@@ -589,6 +599,8 @@ int WasmModule::awaitPthreadCall(const faabric::Message* msg, int pthreadPtr)
 
 void WasmModule::createThreadStacks()
 {
+    ZoneScopedNS("WasmModule::createThreadStacks", 6);
+    ZoneValue(threadPoolSize);
     SPDLOG_DEBUG("Creating {} thread stacks", threadPoolSize);
 
     for (int i = 0; i < threadPoolSize; i++) {

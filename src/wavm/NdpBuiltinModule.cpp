@@ -42,6 +42,7 @@ static std::string userObjectPath(const std::string& user,
 
 static int ndpGet(NDPBuiltinModule& module, faabric::Message& msg)
 {
+    ZoneScopedN("NdpBuiltinModule::ndpGet");
     auto args = BuiltinNdpGetArgs::fromBytes(
       faabric::util::stringToBytes(msg.inputdata()));
     std::string objPath = userObjectPath(msg.user(), args.key);
@@ -67,6 +68,7 @@ static int ndpGet(NDPBuiltinModule& module, faabric::Message& msg)
 
 static int ndpPut(NDPBuiltinModule& module, faabric::Message& msg)
 {
+    ZoneScopedN("NdpBuiltinModule::ndpPut");
     auto args = BuiltinNdpPutArgs::fromBytes(
       faabric::util::stringToBytes(msg.inputdata()));
     std::string objPath = userObjectPath(msg.user(), args.key);

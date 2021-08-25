@@ -8,6 +8,7 @@
 #include <faabric/util/files.h>
 #include <faabric/util/logging.h>
 #include <faabric/util/snapshot.h>
+#include <faabric/util/timing.h>
 #include <wasm/WasmExecutionContext.h>
 #include <wasm/chaining.h>
 #include <wasm/ndp.h>
@@ -29,6 +30,7 @@ namespace wasm {
 faabric::Message ndpStorageBuiltinCall(std::string functionName,
                                        const std::vector<uint8_t>& inputData)
 {
+    ZoneScopedNS("ndp_objects::ndpStorageBuiltinCall", 6);
     auto wee = getCurrentWasmExecutionContext();
     faabric::Message msg = faabric::util::messageFactory(
       wee->executingModule->getBoundUser(), functionName);
@@ -49,6 +51,7 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
                                I32 dataPtr,
                                I32 dataLen)
 {
+    ZoneScopedNS("ndp_objects::put", 6);
     const faabric::util::SystemConfig& config =
       faabric::util::getSystemConfig();
 
@@ -90,6 +93,7 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
                                U32 maxRequestedLen,
                                I32 outDataLenPtr)
 {
+    ZoneScopedNS("ndp_objects::get_mmap", 6);
     const faabric::util::SystemConfig& config =
       faabric::util::getSystemConfig();
 
@@ -117,8 +121,10 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
         get_result =
           ndpStorageBuiltinCall(BUILTIN_NDP_GET_FUNCTION, getArgs.asBytes());
     } else {
+        ZoneScopedN("NDP get chain call");
         int get_call = makeChainedCall(
           BUILTIN_NDP_GET_FUNCTION, 0, nullptr, getArgs.asBytes(), true);
+        ZoneNamedN(__zone_await, "NDP get chain call", true);
         get_result = awaitChainedCallMessage(get_call);
     }
 
@@ -128,6 +134,7 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
 
     U32 outPtr{ 0 };
     if (get_result.returnvalue() == 0) {
+        ZoneScopedN("NDP get map memory");
         std::vector<uint8_t> outputData =
           faabric::util::stringToBytes(get_result.outputdata());
         size_t copyLen = std::min(outputData.size(), (size_t)maxRequestedLen);
@@ -151,6 +158,7 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
 
 I32 storageCallAndAwaitImpl(I32 wasmFuncPtr, I32 pyFuncNamePtr)
 {
+    ZoneScopedNS("ndp_objects::storageCallAndAwait", 6);
     const faabric::util::SystemConfig& config =
       faabric::util::getSystemConfig();
     const bool isPython = pyFuncNamePtr != 0;
@@ -183,21 +191,27 @@ I32 storageCallAndAwaitImpl(I32 wasmFuncPtr, I32 pyFuncNamePtr)
                                 &result);
         return result.i32;
     } else {
+        TracyMessageL("Get zygote snapshot");
         auto zygoteSnapshotKV = thisModule->getZygoteSnapshot();
         auto zygoteSnapshot = zygoteSnapshotKV->get();
         faabric::util::SnapshotData zygoteSnap;
         zygoteSnap.fd = -1;
         zygoteSnap.data = zygoteSnapshot;
         zygoteSnap.size = zygoteSnapshotKV->size();
+        TracyMessageL("Create zygote->now delta");
         auto zygoteDelta =
           faabric::util::bytesToString(thisModule->deltaSnapshot(zygoteSnap));
+        TracyMessageL("Made delta");
 
         SPDLOG_INFO("{} - NDP sending snapshot of {} bytes",
                     call->id(),
                     zygoteDelta.size());
+        TracyMessageL("Chain call");
         int ndpCallId = chainNdpCall(
           zygoteDelta, call->inputdata(), wasmFuncPtr, pyFuncName.c_str());
+        TracyMessageL("Await call");
         faabric::Message ndpResult = awaitChainedCallMessage(ndpCallId);
+        TracyMessageL("Call returned");
 
         if (ndpResult.returnvalue() != 0) {
             call->set_outputdata(ndpResult.outputdata());
@@ -212,9 +226,11 @@ I32 storageCallAndAwaitImpl(I32 wasmFuncPtr, I32 pyFuncNamePtr)
         // faabric::util::writeBytesToFile(
         //   "/usr/local/faasm/debug_shared_store/debug_delta.bin",
         //   faabric::util::stringToBytes(ndpResult.outputdata()));
+        TracyMessageL("Restore delta");
         std::vector<uint8_t> memoryDelta =
           faabric::util::stringToBytes(ndpResult.outputdata());
         thisModule->deltaRestore(memoryDelta);
+        TracyMessageL("Restored");
     }
 
     return 0;

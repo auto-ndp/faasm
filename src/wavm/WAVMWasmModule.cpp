@@ -7,8 +7,8 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 
-#include <faabric/snapshot/SnapshotRegistry.h>
 #include <faabric/scheduler/Scheduler.h>
+#include <faabric/snapshot/SnapshotRegistry.h>
 #include <faabric/util/bytes.h>
 #include <faabric/util/config.h>
 #include <faabric/util/func.h>
@@ -78,6 +78,7 @@ void WAVMWasmModule::clearCaches()
 
 void WAVMWasmModule::reset(faabric::Message& msg)
 {
+    ZoneScopedNS("WAVMWasmModule::reset", 5);
     if (!_isBound) {
         return;
     }
@@ -118,6 +119,7 @@ WAVMWasmModule::WAVMWasmModule(int threadPoolSizeIn)
 
 WAVMWasmModule& WAVMWasmModule::operator=(const WAVMWasmModule& other)
 {
+    ZoneScopedNS("WAVMWasmModule::operator=", 5);
     PROF_START(wasmAssignOp)
 
     // Do the clone
@@ -130,6 +132,7 @@ WAVMWasmModule& WAVMWasmModule::operator=(const WAVMWasmModule& other)
 
 WAVMWasmModule::WAVMWasmModule(const WAVMWasmModule& other)
 {
+    ZoneScopedNS("WAVMWasmModule::this(copy)", 5);
     PROF_START(wasmCopyConstruct)
 
     // Do the clone
@@ -140,6 +143,7 @@ WAVMWasmModule::WAVMWasmModule(const WAVMWasmModule& other)
 
 void WAVMWasmModule::clone(const WAVMWasmModule& other)
 {
+    ZoneScopedNS("WAVMWasmModule::clone", 5);
     // If bound, we want to reclaim all the memory we've created _before_
     // cloning from the zygote otherwise it's lost forever
     if (_isBound) {
@@ -218,6 +222,7 @@ void WAVMWasmModule::clone(const WAVMWasmModule& other)
 
 WAVMWasmModule::~WAVMWasmModule()
 {
+    ZoneScopedNS("WAVMWasmModule::~this", 5);
     // Note - the only need for this destructor is to perform the WAVM-related
     // GC, do not add anything else here.
     doWAVMGarbageCollection();
@@ -225,6 +230,7 @@ WAVMWasmModule::~WAVMWasmModule()
 
 void WAVMWasmModule::doWAVMGarbageCollection()
 {
+    ZoneScopedNS("WAVMWasmModule::doWAVM GC", 5);
     // To allow WAVM to perform GC, we need to ensure all of our own copies of
     // WAVM GCPointers have been set to nullptr, so that WAVM's own refcounts
     // will be zero. We can then call its GC method directly.
@@ -406,6 +412,7 @@ void WAVMWasmModule::doBindToFunctionInternal(faabric::Message& msg,
                                               bool executeZygote,
                                               bool useCache)
 {
+    ZoneScopedNS("WAVMWasmModule::doBindToFunctionInternal", 5);
     /*
      * NOTE - the order things happen in this function is important.
      * The zygote function may execute non-trivial code and modify the memory,
@@ -452,6 +459,7 @@ void WAVMWasmModule::doBindToFunctionInternal(faabric::Message& msg,
 
     // Get and execute zygote function
     if (executeZygote) {
+        ZoneScopedNS("WAVMWasmModule::executeZygote", 5);
         executeZygoteFunction();
     }
 
@@ -475,6 +483,7 @@ void WAVMWasmModule::doBindToFunctionInternal(faabric::Message& msg,
     PROF_END(wasmBind)
 
     if (executeZygote) {
+        ZoneScopedNS("WAVMWasmModule::storeZygoteSnapshot", 5);
         PROF_START(wasmNdpZygoteSnapshot)
         this->storeZygoteSnapshot();
         PROF_END(wasmNdpZygoteSnapshot)
@@ -521,7 +530,7 @@ Runtime::Instance* WAVMWasmModule::createModuleInstance(
   const std::string& name,
   const std::string& sharedModulePath)
 {
-
+    ZoneScopedNS("WAVMWasmModule::createModuleInstance", 5);
     PROF_START(wasmCreateModule)
 
     IRModuleCache& moduleRegistry = getIRModuleCache();
@@ -691,6 +700,7 @@ I32 WAVMWasmModule::getGlobalI32(const std::string& globalName,
 int WAVMWasmModule::dynamicLoadModule(const std::string& path,
                                       Runtime::Context* context)
 {
+    ZoneScopedNS("WAVMWasmModule::dynamicLoadModule", 5);
     // This function is essentially dlopen. See the comments around the GOT
     // function for more detail on the dynamic linking approach.
     // It returns 0 on error, as does dlopen
@@ -818,6 +828,7 @@ uint32_t WAVMWasmModule::addFunctionToTable(Runtime::Object* exportedFunc) const
 
 int32_t WAVMWasmModule::executeFunction(faabric::Message& msg)
 {
+    ZoneScopedNS("WAVMWasmModule::executeFunction", 5);
     if (!_isBound) {
         throw std::runtime_error("Module must be bound before executing");
     }
@@ -827,6 +838,7 @@ int32_t WAVMWasmModule::executeFunction(faabric::Message& msg)
 
     // Restore from snapshot before executing if necessary
     if (!msg.snapshotkey().empty()) {
+        ZoneScopedN("WAVMWasmModule::executeFunction restore");
         restore(msg.snapshotkey());
     }
 
@@ -836,6 +848,7 @@ int32_t WAVMWasmModule::executeFunction(faabric::Message& msg)
     IR::FunctionType funcType;
 
     if (msg.isoutputmemorydelta()) {
+        ZoneScopedN("WAVMWasmModule::executeFunction capture pre-exec data");
         this->preExecuteMemoryData = this->snapshot(true);
     }
 
@@ -869,6 +882,8 @@ int32_t WAVMWasmModule::executeFunction(faabric::Message& msg)
             }
         }
     } else {
+
+        ZoneScopedN("WAVMWasmModule::executeFunction prepare argcv");
         // Set up main args
         prepareArgcArgv(msg);
 
@@ -881,6 +896,7 @@ int32_t WAVMWasmModule::executeFunction(faabric::Message& msg)
     WasmExecutionContext ctx(this, &msg);
     int returnValue = 0;
     try {
+        ZoneScopedN("WAVMWasmModule::executeFunction WASM runtime call");
         Runtime::catchRuntimeExceptions(
           [this, &funcInstance, &funcType, &invokeArgs, &returnValue] {
               IR::UntaggedValue result;
@@ -904,10 +920,13 @@ int32_t WAVMWasmModule::executeFunction(faabric::Message& msg)
     msg.set_returnvalue(returnValue);
 
     if (returnValue == 0 && msg.isoutputmemorydelta()) {
+        ZoneScopedN(
+          "WAVMWasmModule::executeFunction calculate output memory delta");
         faabric::snapshot::SnapshotRegistry& reg =
           faabric::snapshot::getSnapshotRegistry();
         auto oldDataSnap = reg.getSnapshot(this->preExecuteMemoryData);
-        uint8_t* oldMemory = reg.mapSnapshot(this->preExecuteMemoryData, nullptr);
+        uint8_t* oldMemory =
+          reg.mapSnapshot(this->preExecuteMemoryData, nullptr);
         oldDataSnap.data = oldMemory;
         auto delta = this->deltaSnapshot(oldDataSnap);
         munmap(oldMemory, oldDataSnap.size);
