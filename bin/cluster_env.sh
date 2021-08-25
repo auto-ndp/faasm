@@ -1,5 +1,5 @@
 
-THIS_DIR=$(dirname $(readlink -f $0))
+THIS_DIR=$(dirname $(readlink -f ${BASH_SOURCE[0]:-${(%):-%x}}))
 PROJ_ROOT=${THIS_DIR}/..
 
 export FAASM_VERSION=$(cat ${PROJ_ROOT}/VERSION)
