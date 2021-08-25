@@ -1,5 +1,6 @@
 #include <faabric/endpoint/Endpoint.h>
 #include <faabric/util/logging.h>
+#include <faabric/util/timing.h>
 
 #include <pistache/endpoint.h>
 #include <pistache/listener.h>
@@ -21,6 +22,7 @@ Endpoint::Endpoint(int portIn, int threadCountIn)
 void Endpoint::start(bool awaitSignal)
 {
     SPDLOG_INFO("Starting HTTP endpoint on {}, {} threads", port, threadCount);
+    tracy::SetThreadName("EndpointSignalAwaiter");
 
     // Set up signal handler
     sigset_t signals;

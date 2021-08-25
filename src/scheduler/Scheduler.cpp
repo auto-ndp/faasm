@@ -57,6 +57,7 @@ Scheduler::Scheduler()
 
 std::set<std::string> Scheduler::getAvailableHosts()
 {
+    ZoneScopedN("Scheduler::getAvailableHosts");
     redis::Redis& redis = redis::Redis::getQueue();
     return redis.smembers(getGlobalSetName());
 }
@@ -64,6 +65,7 @@ std::set<std::string> Scheduler::getAvailableHosts()
 std::set<std::string> Scheduler::getAvailableHostsForFunction(
   const faabric::Message& msg)
 {
+    ZoneScopedN("Scheduler::getAvailableHostsForFunction");
     redis::Redis& redis = redis::Redis::getQueue();
     return redis.smembers(getGlobalSetNameForFunction(msg));
 }
@@ -183,6 +185,7 @@ void Scheduler::removeRegisteredHost(const std::string& host,
 
 void Scheduler::vacateSlot()
 {
+    ZoneScopedNS("Vacate scheduler slot", 5);
     faabric::util::FullLock lock(mx);
     thisHostResources.set_usedslots(thisHostResources.usedslots() - 1);
 }
@@ -190,6 +193,7 @@ void Scheduler::vacateSlot()
 void Scheduler::notifyExecutorShutdown(Executor* exec,
                                        const faabric::Message& msg)
 {
+    ZoneScopedNS("Scheduler::notifyExecutorShutdown", 5);
     faabric::util::FullLock lock(mx);
 
     SPDLOG_TRACE("Shutting down executor {}", exec->id);
@@ -234,6 +238,7 @@ std::vector<std::string> Scheduler::callFunctions(
   std::shared_ptr<faabric::BatchExecuteRequest> req,
   bool forceLocal)
 {
+    ZoneScopedNS("Scheduler::callFunctions", 5);
     auto& config = faabric::util::getSystemConfig();
 
     int nMessages = req->messages_size();
@@ -264,6 +269,7 @@ std::vector<std::string> Scheduler::callFunctions(
         SPDLOG_DEBUG(
           "Forwarding {} {} back to master {}", nMessages, funcStr, masterHost);
 
+        ZoneScopedN("Scheduler::callFunctions forward to master");
         getFunctionCallClient(masterHost).executeFunctions(req);
         return executed;
     }
@@ -308,6 +314,7 @@ std::vector<std::string> Scheduler::callFunctions(
 
                 // Do the snapshot diff pushing
                 if (!snapshotDiffs.empty()) {
+                    ZoneScopedN("Scheduler::callFunctions snapshot diff pushing");
                     for (const auto& h : thisRegisteredHosts) {
                         SPDLOG_DEBUG("Pushing {} snapshot diffs for {} to {} "
                                      "(snapshot size up to {} bytes)",
@@ -487,6 +494,7 @@ std::vector<std::string> Scheduler::callFunctions(
     // one executor, for anything else we want one Executor per function
     // in flight
     if (!localMessageIdxs.empty()) {
+        ZoneScopedN("Scheduler::callFunctions local execution");
         // Update slots
         thisHostResources.set_usedslots(thisHostResources.usedslots() +
                                         localMessageIdxs.size());
@@ -499,6 +507,7 @@ std::vector<std::string> Scheduler::callFunctions(
 
             std::shared_ptr<Executor> e = nullptr;
             if (thisExecutors.empty()) {
+                ZoneScopedN("Scheduler::callFunctions claiming new executor");
                 // Create executor if not exists
                 e = claimExecutor(firstMsg);
             } else if (thisExecutors.size() == 1) {
@@ -515,11 +524,18 @@ std::vector<std::string> Scheduler::callFunctions(
             assert(e != nullptr);
 
             // Execute the tasks
+            ZoneScopedN("Scheduler::callFunctions execute tasks");
             e->executeTasks(localMessageIdxs, req);
         } else {
             // Non-threads require one executor per task
             for (auto i : localMessageIdxs) {
-                std::shared_ptr<Executor> e = claimExecutor(firstMsg);
+                std::shared_ptr<Executor> e;
+                {
+                    ZoneScopedN("Scheduler::callFunctions claim executor");
+                    e = claimExecutor(firstMsg);
+                }
+                ZoneScopedN("Scheduler::callFunctions execute tasks");
+                ZoneValue(i);
                 e->executeTasks({ i }, req);
             }
         }
@@ -593,6 +609,7 @@ int Scheduler::scheduleFunctionsOnHost(
   faabric::util::SnapshotData* snapshot,
   bool forceAll)
 {
+    ZoneScopedN("Scheduler::scheduleFunctionsOnHost");
     const faabric::Message& firstMsg = req->messages().at(0);
     std::string funcStr = faabric::util::funcToString(firstMsg, false);
 
@@ -722,6 +739,7 @@ std::shared_ptr<Executor> Scheduler::claimExecutor(faabric::Message& msg)
 
     // We have no warm executors available, so scale up
     if (claimed == nullptr) {
+        ZoneScopedN("Scheduler::claimExecutor scaling up");
         int nExecutors = thisExecutors.size();
         SPDLOG_DEBUG(
           "Scaling {} from {} -> {}", funcStr, nExecutors, nExecutors + 1);
@@ -774,6 +792,7 @@ void Scheduler::flushLocally()
 
 void Scheduler::setFunctionResult(faabric::Message& msg)
 {
+    ZoneScopedNS("Scheduler::setFunctionResult", 5);
     redis::Redis& redis = redis::Redis::getQueue();
 
     // Record which host did the execution
@@ -850,6 +869,8 @@ int32_t Scheduler::awaitThreadResult(uint32_t messageId)
 faabric::Message Scheduler::getFunctionResult(unsigned int messageId,
                                               int timeoutMs)
 {
+    ZoneScopedNS("Scheduler::getFunctionResult", 5);
+    ZoneValue(messageId);
     if (messageId == 0) {
         throw std::runtime_error("Must provide non-zero message ID");
     }
@@ -866,6 +887,7 @@ faabric::Message Scheduler::getFunctionResult(unsigned int messageId,
         // Blocking version will throw an exception when timing out
         // which is handled by the caller.
         std::vector<uint8_t> result = redis.dequeueBytes(resultKey, timeoutMs);
+        ZoneScopedN("Parse result message");
         msgResult.ParseFromArray(result.data(), (int)result.size());
     } else {
         // Non-blocking version will tolerate empty responses, therefore
@@ -882,6 +904,7 @@ faabric::Message Scheduler::getFunctionResult(unsigned int messageId,
             msgResult.set_type(faabric::Message_MessageType_EMPTY);
         } else {
             // Normal response if we get something from redis
+            ZoneScopedN("Parse result message");
             msgResult.ParseFromArray(result.data(), (int)result.size());
         }
     }

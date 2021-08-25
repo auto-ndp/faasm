@@ -38,6 +38,7 @@ function(faabric_lib lib_name lib_deps)
         PUBLIC ${ZEROMQ_INCLUDE_DIR}
         PUBLIC ${PROTOBUF_INCLUDE_DIR}
         )
+    target_link_libraries(${lib_name} PRIVATE Tracy::TracyClient)
 
     # Object library for bundling everything together (should have the same
     # include dirs and dependencies as the normal library)
@@ -52,7 +53,7 @@ function(faabric_lib lib_name lib_deps)
         PUBLIC ${PROTOBUF_INCLUDE_DIR}
         )
 
-    target_link_libraries(${lib_name}_obj ${lib_name})
+    target_link_libraries(${lib_name}_obj ${lib_name} Tracy::TracyClient)
 
     if(BUILD_SHARED_LIBS)
         target_compile_options(${lib_name} PRIVATE "-fPIC")
@@ -104,6 +105,7 @@ target_link_libraries(faabric PUBLIC
     boost_system
     boost_filesystem
     zstd::libzstd_static
+    Tracy::TracyClient
     ${PISTACHE_LIBRARY}
     ${PROTOBUF_LIBRARY}
     ${ZEROMQ_LIBRARY}

@@ -2,6 +2,7 @@ include(FindGit)
 find_package(Git)
 include (ExternalProject)
 include (FetchContent)
+find_package (Threads REQUIRED)
 
 # Protobuf
 set(PROTOBUF_LIBRARY ${CMAKE_INSTALL_PREFIX}/lib/libprotobuf.so)
@@ -117,6 +118,32 @@ FetchContent_MakeAvailable(zstd_ext)
 # Work around zstd not declaring its targets properly
 target_include_directories(libzstd_static INTERFACE $<BUILD_INTERFACE:${zstd_ext_SOURCE_DIR}/lib>)
 add_library(zstd::libzstd_static ALIAS libzstd_static)
+
+# Tracy
+FetchContent_Declare(tracy_ext
+    GIT_REPOSITORY "https://github.com/wolfpld/tracy.git"
+    GIT_TAG "v0.7.8"
+)
+FetchContent_MakeAvailable(tracy_ext)
+add_library(TracyClient STATIC ${tracy_ext_SOURCE_DIR}/TracyClient.cpp)
+target_link_libraries(TracyClient PUBLIC Threads::Threads dl)
+target_include_directories(TracyClient PUBLIC ${tracy_ext_SOURCE_DIR})
+target_compile_features(TracyClient PUBLIC cxx_std_14)
+target_compile_definitions(TracyClient PUBLIC
+    TRACY_ENABLE
+    TRACY_ON_DEMAND
+    TRACY_NO_BROADCAST
+    TRACY_NO_FRAME_IMAGE
+    TRACY_NO_VSYNC_CAPTURE
+    TRACY_PORT=8086 # 8086 is the default
+)
+if(BUILD_SHARED_LIBS)
+    target_compile_options(TracyClient PRIVATE "-fPIC")
+endif()
+add_library(Tracy::TracyClient ALIAS TracyClient)
+
+# Adds Tracy::TracyClient
+message(STATUS "Tracy enabled: ${TRACY_ENABLE}")
 
 # ZeroMQ
 set(ZEROMQ_LIBRARY ${CMAKE_INSTALL_PREFIX}/lib/libzmq.so)

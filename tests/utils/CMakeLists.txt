@@ -16,6 +16,6 @@ add_library(faabric_test_utils "${LIB_FILES}")
 add_dependencies(faabric_test_utils catch_ext)
 target_include_directories(faabric_test_utils PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
-target_link_libraries(faabric_test_utils state runner scheduler transport)
+target_link_libraries(faabric_test_utils PUBLIC state runner scheduler transport Tracy::TracyClient)
 
 add_library(faabric::test_utils ALIAS faabric_test_utils)

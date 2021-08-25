@@ -3,6 +3,7 @@
 #include <faabric/util/latch.h>
 #include <faabric/util/logging.h>
 #include <faabric/util/network.h>
+#include <faabric/util/timing.h>
 
 #include <csignal>
 #include <cstdlib>
@@ -26,9 +27,11 @@ void MessageEndpointServerThread::start(
         int port = -1;
 
         if (async) {
+            tracy::SetThreadName("Async Message Endpoint Server");
             port = server->asyncPort;
             endpoint = std::make_unique<AsyncRecvMessageEndpoint>(port);
         } else {
+            tracy::SetThreadName("Sync Message Endpoint Server");
             port = server->syncPort;
             endpoint = std::make_unique<SyncRecvMessageEndpoint>(port);
         }

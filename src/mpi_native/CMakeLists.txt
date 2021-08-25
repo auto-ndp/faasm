@@ -34,7 +34,7 @@ target_include_directories(faabricmpi_native
     )
 
 set(FAABRIC_LIB_DIR "/build/faabric/install/lib")
-target_link_libraries(faabricmpi_native 
+target_link_libraries(faabricmpi_native PUBLIC
     faabric
     faabricmpi
     ${FAABRIC_LIB_DIR}/${PISTACHE_LIBNAME}

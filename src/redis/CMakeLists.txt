@@ -5,4 +5,4 @@ set(LIB_FILES
 
 faabric_lib(redis "${LIB_FILES}")
 
-target_link_libraries(redis util pthread hiredis)
+target_link_libraries(redis PUBLIC util pthread hiredis)

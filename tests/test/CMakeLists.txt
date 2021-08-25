@@ -11,7 +11,7 @@ add_executable(
     ${TEST_FILES}
 )
 
-target_link_libraries(faabric_tests 
+target_link_libraries(faabric_tests
     faabric::test_utils
 )
 

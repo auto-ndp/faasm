@@ -51,6 +51,7 @@ Executor::~Executor() {}
 void Executor::finish()
 {
     SPDLOG_DEBUG("Executor {} shutting down", id);
+    ZoneScopedNS("Executor::finish", 5);
 
     // Shut down thread pools and wait
     for (int i = 0; i < threadPoolThreads.size(); i++) {
@@ -93,7 +94,9 @@ void Executor::finish()
 void Executor::executeTasks(std::vector<int> msgIdxs,
                             std::shared_ptr<faabric::BatchExecuteRequest> req)
 {
+    ZoneScopedNS("Executor::executeTasks", 5);
     const std::string funcStr = faabric::util::funcToString(req);
+    ZoneText(funcStr.c_str(), funcStr.length());
     SPDLOG_TRACE("{} executing {}/{} tasks of {}",
                  id,
                  msgIdxs.size(),
@@ -122,6 +125,7 @@ void Executor::executeTasks(std::vector<int> msgIdxs,
         if ((!isMaster && isThreads) || !isThreads) {
             SPDLOG_DEBUG("Restoring {} from snapshot {}", funcStr, snapshotKey);
             lastSnapshot = snapshotKey;
+            ZoneScopedNS("Executor::restore", 5);
             restore(firstMsg);
         } else {
             SPDLOG_DEBUG("Skipping snapshot restore on master {} [{}]",
@@ -152,6 +156,8 @@ void Executor::executeTasks(std::vector<int> msgIdxs,
 
     // Iterate through and invoke tasks
     for (int msgIdx : msgIdxs) {
+        ZoneScopedNS("Executor::executeTasks[msgIdx]", 5);
+        ZoneValue(msgIdx);
         const faabric::Message& msg = req->messages().at(msgIdx);
 
         // If executing threads, we must always keep thread pool index zero
@@ -181,6 +187,7 @@ void Executor::executeTasks(std::vector<int> msgIdxs,
 void Executor::threadPoolThread(int threadPoolIdx)
 {
     SPDLOG_DEBUG("Thread pool thread {}:{} starting up", id, threadPoolIdx);
+    tracy::SetThreadName("Executor threadPoolThread");
 
     auto& sch = faabric::scheduler::getScheduler();
     const auto& conf = faabric::util::getSystemConfig();
@@ -193,6 +200,7 @@ void Executor::threadPoolThread(int threadPoolIdx)
         ExecutorTask task;
 
         try {
+            ZoneScopedN("Dequeue task");
             task = threadTaskQueues[threadPoolIdx].dequeue(conf.boundTimeout);
         } catch (faabric::util::QueueTimeoutException& ex) {
             // If the thread has had no messages, it needs to
@@ -228,6 +236,8 @@ void Executor::threadPoolThread(int threadPoolIdx)
 
         int32_t returnValue;
         try {
+
+            ZoneScopedN("Execute task");
             returnValue =
               executeTask(threadPoolIdx, task.messageIndex, task.req);
         } catch (const std::exception& ex) {
@@ -255,6 +265,7 @@ void Executor::threadPoolThread(int threadPoolIdx)
 
         // Handle snapshot diffs _before_ we reset the executor
         if (isLastInBatch && task.needsSnapshotPush) {
+            ZoneScopedN("Task snapshot diff push");
             // Get diffs between original snapshot and after execution
             faabric::util::SnapshotData snapshotPostExecution = snapshot();
 
@@ -277,9 +288,11 @@ void Executor::threadPoolThread(int threadPoolIdx)
         // executor has been reset, otherwise the executor may not be reused for
         // a repeat invocation.
         if (isThreads) {
+            ZoneScopedN("Task set result");
             // Set non-final thread result
             sch.setThreadResult(msg, returnValue);
         } else {
+            ZoneScopedN("Task set result");
             // Set normal function result
             sch.setFunctionResult(msg);
         }
@@ -292,15 +305,18 @@ void Executor::threadPoolThread(int threadPoolIdx)
                 SPDLOG_TRACE("Skipping reset for {}",
                              faabric::util::funcToString(msg, true));
             } else {
+                ZoneScopedN("Task reset");
                 reset(msg);
             }
 
+            ZoneScopedN("Task release claim");
             releaseClaim();
         }
 
         // Vacate the slot occupied by this task. This must be done after
         // releasing the claim on this executor, otherwise the scheduler may try
         // to schedule another function and be unable to reuse this executor.
+        ZoneScopedN("Task vacate slot");
         sch.vacateSlot();
     }
 

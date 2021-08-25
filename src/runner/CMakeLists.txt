@@ -5,4 +5,4 @@ set(LIB_FILES
 
 faabric_lib(runner "${LIB_FILES}")
 
-target_link_libraries(runner scheduler util endpoint)
+target_link_libraries(runner PUBLIC scheduler util endpoint)

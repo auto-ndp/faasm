@@ -19,6 +19,7 @@ void FaabricEndpointHandler::onRequest(const Pistache::Http::Request& request,
                                        Pistache::Http::ResponseWriter response)
 {
     SPDLOG_DEBUG("Faabric handler received request");
+    ZoneScopedNS("HTTP request", 4);
 
     // Very permissive CORS
     response.headers().add<Pistache::Http::Header::AccessControlAllowOrigin>(
@@ -53,6 +54,7 @@ void FaabricEndpointHandler::onRequest(const Pistache::Http::Request& request,
 std::pair<int, std::string> FaabricEndpointHandler::handleFunction(
   const std::string& requestStr)
 {
+    ZoneScopedNS("Handle HTTP function", 4);
     std::pair<int, std::string> response;
     if (requestStr.empty()) {
         SPDLOG_ERROR("Faabric handler received empty request");
@@ -96,6 +98,7 @@ std::pair<int, std::string> FaabricEndpointHandler::handleFunction(
 std::pair<int, std::string> FaabricEndpointHandler::executeFunction(
   faabric::Message& msg)
 {
+    ZoneScopedNS("Execute HTTP function", 4);
     faabric::util::SystemConfig& conf = faabric::util::getSystemConfig();
 
     if (msg.user().empty()) {
@@ -117,7 +120,10 @@ std::pair<int, std::string> FaabricEndpointHandler::executeFunction(
 
     // Schedule it
     faabric::scheduler::Scheduler& sch = faabric::scheduler::getScheduler();
-    sch.callFunction(msg);
+    {
+        ZoneScopedN("Scheduler.callFunction");
+        sch.callFunction(msg);
+    }
 
     // Await result on global bus (may have been executed on a different worker)
     if (msg.isasync()) {
@@ -125,10 +131,12 @@ std::pair<int, std::string> FaabricEndpointHandler::executeFunction(
     }
 
     SPDLOG_DEBUG("Worker thread {} awaiting {}", tid, funcStr);
+    ZoneNamedN(__zoneAwait, "Await result", true);
 
     try {
         const faabric::Message result =
           sch.getFunctionResult(msg.id(), conf.globalMessageTimeout);
+        TracyMessageL("Got result");
         SPDLOG_DEBUG("Worker thread {} result {}", tid, funcStr);
 
         if (result.sgxresult().empty()) {
