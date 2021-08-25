@@ -45,12 +45,15 @@ static int ndpGet(NDPBuiltinModule& module, faabric::Message& msg)
     ZoneScopedN("NdpBuiltinModule::ndpGet");
     auto args = BuiltinNdpGetArgs::fromBytes(
       faabric::util::stringToBytes(msg.inputdata()));
+    TracyMessageL("Parsed input");
     std::string objPath = userObjectPath(msg.user(), args.key);
     if (!fs::exists(objPath)) {
         SPDLOG_DEBUG("NDP GET file {} doesn't exist", objPath);
         return 1;
     }
+    TracyMessageL("Checked file existance");
     auto bytes = faabric::util::readFileToBytes(objPath);
+    TracyMessageL("Read file to bytes");
     size_t startOffset = std::min(bytes.size(), args.offset);
     size_t dataLen = std::min(bytes.size() - startOffset, args.uptoBytes);
     SPDLOG_INFO("NDP GET {} bytes starting at offset {} from file {} "
