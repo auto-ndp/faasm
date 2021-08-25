@@ -7,4 +7,4 @@ set(LIB_FILES
         )
 
 faasm_private_lib(threads "${LIB_FILES}")
-target_link_libraries(threads util)
+target_link_libraries(threads PUBLIC faabric util)

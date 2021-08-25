@@ -17,7 +17,8 @@ set(LIB_FILES
 faasm_private_lib(storage "${LIB_FILES}")
 add_dependencies(storage aws_ext)
 
-target_link_libraries(storage
+target_link_libraries(storage PUBLIC
+    faabric
     wavmmodule
     wamrmodule
     aws_ext_core

@@ -79,12 +79,14 @@ llvm_map_components_to_libnames(
 
 # Link everything together
 faasm_private_lib(wamrmodule "${LIB_FILES}")
-target_link_libraries(wamrmodule
+target_link_libraries(wamrmodule PUBLIC
+        faabric
         wasm
         wamrlib
         )
 
-target_link_libraries(wamrmodule
+target_link_libraries(wamrmodule PUBLIC
+        faabric
         aotclib
         ${WAMR_LLVM_LIBRARIES}
         )

@@ -8,4 +8,4 @@ set(LIB_FILES
         )
 
 faasm_private_lib(conf "${LIB_FILES}")
-target_link_libraries(conf util)
+target_link_libraries(conf PUBLIC util faabric)

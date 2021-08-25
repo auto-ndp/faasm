@@ -13,6 +13,6 @@ set(LIB_FILES
 
 faasm_private_lib(codegen "${LIB_FILES}")
 
-target_link_libraries(codegen
-    storage
+target_link_libraries(codegen PUBLIC
+    storage faabric
 )

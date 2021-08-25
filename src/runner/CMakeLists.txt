@@ -1,4 +1,5 @@
 set(RUNNER_LIBS
+        faabric
         faaslet_lib
         wavmmodule
         wamrmodule

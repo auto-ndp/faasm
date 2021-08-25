@@ -7,7 +7,7 @@ set(LIB_FILES
 
 faasm_private_lib(upload_lib "${LIB_FILES}")
 
-target_link_libraries(upload_lib
+target_link_libraries(upload_lib PUBLIC
         codegen
         cpprestsdk::cpprest
         faaslet_lib
@@ -19,4 +19,4 @@ target_link_libraries(upload_lib
         )
 
 add_executable(upload upload_server.cpp)
-target_link_libraries(upload upload_lib)
+target_link_libraries(upload PUBLIC faabric upload_lib)

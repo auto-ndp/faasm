@@ -11,7 +11,7 @@ set(LIB_FILES
 
 faasm_private_lib(faaslet_lib "${LIB_FILES}")
 
-target_link_libraries(faaslet_lib
+target_link_libraries(faaslet_lib PUBLIC
         faabric
         system
         threads
@@ -20,6 +20,6 @@ target_link_libraries(faaslet_lib
 
 # Include SGX lib if enabled
 if(SGX_FOUND)
-    target_link_libraries(faaslet_lib faasm_sgx)
+    target_link_libraries(faaslet_lib PUBLIC faasm_sgx)
     target_include_directories(faaslet_lib PUBLIC ${FAASM_INCLUDE_DIR}/sgx)
 endif()

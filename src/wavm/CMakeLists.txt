@@ -37,4 +37,4 @@ set(LIB_FILES
         )
 
 faasm_private_lib(wavmmodule "${LIB_FILES}")
-target_link_libraries(wavmmodule wasm libWAVM threads)
+target_link_libraries(wavmmodule PUBLIC faabric wasm libWAVM threads)

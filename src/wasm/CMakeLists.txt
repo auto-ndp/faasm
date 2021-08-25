@@ -17,4 +17,4 @@ set(LIB_FILES
         )
 
 faasm_private_lib(wasm "${LIB_FILES}")
-target_link_libraries(wasm conf storage threads)
+target_link_libraries(wasm PUBLIC faabric conf storage threads)

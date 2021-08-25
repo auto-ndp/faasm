@@ -57,6 +57,7 @@ services:
       - "8003-8010"
     ports:
       - "8080"
+      - "8086:8086"
     privileged: true
     volumes:
       - ./:/usr/local/code/faasm/
@@ -87,6 +88,7 @@ services:
       - "8003-8010"
     ports:
       - "8080"
+      - "8087:8086"
     privileged: true
     volumes:
       - ./:/usr/local/code/faasm/

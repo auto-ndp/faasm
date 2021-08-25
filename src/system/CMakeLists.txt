@@ -11,4 +11,4 @@ set(LIB_FILES
         )
 
 add_library(system "${LIB_FILES}")
-target_link_libraries(system faabric)
+target_link_libraries(system PUBLIC faabric)
