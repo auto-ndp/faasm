@@ -849,7 +849,8 @@ int32_t WAVMWasmModule::executeFunction(faabric::Message& msg)
 
     if (msg.isoutputmemorydelta()) {
         ZoneScopedN("WAVMWasmModule::executeFunction capture pre-exec data");
-        this->preExecuteMemoryData = this->snapshot(true);
+        auto base = this->getMemoryBase();
+        this->preExecuteMemoryData.assign(base, base + this->getMemorySizeBytes());
     }
 
     // Run a specific function if requested
@@ -922,15 +923,11 @@ int32_t WAVMWasmModule::executeFunction(faabric::Message& msg)
     if (returnValue == 0 && msg.isoutputmemorydelta()) {
         ZoneScopedN(
           "WAVMWasmModule::executeFunction calculate output memory delta");
-        faabric::snapshot::SnapshotRegistry& reg =
-          faabric::snapshot::getSnapshotRegistry();
-        auto oldDataSnap = reg.getSnapshot(this->preExecuteMemoryData);
-        uint8_t* oldMemory =
-          reg.mapSnapshot(this->preExecuteMemoryData, nullptr);
-        oldDataSnap.data = oldMemory;
+        faabric::util::SnapshotData oldDataSnap;
+        oldDataSnap.size = this->preExecuteMemoryData.size();
+        oldDataSnap.data = this->preExecuteMemoryData.data();
+        oldDataSnap.fd = -1;
         auto delta = this->deltaSnapshot(oldDataSnap);
-        munmap(oldMemory, oldDataSnap.size);
-        reg.deleteSnapshot(this->preExecuteMemoryData);
         this->preExecuteMemoryData.clear();
         msg.set_outputdata(delta.data(), delta.size());
     }
