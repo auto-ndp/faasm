@@ -455,6 +455,9 @@ int32_t WasmModule::executeTask(
     if (req->type() == faabric::BatchExecuteRequest::THREADS) {
         // Modules must have provisioned their own thread stacks
         assert(!threadStacks.empty());
+        while(threadStacks.size() <= threadPoolIdx) {
+            addThreadStack();
+        }
         uint32_t stackTop = threadStacks.at(threadPoolIdx);
         switch (req->subtype()) {
             case ThreadRequestType::PTHREAD: {
@@ -597,26 +600,23 @@ int WasmModule::awaitPthreadCall(const faabric::Message* msg, int pthreadPtr)
     return returnValue;
 }
 
-void WasmModule::createThreadStacks()
+void WasmModule::addThreadStack()
 {
-    ZoneScopedNS("WasmModule::createThreadStacks", 6);
-    ZoneValue(threadPoolSize);
-    SPDLOG_DEBUG("Creating {} thread stacks", threadPoolSize);
+    ZoneScopedNS("WasmModule::addThreadStack", 6);
+    SPDLOG_DEBUG("Adding a thread stack");
 
-    for (int i = 0; i < 1; i++) {
-        // Allocate thread and guard pages
-        uint32_t memSize = THREAD_STACK_SIZE + (2 * GUARD_REGION_SIZE);
-        uint32_t memBase = growMemory(memSize);
+    // Allocate thread and guard pages
+    uint32_t memSize = THREAD_STACK_SIZE + (2 * GUARD_REGION_SIZE);
+    uint32_t memBase = growMemory(memSize);
 
-        // Note that wasm stacks grow downwards, so we have to store the stack
-        // top, which is the offset one below the guard region above the stack
-        uint32_t stackTop = memBase + GUARD_REGION_SIZE + THREAD_STACK_SIZE - 1;
-        threadStacks.push_back(stackTop);
+    // Note that wasm stacks grow downwards, so we have to store the stack
+    // top, which is the offset one below the guard region above the stack
+    uint32_t stackTop = memBase + GUARD_REGION_SIZE + THREAD_STACK_SIZE - 1;
+    threadStacks.push_back(stackTop);
 
-        // Add guard regions
-        createMemoryGuardRegion(memBase);
-        createMemoryGuardRegion(stackTop + 1);
-    }
+    // Add guard regions
+    createMemoryGuardRegion(memBase);
+    createMemoryGuardRegion(stackTop + 1);
 }
 
 threads::MutexManager& WasmModule::getMutexes()

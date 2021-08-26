@@ -212,7 +212,7 @@ class WasmModule
     virtual void doBindToFunction(faabric::Message& msg, bool cache);
 
     // Threads
-    void createThreadStacks();
+    void addThreadStack();
 };
 
 // Convenience functions

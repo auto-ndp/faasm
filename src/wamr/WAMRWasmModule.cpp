@@ -108,9 +108,6 @@ void WAMRWasmModule::doBindToFunction(faabric::Message& msg, bool cache)
     }
 
     currentBrk = getMemorySizeBytes();
-
-    // Set up thread stacks
-    createThreadStacks();
 }
 
 int32_t WAMRWasmModule::executeFunction(faabric::Message& msg)
