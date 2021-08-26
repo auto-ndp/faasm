@@ -178,7 +178,7 @@ void WAVMWasmModule::clone(const WAVMWasmModule& other)
     stdoutSize = 0;
 
     if (other._isBound) {
-        ZoneScopedN("WAVMWasmModule::clone::if");
+        ZoneNamedN(_inif_zone, "WAVMWasmModule::clone::if", true);
         assert(other.compartment != nullptr);
 
         // Clone compartment
