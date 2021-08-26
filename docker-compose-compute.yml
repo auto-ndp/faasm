@@ -10,6 +10,8 @@ services:
   # Compute
   worker:
     image: kubasz51/faasm-worker:${FAASM_VERSION}
+    security_opt:
+      - seccomp:unconfined
     ports:
       - "8080:8080"
 #      - "5000:5000"

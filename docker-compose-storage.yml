@@ -49,6 +49,8 @@ services:
   # Storage
   worker-storage:
     image: kubasz51/faasm-worker-storage:${FAASM_VERSION}
+    security_opt:
+      - seccomp:unconfined
     depends_on:
       - upload
     ports:
