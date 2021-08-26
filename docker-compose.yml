@@ -76,7 +76,7 @@ services:
       - STATE_MODE=inmemory
       - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
       - ENDPOINT_HOST=worker
-      - OVERRIDE_CPU_COUNT=1
+      - OVERRIDE_CPU_COUNT=8
 
   worker-storage:
     image: kubasz51/faasm-worker-storage:${FAASM_VERSION}
@@ -108,7 +108,7 @@ services:
       - STATE_MODE=inmemory
       - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
       - ENDPOINT_HOST=worker-storage
-      - OVERRIDE_CPU_COUNT=1
+      - OVERRIDE_CPU_COUNT=8
 
   nginx:
     image: nginx:latest

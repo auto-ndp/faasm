@@ -33,7 +33,7 @@ services:
       - S3_HOST=${STORAGE_NODE}
       - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
       - ENDPOINT_HOST=${COMPUTE_NODE}
-      - OVERRIDE_CPU_COUNT=1
+      - OVERRIDE_CPU_COUNT=15
 
   # Compute
   nginx:

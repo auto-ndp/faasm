@@ -74,7 +74,7 @@ services:
       - REDIS_STATE_HOST=${STORAGE_NODE}
       - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
       - ENDPOINT_HOST=${STORAGE_NODE}
-      - OVERRIDE_CPU_COUNT=1
+      - OVERRIDE_CPU_COUNT=15
 
   # Both
   cpp:
