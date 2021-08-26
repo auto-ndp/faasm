@@ -129,7 +129,7 @@ if(NOT tracy_ext_POPULATED)
 endif()
 add_library(TracyClient STATIC ${tracy_ext_SOURCE_DIR}/TracyClient.cpp)
 target_link_libraries(TracyClient PUBLIC Threads::Threads dl)
-target_include_directories(TracyClient PUBLIC ${tracy_ext_SOURCE_DIR})
+target_include_directories(TracyClient PUBLIC $<INSTALL_INTERFACE:include> $<BUILD_INTERFACE:${tracy_ext_SOURCE_DIR}>)
 target_compile_features(TracyClient PUBLIC cxx_std_14)
 target_compile_definitions(TracyClient PUBLIC
     TRACY_ENABLE
@@ -144,6 +144,14 @@ if(BUILD_SHARED_LIBS)
     target_compile_options(TracyClient PRIVATE "-fPIC")
 endif()
 add_library(Tracy::TracyClient ALIAS TracyClient)
+export(
+	TARGETS TracyClient
+	FILE ${CMAKE_CURRENT_BINARY_DIR}/cmake/TracyConfig.cmake
+	NAMESPACE Tracy::)
+install(
+    TARGETS TracyClient EXPORT TracyClientExport
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Tracy)
+install(EXPORT TracyClientExport DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Tracy)
 
 # Adds Tracy::TracyClient
 message(STATUS "Tracy enabled: ${TRACY_ENABLE}")
