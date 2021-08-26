@@ -825,6 +825,7 @@ void Scheduler::setFunctionResult(faabric::Message& msg)
         if (it != localResults.end()) {
             it->second.set_value(std::make_unique<faabric::Message>(msg));
         }
+        return;
     }
 
     std::string key = msg.resultkey();
