@@ -819,6 +819,7 @@ void Scheduler::setFunctionResult(faabric::Message& msg)
     msg.set_finishtimestamp(faabric::util::getGlobalClock().epochMillis());
 
     if (msg.executeslocally() && !msg.isasync()) {
+        ZoneScopedNS("Local results publish", 5);
         faabric::util::UniqueLock resultsLock(localResultsMutex);
         auto it = localResults.find(msg.id());
         if (it != localResults.end()) {
@@ -906,6 +907,7 @@ faabric::Message Scheduler::getFunctionResult(unsigned int messageId,
             }
             fut = it->second.get_future();
         }
+        ZoneScopedNS("Wait for future", 5);
         if (!isBlocking) {
             auto status = fut.wait_for(std::chrono::milliseconds(timeoutMs));
             if (status == std::future_status::timeout) {
@@ -913,7 +915,10 @@ faabric::Message Scheduler::getFunctionResult(unsigned int messageId,
                 msgResult.set_type(faabric::Message_MessageType_EMPTY);
                 return msgResult;
             }
+        } else {
+            fut.wait();
         }
+        ZoneNamedNS(_zone_grab, "Grab future", 5, true);
         {
             faabric::util::UniqueLock resultsLock(localResultsMutex);
             localResults.erase(messageId);
