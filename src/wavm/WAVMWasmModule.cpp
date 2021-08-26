@@ -565,15 +565,27 @@ Runtime::Instance* WAVMWasmModule::createModuleInstance(
 
     // Warning: be very careful here to stick to *references* to the same shared
     // modules rather than creating copies.
-    IR::Module& irModule =
-      moduleRegistry.getModule(boundUser, boundFunction, sharedModulePath);
+    IR::Module* irModulePtr;
+    {
+        ZoneScopedN("ModuleRegistry.getModule");
+        irModulePtr =
+          &moduleRegistry.getModule(boundUser, boundFunction, sharedModulePath);
+    }
+
+    IR::Module& irModule = *irModulePtr;
 
     if (isMainModule) {
         // Normal (C/C++) env
-        envModule = Runtime::cloneInstance(getEnvModule(), compartment);
+        {
+            ZoneScopedN("cloneEnvModule");
+            envModule = Runtime::cloneInstance(getEnvModule(), compartment);
+        }
 
         // WASI
-        wasiModule = Runtime::cloneInstance(getWasiModule(), compartment);
+        {
+            ZoneScopedN("cloneWasiModule");
+            wasiModule = Runtime::cloneInstance(getWasiModule(), compartment);
+        }
 
         // Make sure the stack top is as expected
         IR::GlobalDef stackDef = irModule.globals.getDef(0);
@@ -581,6 +593,7 @@ Runtime::Instance* WAVMWasmModule::createModuleInstance(
             throw std::runtime_error("Found immutable stack top");
         }
     } else {
+        ZoneScopedN("handleDynamicModule");
         // A dynamic module needs the same resources as a main module but we
         // need to manually create them
 
@@ -632,28 +645,42 @@ Runtime::Instance* WAVMWasmModule::createModuleInstance(
     }
 
     // Add module to GOT before linking
-    addModuleToGOT(irModule, isMainModule);
-
-    // Do the linking
-    Runtime::LinkResult linkResult = linkModule(irModule, *this);
-    if (!linkResult.success) {
-        SPDLOG_ERROR("Failed to link module");
-        throw std::runtime_error("Failed linking module");
+    {
+        ZoneScopedN("addModuleToGOT");
+        addModuleToGOT(irModule, isMainModule);
     }
 
-    Runtime::ModuleRef compiledModule = moduleRegistry.getCompiledModule(
-      boundUser, boundFunction, sharedModulePath);
+    // Do the linking
+    Runtime::LinkResult linkResult;
+    {
+        ZoneScopedN("linkModule");
+        linkResult = linkModule(irModule, *this);
+        if (!linkResult.success) {
+            SPDLOG_ERROR("Failed to link module");
+            throw std::runtime_error("Failed linking module");
+        }
+    }
+
+    Runtime::ModuleRef compiledModule;
+    {
+        ZoneScopedN("getCompiledModule");
+        compiledModule = moduleRegistry.getCompiledModule(
+          boundUser, boundFunction, sharedModulePath);
+    }
 
     SPDLOG_INFO("Instantiating module {}/{}  {}",
                 boundUser,
                 boundFunction,
                 sharedModulePath);
 
-    Runtime::Instance* instance =
-      instantiateModule(compartment,
-                        compiledModule,
-                        std::move(linkResult.resolvedImports),
-                        name.c_str());
+    Runtime::Instance* instance;
+    {
+        ZoneScopedN("instantiateModule");
+        instance = instantiateModule(compartment,
+                                     compiledModule,
+                                     std::move(linkResult.resolvedImports),
+                                     name.c_str());
+    }
 
     SPDLOG_DEBUG("Finished instantiating module {}/{}  {}",
                  boundUser,
@@ -664,6 +691,7 @@ Runtime::Instance* WAVMWasmModule::createModuleInstance(
     // patch up. They may be exported from the dynamic module itself. I
     // don't know how this happens but occasionally it does
     if (!missingGlobalOffsetEntries.empty()) {
+        ZoneScopedN("addMissingGOEs");
         for (auto& e : missingGlobalOffsetEntries) {
             // Check if it's an export of the module we're currently importing
             Runtime::Object* missingFunction =
