@@ -7,6 +7,7 @@
 #include <faabric/snapshot/SnapshotRegistry.h>
 #include <faabric/util/environment.h>
 #include <faabric/util/func.h>
+#include <faabric/util/locks.h>
 #include <faabric/util/logging.h>
 #include <faabric/util/memory.h>
 #include <faabric/util/random.h>
@@ -14,6 +15,7 @@
 #include <faabric/util/testing.h>
 #include <faabric/util/timing.h>
 
+#include <chrono>
 #include <unordered_set>
 
 #define FLUSH_TIMEOUT_MS 10000
@@ -529,10 +531,17 @@ std::vector<std::string> Scheduler::callFunctions(
         } else {
             // Non-threads require one executor per task
             for (auto i : localMessageIdxs) {
+                faabric::Message& localMsg = req->mutable_messages()->at(i);
+                if (localMsg.executeslocally()) {
+                    faabric::util::UniqueLock resultsLock(localResultsMutex);
+                    localResults.insert(
+                      { localMsg.id(),
+                        std::promise<std::unique_ptr<faabric::Message>>() });
+                }
                 std::shared_ptr<Executor> e;
                 {
                     ZoneScopedN("Scheduler::callFunctions claim executor");
-                    e = claimExecutor(firstMsg, lock);
+                    e = claimExecutor(localMsg, lock);
                 }
                 ZoneScopedN("Scheduler::callFunctions execute tasks");
                 ZoneValue(i);
@@ -642,7 +651,9 @@ int Scheduler::scheduleFunctionsOnHost(
     // Add messages
     int nOnThisHost = std::min<int>(available, remainder);
     for (int i = offset; i < (offset + nOnThisHost); i++) {
-        *hostRequest->add_messages() = req->messages().at(i);
+        auto* newMsg = hostRequest->add_messages();
+        *newMsg = req->messages().at(i);
+        newMsg->set_executeslocally(false);
         records.at(i) = host;
     }
 
@@ -807,6 +818,14 @@ void Scheduler::setFunctionResult(faabric::Message& msg)
     // Set finish timestamp
     msg.set_finishtimestamp(faabric::util::getGlobalClock().epochMillis());
 
+    if (msg.executeslocally() && !msg.isasync()) {
+        faabric::util::UniqueLock resultsLock(localResultsMutex);
+        auto it = localResults.find(msg.id());
+        if (it != localResults.end()) {
+            it->second.set_value(std::make_unique<faabric::Message>(msg));
+        }
+    }
+
     std::string key = msg.resultkey();
     if (key.empty()) {
         throw std::runtime_error("Result key empty. Cannot publish result");
@@ -870,14 +889,40 @@ faabric::Message Scheduler::getFunctionResult(unsigned int messageId,
 {
     ZoneScopedNS("Scheduler::getFunctionResult", 5);
     ZoneValue(messageId);
+
+    bool isBlocking = timeoutMs > 0;
+
     if (messageId == 0) {
         throw std::runtime_error("Must provide non-zero message ID");
     }
 
+    do {
+        std::future<std::unique_ptr<faabric::Message>> fut;
+        {
+            faabric::util::UniqueLock resultsLock(localResultsMutex);
+            auto it = localResults.find(messageId);
+            if (it == localResults.end()) {
+                break; // fallback to redis
+            }
+            fut = it->second.get_future();
+        }
+        if (!isBlocking) {
+            auto status = fut.wait_for(std::chrono::milliseconds(timeoutMs));
+            if (status == std::future_status::timeout) {
+                faabric::Message msgResult;
+                msgResult.set_type(faabric::Message_MessageType_EMPTY);
+                return msgResult;
+            }
+        }
+        {
+            faabric::util::UniqueLock resultsLock(localResultsMutex);
+            localResults.erase(messageId);
+        }
+        return *fut.get();
+    } while (0);
+
     redis::Redis& redis = redis::Redis::getQueue();
     TracyMessageL("Got redis queue");
-
-    bool isBlocking = timeoutMs > 0;
 
     std::string resultKey = faabric::util::resultKeyFromMessageId(messageId);
 
