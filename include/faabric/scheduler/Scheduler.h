@@ -11,6 +11,8 @@
 #include <faabric/util/snapshot.h>
 #include <faabric/util/timing.h>
 
+#include <atomic>
+#include <cstdint>
 #include <future>
 #include <shared_mutex>
 
@@ -212,6 +214,7 @@ class Scheduler
       const std::string& otherHost);
 
     faabric::HostResources thisHostResources;
+    std::atomic<int32_t> thisHostUsedSlots;
     std::set<std::string> availableHostsCache;
     std::unordered_map<std::string, std::set<std::string>> registeredHosts;
 
@@ -223,7 +226,9 @@ class Scheduler
     std::vector<std::string> getUnregisteredHosts(const std::string& funcStr,
                                                   bool noCache = false);
 
-    std::shared_ptr<Executor> claimExecutor(faabric::Message& msg);
+    std::shared_ptr<Executor> claimExecutor(
+      faabric::Message& msg,
+      faabric::util::FullLock& schedulerLock);
 
     faabric::HostResources getHostResources(const std::string& host);
 

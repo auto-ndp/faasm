@@ -186,8 +186,7 @@ void Scheduler::removeRegisteredHost(const std::string& host,
 void Scheduler::vacateSlot()
 {
     ZoneScopedNS("Vacate scheduler slot", 5);
-    faabric::util::FullLock lock(mx);
-    thisHostResources.set_usedslots(thisHostResources.usedslots() - 1);
+    thisHostUsedSlots.fetch_sub(1, std::memory_order_acq_rel);
 }
 
 void Scheduler::notifyExecutorShutdown(Executor* exec,
@@ -314,7 +313,8 @@ std::vector<std::string> Scheduler::callFunctions(
 
                 // Do the snapshot diff pushing
                 if (!snapshotDiffs.empty()) {
-                    ZoneScopedN("Scheduler::callFunctions snapshot diff pushing");
+                    ZoneScopedN(
+                      "Scheduler::callFunctions snapshot diff pushing");
                     for (const auto& h : thisRegisteredHosts) {
                         SPDLOG_DEBUG("Pushing {} snapshot diffs for {} to {} "
                                      "(snapshot size up to {} bytes)",
@@ -343,7 +343,8 @@ std::vector<std::string> Scheduler::callFunctions(
             int slots = thisHostResources.slots();
 
             // Work out available cores, flooring at zero
-            int available = slots - thisHostResources.usedslots();
+            int available =
+              slots - this->thisHostUsedSlots.load(std::memory_order_acquire);
             available = std::max<int>(available, 0);
 
             // Claim as many as we can
@@ -495,9 +496,8 @@ std::vector<std::string> Scheduler::callFunctions(
     // in flight
     if (!localMessageIdxs.empty()) {
         ZoneScopedN("Scheduler::callFunctions local execution");
-        // Update slots
-        thisHostResources.set_usedslots(thisHostResources.usedslots() +
-                                        localMessageIdxs.size());
+        this->thisHostUsedSlots.fetch_add((int32_t)localMessageIdxs.size(),
+                                          std::memory_order_acquire);
 
         if (isThreads) {
             // Threads use the existing executor. We assume there's only
@@ -509,7 +509,7 @@ std::vector<std::string> Scheduler::callFunctions(
             if (thisExecutors.empty()) {
                 ZoneScopedN("Scheduler::callFunctions claiming new executor");
                 // Create executor if not exists
-                e = claimExecutor(firstMsg);
+                e = claimExecutor(firstMsg, lock);
             } else if (thisExecutors.size() == 1) {
                 // Use existing executor if exists
                 e = thisExecutors.back();
@@ -532,7 +532,7 @@ std::vector<std::string> Scheduler::callFunctions(
                 std::shared_ptr<Executor> e;
                 {
                     ZoneScopedN("Scheduler::callFunctions claim executor");
-                    e = claimExecutor(firstMsg);
+                    e = claimExecutor(firstMsg, lock);
                 }
                 ZoneScopedN("Scheduler::callFunctions execute tasks");
                 ZoneValue(i);
@@ -718,7 +718,9 @@ Scheduler::getRecordedMessagesShared()
     return recordedMessagesShared;
 }
 
-std::shared_ptr<Executor> Scheduler::claimExecutor(faabric::Message& msg)
+std::shared_ptr<Executor> Scheduler::claimExecutor(
+  faabric::Message& msg,
+  faabric::util::FullLock& schedulerLock)
 {
     std::string funcStr = faabric::util::funcToString(msg, false);
 
@@ -743,8 +745,12 @@ std::shared_ptr<Executor> Scheduler::claimExecutor(faabric::Message& msg)
         int nExecutors = thisExecutors.size();
         SPDLOG_DEBUG(
           "Scaling {} from {} -> {}", funcStr, nExecutors, nExecutors + 1);
-
-        thisExecutors.emplace_back(factory->createExecutor(msg));
+        // Spinning up a new executor can be lengthy, allow other things to run
+        // in parallel
+        schedulerLock.unlock();
+        auto executor = factory->createExecutor(msg);
+        schedulerLock.lock();
+        thisExecutors.push_back(std::move(executor));
         claimed = thisExecutors.back();
 
         // Claim it
@@ -916,12 +922,15 @@ faabric::Message Scheduler::getFunctionResult(unsigned int messageId,
 
 faabric::HostResources Scheduler::getThisHostResources()
 {
+    thisHostResources.set_usedslots(
+      this->thisHostUsedSlots.load(std::memory_order_acquire));
     return thisHostResources;
 }
 
 void Scheduler::setThisHostResources(faabric::HostResources& res)
 {
     thisHostResources = res;
+    this->thisHostUsedSlots.store(res.usedslots(), std::memory_order_release);
 }
 
 faabric::HostResources Scheduler::getHostResources(const std::string& host)
