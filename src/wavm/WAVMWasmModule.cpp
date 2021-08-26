@@ -178,34 +178,60 @@ void WAVMWasmModule::clone(const WAVMWasmModule& other)
     stdoutSize = 0;
 
     if (other._isBound) {
+        ZoneScopedN("WAVMWasmModule::clone::if");
         assert(other.compartment != nullptr);
 
         // Clone compartment
-        compartment = Runtime::cloneCompartment(other.compartment);
+        {
+            ZoneScopedN("WAVMWasmModule::clone::compartment");
+            compartment = Runtime::cloneCompartment(other.compartment);
+        }
 
         // Clone context
-        executionContext =
-          Runtime::cloneContext(other.executionContext, compartment);
+        {
+            ZoneScopedN("WAVMWasmModule::clone::executionContext");
+            executionContext =
+              Runtime::cloneContext(other.executionContext, compartment);
+        }
 
         // Remap parts we need specific references to
-        envModule =
-          Runtime::remapToClonedCompartment(other.envModule, compartment);
-        wasiModule =
-          Runtime::remapToClonedCompartment(other.wasiModule, compartment);
-        moduleInstance =
-          Runtime::remapToClonedCompartment(other.moduleInstance, compartment);
+        {
+            ZoneScopedN("WAVMWasmModule::clone::envModule");
+            envModule =
+              Runtime::remapToClonedCompartment(other.envModule, compartment);
+        }
+        {
+            ZoneScopedN("WAVMWasmModule::clone::wasiModule");
+            wasiModule =
+              Runtime::remapToClonedCompartment(other.wasiModule, compartment);
+        }
+        {
+            ZoneScopedN("WAVMWasmModule::clone::moduleInstance");
+            moduleInstance = Runtime::remapToClonedCompartment(
+              other.moduleInstance, compartment);
+        }
 
         // Extract the memory and table again
-        defaultMemory = Runtime::getDefaultMemory(moduleInstance);
-        defaultTable = Runtime::getDefaultTable(moduleInstance);
+        {
+            ZoneScopedN("WAVMWasmModule::clone::defaultMemory");
+            defaultMemory = Runtime::getDefaultMemory(moduleInstance);
+        }
+        {
+            ZoneScopedN("WAVMWasmModule::clone::defaultTable");
+            defaultTable = Runtime::getDefaultTable(moduleInstance);
+        }
 
         // Reset shared memory variables
-        sharedMemWasmPtrs = other.sharedMemWasmPtrs;
+        {
+            ZoneScopedN("WAVMWasmModule::clone::sharedMemWasmPtrs");
+            sharedMemWasmPtrs = other.sharedMemWasmPtrs;
+        }
 
         // Remap dynamic modules
         lastLoadedDynamicModuleHandle = other.lastLoadedDynamicModuleHandle;
         dynamicPathToHandleMap = other.dynamicPathToHandleMap;
         for (const auto& p : other.dynamicModuleMap) {
+            ZoneScopedN("WAVMWasmModule::clone::dynamicModuleMap[_]");
             Runtime::Instance* newInstance =
               Runtime::remapToClonedCompartment(p.second.ptr, compartment);
 
@@ -214,6 +240,7 @@ void WAVMWasmModule::clone(const WAVMWasmModule& other)
         }
 
         // Copy dynamic linking stuff
+        ZoneScopedN("WAVMWasmModule::clone::GOMaps");
         globalOffsetTableMap = other.globalOffsetTableMap;
         globalOffsetMemoryMap = other.globalOffsetMemoryMap;
         missingGlobalOffsetEntries = other.missingGlobalOffsetEntries;
@@ -850,7 +877,8 @@ int32_t WAVMWasmModule::executeFunction(faabric::Message& msg)
     if (msg.isoutputmemorydelta()) {
         ZoneScopedN("WAVMWasmModule::executeFunction capture pre-exec data");
         auto base = this->getMemoryBase();
-        this->preExecuteMemoryData.assign(base, base + this->getMemorySizeBytes());
+        this->preExecuteMemoryData.assign(base,
+                                          base + this->getMemorySizeBytes());
     }
 
     // Run a specific function if requested
