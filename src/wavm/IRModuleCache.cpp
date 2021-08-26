@@ -1,5 +1,6 @@
 #include <faabric/util/locks.h>
 #include <faabric/util/logging.h>
+#include <faabric/util/timing.h>
 
 #include <WAVM/IR/Module.h>
 #include <WAVM/IR/Types.h>
@@ -152,10 +153,16 @@ Runtime::ModuleRef IRModuleCache::getCompiledSharedModule(
             IR::Module& module = getModuleFromMap(key);
 
             storage::FileLoader& functionLoader = storage::getFileLoader();
-            std::vector<uint8_t> objectBytes =
-              functionLoader.loadSharedObjectObjectFile(path);
-            compiledModuleMap[key] =
-              Runtime::loadPrecompiledModule(module, objectBytes);
+            std::vector<uint8_t> objectBytes;
+            {
+                ZoneScopedN("Load object file");
+                objectBytes = functionLoader.loadSharedObjectObjectFile(path);
+            }
+            {
+                ZoneScopedN("Runtime::loadPrecompiledModule");
+                compiledModuleMap[key] =
+                  Runtime::loadPrecompiledModule(module, objectBytes);
+            }
         }
     } else {
         SPDLOG_DEBUG(

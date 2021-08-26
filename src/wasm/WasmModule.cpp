@@ -603,7 +603,7 @@ void WasmModule::createThreadStacks()
     ZoneValue(threadPoolSize);
     SPDLOG_DEBUG("Creating {} thread stacks", threadPoolSize);
 
-    for (int i = 0; i < threadPoolSize; i++) {
+    for (int i = 0; i < 1; i++) {
         // Allocate thread and guard pages
         uint32_t memSize = THREAD_STACK_SIZE + (2 * GUARD_REGION_SIZE);
         uint32_t memBase = growMemory(memSize);
