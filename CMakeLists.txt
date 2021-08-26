@@ -133,11 +133,12 @@ message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 include_directories(${LLVM_INCLUDE_DIRS})
 add_definitions(${LLVM_DEFINITIONS})
 
+# Faabric
+add_subdirectory(faabric)
+
 # Third party deps
 include(cmake/ExternalProjects.cmake)
 
-# Faabric
-add_subdirectory(faabric)
 include_directories(${CMAKE_CURRENT_LIST_DIR}/faabric/include)
 
 # See https://github.com/bytecodealliance/wasm-micro-runtime/blob/main/doc/build_wamr.md

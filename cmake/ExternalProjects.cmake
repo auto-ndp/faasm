@@ -19,6 +19,7 @@ FetchContent_Declare(wamr_ext
     GIT_TAG "d4a3246b3b10a7792ca69d260d428fe21518a0b3"
 )
 
+set(WAVM_ENABLE_STATIC_LINKING ON CACHE INTERNAL "")
 FetchContent_MakeAvailable(wavm_ext wamr_ext)
 
 # Allow access to headers nested in other projects
