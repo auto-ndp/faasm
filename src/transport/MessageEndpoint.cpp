@@ -157,7 +157,7 @@ Message MessageEndpoint::recvBuffer(zmq::socket_t& socket, int size)
           auto res = socket.recv(zmq::buffer(msg.udata(), msg.size()));
 
           if (!res.has_value()) {
-              SPDLOG_TRACE("Timed out receiving message of size {}", size);
+              SPDLOG_ERROR("Timed out receiving message of size {}", size);
               throw MessageTimeoutException("Timed out receiving message");
           }
 
@@ -189,7 +189,7 @@ Message MessageEndpoint::recvNoBuffer(zmq::socket_t& socket)
       try {
           auto res = socket.recv(msg);
           if (!res.has_value()) {
-              SPDLOG_TRACE("Timed out receiving message with no size");
+              SPDLOG_ERROR("Timed out receiving message with no size");
               throw MessageTimeoutException("Timed out receiving message");
           }
       } catch (zmq::error_t& e) {
