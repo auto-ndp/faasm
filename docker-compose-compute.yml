@@ -3,7 +3,7 @@ version: "3"
 services:
   # Compute
   redis-queue:
-    image: kubasz51/faasm-redis:${FAASM_VERSION}
+    image: kubasz51/faasm-redis:${REDIS_VERSION}
     ports:
       - "6379:6379"
 

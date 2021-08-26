@@ -2,7 +2,7 @@ version: "3"
 
 services:
   redis:
-    image: kubasz51/faasm-redis:${FAASM_VERSION}
+    image: kubasz51/faasm-redis:${REDIS_VERSION}
 
   minio:
     image: kubasz51/faasm-minio:${FAASM_VERSION}
