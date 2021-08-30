@@ -811,7 +811,6 @@ void Scheduler::flushLocally()
 void Scheduler::setFunctionResult(faabric::Message& msg)
 {
     ZoneScopedNS("Scheduler::setFunctionResult", 5);
-    redis::Redis& redis = redis::Redis::getQueue();
 
     // Record which host did the execution
     msg.set_executedhost(faabric::util::getSystemConfig().endpointHost);
@@ -839,6 +838,7 @@ void Scheduler::setFunctionResult(faabric::Message& msg)
 
     // Write the successful result to the result queue
     std::vector<uint8_t> inputData = faabric::util::messageToBytes(msg);
+    redis::Redis& redis = redis::Redis::getQueue();
     redis.publishSchedulerResult(key, msg.statuskey(), inputData);
 }
 
