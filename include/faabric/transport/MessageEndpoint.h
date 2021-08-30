@@ -3,6 +3,7 @@
 #include <faabric/transport/Message.h>
 #include <faabric/util/exception.h>
 
+#include <optional>
 #include <thread>
 #include <optional>
 #include <zmq.hpp>

@@ -47,6 +47,9 @@ else
     return 0
 end
 )---";
+
+    // Script to push and expire function execution results avoiding extra
+    // copies and round-trips
     const std::string_view schedPublishCmd = R"---(
 local key = KEYS[1]
 local status_key = KEYS[2]

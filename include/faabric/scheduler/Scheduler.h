@@ -218,7 +218,8 @@ class Scheduler
     std::set<std::string> availableHostsCache;
     std::unordered_map<std::string, std::set<std::string>> registeredHosts;
 
-    std::unordered_map<uint32_t, std::promise<std::unique_ptr<faabric::Message>>>
+    std::unordered_map<uint32_t,
+                       std::promise<std::unique_ptr<faabric::Message>>>
       localResults;
     std::mutex localResultsMutex;
 

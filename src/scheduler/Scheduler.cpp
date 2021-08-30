@@ -498,6 +498,7 @@ std::vector<std::string> Scheduler::callFunctions(
     // in flight
     if (!localMessageIdxs.empty()) {
         ZoneScopedN("Scheduler::callFunctions local execution");
+        // Update slots
         this->thisHostUsedSlots.fetch_add((int32_t)localMessageIdxs.size(),
                                           std::memory_order_acquire);
 
@@ -818,14 +819,17 @@ void Scheduler::setFunctionResult(faabric::Message& msg)
     // Set finish timestamp
     msg.set_finishtimestamp(faabric::util::getGlobalClock().epochMillis());
 
-    if (msg.executeslocally() && !msg.isasync()) {
+    if (msg.executeslocally()) {
         ZoneScopedNS("Local results publish", 5);
         faabric::util::UniqueLock resultsLock(localResultsMutex);
         auto it = localResults.find(msg.id());
         if (it != localResults.end()) {
             it->second.set_value(std::make_unique<faabric::Message>(msg));
         }
-        return;
+        // Sync messages can't have their results read twice, so skip redis
+        if (!msg.isasync()) {
+            return;
+        }
     }
 
     std::string key = msg.resultkey();
@@ -908,8 +912,8 @@ faabric::Message Scheduler::getFunctionResult(unsigned int messageId,
             }
             fut = it->second.get_future();
         }
-        ZoneScopedNS("Wait for future", 5);
         if (!isBlocking) {
+            ZoneScopedNS("Wait for future", 5);
             auto status = fut.wait_for(std::chrono::milliseconds(timeoutMs));
             if (status == std::future_status::timeout) {
                 faabric::Message msgResult;
@@ -917,6 +921,7 @@ faabric::Message Scheduler::getFunctionResult(unsigned int messageId,
                 return msgResult;
             }
         } else {
+            ZoneScopedNS("Wait for future", 5);
             fut.wait();
         }
         ZoneNamedNS(_zone_grab, "Grab future", 5, true);

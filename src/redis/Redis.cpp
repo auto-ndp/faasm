@@ -7,7 +7,6 @@
 #include <faabric/util/network.h>
 #include <faabric/util/random.h>
 #include <faabric/util/timing.h>
-#include <string_view>
 #include <thread>
 
 namespace faabric::redis {
@@ -29,7 +28,7 @@ RedisInstance::RedisInstance(RedisRole roleIn)
     port = std::stoi(portStr);
 
     // Load scripts
-    if (delifeqSha.empty()) {
+    if (delifeqSha.empty() || schedPublishSha.empty()) {
         std::unique_lock<std::mutex> lock(scriptsLock);
 
         if (delifeqSha.empty() || schedPublishSha.empty()) {

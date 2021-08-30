@@ -59,8 +59,7 @@ faabric::MpiHostsToRanksMessage MpiWorld::recvMpiHostRankMsg()
     }
 
     SPDLOG_TRACE("Receiving MPI host ranks on {}", basePort);
-    std::optional<faabric::transport::Message> mMaybe = ranksRecvEndpoint->recv();
-    faabric::transport::Message &m = mMaybe.value();
+    faabric::transport::Message m = ranksRecvEndpoint->recv().value();
     PARSE_MSG(faabric::MpiHostsToRanksMessage, m.data(), m.size());
 
     return msg;
