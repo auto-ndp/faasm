@@ -1,4 +1,5 @@
 from time import sleep
+import pprint
 
 from faasmcli.util.env import PYTHON_USER, PYTHON_FUNC
 from faasmcli.util.http import do_post
@@ -117,10 +118,15 @@ def invoke_impl(
     msg["master_host"] = "worker"
 
     # Knative must pass custom headers
+    headers = dict()
     if knative:
         headers = get_knative_headers()
+        print("Invoking function at {} ({})".format(url, headers))
     else:
-        headers = {}
+        print("Invoking function at {}".format(url))
+
+    print("Payload:")
+    pprint.pprint(msg)
 
     if asynch:
         return _async_invoke(
