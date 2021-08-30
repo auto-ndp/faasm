@@ -75,7 +75,7 @@ services:
       - NETNS_MODE=off
       - REDIS_QUEUE_HOST=redis-queue
       - REDIS_STATE_HOST=redis-state
-      - STATE_MODE=inmemory
+      - STATE_MODE=redis
       - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
       - ENDPOINT_HOST=worker
       - OVERRIDE_CPU_COUNT=8
@@ -109,7 +109,7 @@ services:
       - NETNS_MODE=off
       - REDIS_QUEUE_HOST=redis-queue
       - REDIS_STATE_HOST=redis-state
-      - STATE_MODE=inmemory
+      - STATE_MODE=redis
       - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
       - ENDPOINT_HOST=worker-storage
       - OVERRIDE_CPU_COUNT=8

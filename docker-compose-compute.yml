@@ -32,6 +32,7 @@ services:
       - NETNS_MODE=off
       - REDIS_QUEUE_HOST=${COMPUTE_NODE}
       - REDIS_STATE_HOST=${STORAGE_NODE}
+      - STATE_MODE=redis
       - S3_HOST=${STORAGE_NODE}
       - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
       - ENDPOINT_HOST=${COMPUTE_NODE}
