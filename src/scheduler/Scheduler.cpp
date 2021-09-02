@@ -655,6 +655,13 @@ int Scheduler::scheduleFunctionsOnHost(
         auto* newMsg = hostRequest->add_messages();
         *newMsg = req->messages().at(i);
         newMsg->set_executeslocally(false);
+        if (!newMsg->directresulthost().empty()) {
+            ZoneScopedN("Create local result promise");
+            faabric::util::UniqueLock resultsLock(localResultsMutex);
+            localResults.insert(
+              { newMsg->id(),
+                std::promise<std::unique_ptr<faabric::Message>>() });
+        }
         records.at(i) = host;
     }
 
@@ -812,14 +819,41 @@ void Scheduler::setFunctionResult(faabric::Message& msg)
 {
     ZoneScopedNS("Scheduler::setFunctionResult", 5);
 
+    const auto& myHostname = faabric::util::getSystemConfig().endpointHost;
+
+    const auto& directResultHost = msg.directresulthost();
+    if (directResultHost == myHostname) {
+        faabric::util::UniqueLock resultsLock(localResultsMutex);
+        auto it = localResults.find(msg.id());
+        if (it != localResults.end()) {
+            it->second.set_value(std::make_unique<faabric::Message>(msg));
+        } else {
+            throw std::runtime_error(
+              "Got direct result, but promise is registered");
+        }
+        return;
+    }
+
     // Record which host did the execution
-    msg.set_executedhost(faabric::util::getSystemConfig().endpointHost);
+    msg.set_executedhost(myHostname);
 
     // Set finish timestamp
     msg.set_finishtimestamp(faabric::util::getGlobalClock().epochMillis());
 
+    if (!directResultHost.empty()) {
+        ZoneScopedN("Direct result send");
+        faabric::util::FullLock lock(mx);
+        auto& fc = getFunctionCallClient(directResultHost);
+        lock.unlock();
+        {
+            ZoneScopedN("Socket send");
+            fc.sendDirectResult(msg);
+        }
+        return;
+    }
+
     if (msg.executeslocally()) {
-        ZoneScopedNS("Local results publish", 5);
+        ZoneScopedN("Local results publish");
         faabric::util::UniqueLock resultsLock(localResultsMutex);
         auto it = localResults.find(msg.id());
         if (it != localResults.end()) {

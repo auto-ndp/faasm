@@ -152,6 +152,11 @@ message Message {
     bool isStorage = 38;
     bool isOutputMemoryDelta = 39;
     bytes zygoteDelta = 40;
+    string directResultHost = 41;
+}
+
+message DirectResultTransmission {
+    Message result = 1;
 }
 
 // ---------------------------------------------
