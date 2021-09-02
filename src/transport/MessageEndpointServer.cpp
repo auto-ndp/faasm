@@ -24,6 +24,8 @@ void MessageEndpointServerThread::start(
 {
     backgroundThread = std::thread([this, latch] {
         std::unique_ptr<RecvMessageEndpoint> endpoint = nullptr;
+        std::vector<uint8_t> msgBuffer;
+        msgBuffer.reserve(8192);
         int port = -1;
 
         if (async) {
@@ -84,14 +86,14 @@ void MessageEndpointServerThread::start(
                   server->doSyncRecv(header, body.udata(), body.size());
                 size_t respSize = resp->ByteSizeLong();
 
-                uint8_t buffer[respSize];
-                if (!resp->SerializeToArray(buffer, respSize)) {
+                msgBuffer.resize(respSize);
+                if (!resp->SerializeToArray(msgBuffer.data(), msgBuffer.size())) {
                     throw std::runtime_error("Error serialising message");
                 }
 
                 // Return the response
                 static_cast<SyncRecvMessageEndpoint*>(endpoint.get())
-                  ->sendResponse(buffer, respSize);
+                  ->sendResponse(msgBuffer.data(), msgBuffer.size());
             }
 
             // Wait on the async latch if necessary

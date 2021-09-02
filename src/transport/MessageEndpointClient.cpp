@@ -1,5 +1,6 @@
 #include <faabric/transport/MessageEndpointClient.h>
 #include <faabric/util/timing.h>
+#include <vector>
 
 namespace faabric::transport {
 
@@ -14,19 +15,23 @@ MessageEndpointClient::MessageEndpointClient(std::string hostIn,
   , syncEndpoint(host, syncPort, timeoutMs)
 {}
 
+namespace {
+thread_local std::vector<uint8_t> msgBuffer;
+}
+
 void MessageEndpointClient::asyncSend(int header,
                                       google::protobuf::Message* msg)
 {
     ZoneScopedNS("MessageEndpointClient::asyncSend@2", 6);
     size_t msgSize = msg->ByteSizeLong();
-    uint8_t buffer[msgSize];
+    msgBuffer.resize(msgSize);
 
     TracyMessageL("Serialized");
-    if (!msg->SerializeToArray(buffer, msgSize)) {
+    if (!msg->SerializeToArray(msgBuffer.data(), msgBuffer.size())) {
         throw std::runtime_error("Error serialising message");
     }
 
-    asyncSend(header, buffer, msgSize);
+    asyncSend(header, msgBuffer.data(), msgBuffer.size());
 }
 
 void MessageEndpointClient::asyncSend(int header,
@@ -45,13 +50,13 @@ void MessageEndpointClient::syncSend(int header,
 {
     ZoneScopedNS("MessageEndpointClient::syncSend@3", 6);
     size_t msgSize = msg->ByteSizeLong();
-    uint8_t buffer[msgSize];
-    if (!msg->SerializeToArray(buffer, msgSize)) {
+    msgBuffer.resize(msgSize);
+    if (!msg->SerializeToArray(msgBuffer.data(), msgBuffer.size())) {
         throw std::runtime_error("Error serialising message");
     }
     TracyMessageL("Serialized");
 
-    syncSend(header, buffer, msgSize, response);
+    syncSend(header, msgBuffer.data(), msgBuffer.size(), response);
 }
 
 void MessageEndpointClient::syncSend(int header,
