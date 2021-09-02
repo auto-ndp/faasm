@@ -533,6 +533,9 @@ std::vector<std::string> Scheduler::callFunctions(
             // Non-threads require one executor per task
             for (auto i : localMessageIdxs) {
                 faabric::Message& localMsg = req->mutable_messages()->at(i);
+                if (localMsg.directresulthost() == config.endpointHost) {
+                    localMsg.set_directresulthost("");
+                }
                 if (localMsg.executeslocally()) {
                     faabric::util::UniqueLock resultsLock(localResultsMutex);
                     localResults.insert(
