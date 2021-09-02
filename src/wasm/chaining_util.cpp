@@ -2,6 +2,7 @@
 
 #include <faabric/scheduler/Scheduler.h>
 #include <faabric/util/bytes.h>
+#include <faabric/util/config.h>
 #include <faabric/util/func.h>
 #include <faabric/util/logging.h>
 
@@ -36,6 +37,7 @@ int makeChainedCall(const std::string& functionName,
                     const std::vector<uint8_t>& inputData,
                     bool isStorage)
 {
+    const auto& fcfg = faabric::util::getSystemConfig();
     faabric::scheduler::Scheduler& sch = faabric::scheduler::getScheduler();
     faabric::Message* originalCall = getExecutingCall();
 
@@ -51,6 +53,7 @@ int makeChainedCall(const std::string& functionName,
     msg.set_inputdata(inputData.data(), inputData.size());
     msg.set_funcptr(wasmFuncPtr);
     msg.set_isstorage(isStorage);
+    msg.set_directresulthost(fcfg.endpointHost);
 
     msg.set_pythonuser(originalCall->pythonuser());
     msg.set_pythonfunction(originalCall->pythonfunction());
