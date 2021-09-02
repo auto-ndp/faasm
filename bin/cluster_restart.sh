@@ -11,9 +11,13 @@ source ./bin/cluster_env.sh
 
 echo FAASM_BUILD_MOUNT: $FAASM_BUILD_MOUNT
 
+docker-compose -f docker-compose.yml exec redis-queue redis-cli flushall
+
+docker-compose -f docker-compose.yml exec redis-state redis-cli flushall
+
 docker-compose -f docker-compose.yml \
     up \
-    --force-recreate \
+    --force-recreate --no-deps \
     --timeout 1 \
     -d \
     worker worker-storage
