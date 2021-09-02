@@ -54,6 +54,7 @@ int makeChainedCall(const std::string& functionName,
     msg.set_funcptr(wasmFuncPtr);
     msg.set_isstorage(isStorage);
     msg.set_directresulthost(fcfg.endpointHost);
+    msg.set_executeslocally(true);
 
     msg.set_pythonuser(originalCall->pythonuser());
     msg.set_pythonfunction(originalCall->pythonfunction());
