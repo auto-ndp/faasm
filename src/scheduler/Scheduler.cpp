@@ -862,10 +862,7 @@ void Scheduler::setFunctionResult(faabric::Message& msg)
         if (it != localResults.end()) {
             it->second.set_value(std::make_unique<faabric::Message>(msg));
         }
-        // Sync messages can't have their results read twice, so skip redis
-        if (!msg.isasync()) {
-            return;
-        }
+        return;
     }
 
     std::string key = msg.resultkey();
