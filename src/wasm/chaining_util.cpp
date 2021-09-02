@@ -168,6 +168,7 @@ int chainNdpCall(const std::string& zygoteDelta,
                  int funcPtr,
                  const char* pyFuncName)
 {
+    const auto& fcfg = faabric::util::getSystemConfig();
     faabric::scheduler::Scheduler& sch = faabric::scheduler::getScheduler();
 
     faabric::Message* originalCall = getExecutingCall();
@@ -185,6 +186,7 @@ int chainNdpCall(const std::string& zygoteDelta,
     call.set_isstorage(true);
     call.set_isoutputmemorydelta(true);
     call.set_cmdline(originalCall->cmdline());
+    call.set_directresulthost(fcfg.endpointHost);
 
     call.set_pythonuser(originalCall->pythonuser());
     call.set_pythonfunction(originalCall->pythonfunction());
@@ -199,13 +201,12 @@ int chainNdpCall(const std::string& zygoteDelta,
 
     // Schedule the call
     sch.callFunction(call);
-    SPDLOG_DEBUG(
-      "Chained NDP call {} ({}) -> {} {}() py?:{}",
-      origStr,
-      faabric::util::getSystemConfig().endpointHost,
-      chainedStr,
-      funcPtr,
-      pyFuncName ? pyFuncName : "wasmptr");
+    SPDLOG_DEBUG("Chained NDP call {} ({}) -> {} {}() py?:{}",
+                 origStr,
+                 faabric::util::getSystemConfig().endpointHost,
+                 chainedStr,
+                 funcPtr,
+                 pyFuncName ? pyFuncName : "wasmptr");
 
     return call.id();
 }
