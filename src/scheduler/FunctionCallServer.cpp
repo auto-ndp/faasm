@@ -6,6 +6,7 @@
 #include <faabric/util/config.h>
 #include <faabric/util/func.h>
 #include <faabric/util/logging.h>
+#include <faabric/util/timing.h>
 
 namespace faabric::scheduler {
 FunctionCallServer::FunctionCallServer()
@@ -27,10 +28,6 @@ void FunctionCallServer::doAsyncRecv(int header,
             recvUnregister(buffer, bufferSize);
             break;
         }
-        case faabric::scheduler::FunctionCalls::DirectResult: {
-            recvDirectResult(buffer, bufferSize);
-            break;
-        }
         default: {
             throw std::runtime_error(
               fmt::format("Unrecognized async call header: {}", header));
@@ -49,6 +46,10 @@ std::unique_ptr<google::protobuf::Message> FunctionCallServer::doSyncRecv(
         }
         case faabric::scheduler::FunctionCalls::GetResources: {
             return recvGetResources(buffer, bufferSize);
+        }
+        case faabric::scheduler::FunctionCalls::DirectResult: {
+            recvDirectResult(buffer, bufferSize);
+            return std::make_unique<faabric::EmptyResponse>();
         }
         default: {
             throw std::runtime_error(
@@ -73,6 +74,7 @@ std::unique_ptr<google::protobuf::Message> FunctionCallServer::recvFlush(
 void FunctionCallServer::recvExecuteFunctions(const uint8_t* buffer,
                                               size_t bufferSize)
 {
+    ZoneScopedNS("FunctionCallServer::recvExecuteFunctions", 6);
     PARSE_MSG(faabric::BatchExecuteRequest, buffer, bufferSize)
 
     // This host has now been told to execute these functions no matter what
@@ -97,6 +99,7 @@ std::unique_ptr<google::protobuf::Message> FunctionCallServer::recvGetResources(
   const uint8_t* buffer,
   size_t bufferSize)
 {
+    ZoneScopedNS("FunctionCallServer::recvGetResources", 6);
     auto response = std::make_unique<faabric::HostResources>(
       scheduler.getThisHostResources());
     return response;
@@ -105,6 +108,7 @@ std::unique_ptr<google::protobuf::Message> FunctionCallServer::recvGetResources(
 void FunctionCallServer::recvDirectResult(const uint8_t* buffer,
                                           size_t bufferSize)
 {
+    ZoneScopedNS("FunctionCallServer::recvDirectResult", 6);
     PARSE_MSG(faabric::DirectResultTransmission, buffer, bufferSize)
 
     scheduler.setFunctionResult(*msg.mutable_result());

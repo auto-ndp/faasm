@@ -4,6 +4,7 @@
 #include <faabric/transport/macros.h>
 #include <faabric/util/queue.h>
 #include <faabric/util/testing.h>
+#include <faabric/util/timing.h>
 
 namespace faabric::scheduler {
 
@@ -99,6 +100,7 @@ void FunctionCallClient::sendFlush()
 
 faabric::HostResources FunctionCallClient::getResources()
 {
+    ZoneScopedNS("FunctionCallClient::getResources", 6);
     faabric::EmptyRequest request;
     faabric::HostResources response;
 
@@ -123,6 +125,7 @@ faabric::HostResources FunctionCallClient::getResources()
 void FunctionCallClient::executeFunctions(
   const std::shared_ptr<faabric::BatchExecuteRequest> req)
 {
+    ZoneScopedNS("FunctionCallClient::executeFunctions", 6);
     if (faabric::util::isMockMode()) {
         faabric::util::UniqueLock lock(mockMutex);
         batchMessages.emplace_back(host, req);
@@ -134,9 +137,11 @@ void FunctionCallClient::executeFunctions(
 
 void FunctionCallClient::sendDirectResult(faabric::Message msg)
 {
+    ZoneScopedNS("FunctionCallClient::sendDirectResult", 6);
     faabric::DirectResultTransmission drt;
     drt.mutable_result()->CopyFrom(msg);
-    asyncSend(faabric::scheduler::FunctionCalls::DirectResult, &drt);
+    faabric::EmptyResponse response;
+    syncSend(faabric::scheduler::FunctionCalls::DirectResult, &drt, &response);
 }
 
 void FunctionCallClient::unregister(faabric::UnregisterRequest& req)
