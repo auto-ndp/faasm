@@ -149,6 +149,9 @@ class WAVMWasmModule final
                            uint32_t stackTop,
                            faabric::Message& msg) override;
 
+    std::vector<int32_t> getGlobals();
+    void updateGlobal(size_t idx, int32_t value);
+
   private:
     WAVM::Runtime::GCPointer<WAVM::Runtime::Instance> envModule;
     WAVM::Runtime::GCPointer<WAVM::Runtime::Instance> wasiModule;

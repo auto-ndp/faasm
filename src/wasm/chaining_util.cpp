@@ -167,7 +167,8 @@ faabric::Message awaitChainedCallMessage(unsigned int messageId)
 int chainNdpCall(const std::string& zygoteDelta,
                  const std::string& inputData,
                  int funcPtr,
-                 const char* pyFuncName)
+                 const char* pyFuncName,
+                 const std::vector<int32_t>& wasmGlobals)
 {
     const auto& fcfg = faabric::util::getSystemConfig();
     faabric::scheduler::Scheduler& sch = faabric::scheduler::getScheduler();
@@ -186,6 +187,7 @@ int chainNdpCall(const std::string& zygoteDelta,
     call.set_inputdata(inputData);
     call.set_isstorage(true);
     call.set_isoutputmemorydelta(true);
+    call.mutable_wasmglobals()->Assign(wasmGlobals.cbegin(), wasmGlobals.cend());
     call.set_cmdline(originalCall->cmdline());
     call.set_directresulthost(fcfg.endpointHost);
 

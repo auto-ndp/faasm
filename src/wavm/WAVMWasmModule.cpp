@@ -906,6 +906,18 @@ int32_t WAVMWasmModule::executeFunction(faabric::Message& msg)
                                           base + this->getMemorySizeBytes());
     }
 
+    // Restore globals if necessary
+    if (!msg.wasmglobals().empty()) {
+        const auto& globals = moduleInstance->globals;
+        for (size_t i = 0;
+             i < std::min(globals.size(), (size_t)msg.wasmglobals_size());
+             i++) {
+            Runtime::setGlobalValue(executionContext,
+                                    globals.at(i),
+                                    WAVM::IR::Value((I32)msg.wasmglobals(i)));
+        }
+    }
+
     // Run a specific function if requested
     if (funcPtr > 0) {
         // Get the function this pointer refers to
@@ -983,9 +995,39 @@ int32_t WAVMWasmModule::executeFunction(faabric::Message& msg)
         auto delta = this->deltaSnapshot(oldDataSnap);
         this->preExecuteMemoryData.clear();
         msg.set_outputdata(delta.data(), delta.size());
+
+        const auto& globals = moduleInstance->globals;
+        msg.clear_wasmglobals();
+        for (size_t i = 0; i < globals.size(); i++) {
+            msg.add_wasmglobals(
+              Runtime::getGlobalValue(executionContext, globals.at(i)).i32);
+        }
     }
 
     return returnValue;
+}
+
+std::vector<int32_t> WAVMWasmModule::getGlobals()
+{
+    std::vector<int32_t> out;
+    const auto& globals = moduleInstance->globals;
+    out.reserve(globals.size());
+    for (size_t i = 0; i < globals.size(); i++) {
+        out.push_back(
+          Runtime::getGlobalValue(executionContext, globals.at(i)).i32);
+    }
+    return out;
+}
+
+void WAVMWasmModule::updateGlobal(size_t idx, int32_t value)
+{
+    if (idx >= moduleInstance->globals.size()) {
+        SPDLOG_WARN("WAVMWasmModule::updateGlobal out out range {}", idx);
+        return;
+    }
+    Runtime::setGlobalValue(executionContext,
+                            moduleInstance->globals.at(idx),
+                            WAVM::IR::Value((I32)value));
 }
 
 int32_t WAVMWasmModule::executePthread(int threadPoolIdx,

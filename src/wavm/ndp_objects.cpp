@@ -207,8 +207,12 @@ I32 storageCallAndAwaitImpl(I32 wasmFuncPtr, I32 pyFuncNamePtr)
                     call->id(),
                     zygoteDelta.size());
         TracyMessageL("Chain call");
-        int ndpCallId = chainNdpCall(
-          zygoteDelta, call->inputdata(), wasmFuncPtr, pyFuncName.c_str());
+        std::vector<int32_t> wasmGlobals = thisModule->getGlobals();
+        int ndpCallId = chainNdpCall(zygoteDelta,
+                                     call->inputdata(),
+                                     wasmFuncPtr,
+                                     pyFuncName.c_str(),
+                                     wasmGlobals);
         TracyMessageL("Await call");
         faabric::Message ndpResult = awaitChainedCallMessage(ndpCallId);
         TracyMessageL("Call returned");
@@ -218,6 +222,18 @@ I32 storageCallAndAwaitImpl(I32 wasmFuncPtr, I32 pyFuncNamePtr)
             SPDLOG_DEBUG("Chained NDP resulted in error code {}",
                          ndpResult.returnvalue());
             return ndpResult.returnvalue();
+        }
+
+        {
+            // restore globals
+            for (int i = 0; i < ndpResult.wasmglobals_size(); i++) {
+                int32_t value = ndpResult.wasmglobals(i);
+                SPDLOG_DEBUG("Restoring global #{}: new {} <- old {}",
+                             i,
+                             value,
+                             wasmGlobals.at(i));
+                thisModule->updateGlobal(i, value);
+            }
         }
 
         SPDLOG_INFO("{} - NDP delta restore from {} bytes",
