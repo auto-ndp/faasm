@@ -25,6 +25,7 @@ void MessageEndpointClient::asyncSend(int header,
     ZoneScopedNS("MessageEndpointClient::asyncSend@2", 6);
     size_t msgSize = msg->ByteSizeLong();
     msgBuffer.resize(msgSize);
+    ZoneValue(msgSize);
 
     TracyMessageL("Serialized");
     if (!msg->SerializeToArray(msgBuffer.data(), msgBuffer.size())) {
@@ -39,6 +40,7 @@ void MessageEndpointClient::asyncSend(int header,
                                       size_t bufferSize)
 {
     ZoneScopedNS("MessageEndpointClient::asyncSend@3", 6);
+    ZoneValue(bufferSize);
     asyncEndpoint.sendHeader(header);
     TracyMessageL("Header sent");
     asyncEndpoint.send(buffer, bufferSize);
@@ -50,6 +52,7 @@ void MessageEndpointClient::syncSend(int header,
 {
     ZoneScopedNS("MessageEndpointClient::syncSend@3", 6);
     size_t msgSize = msg->ByteSizeLong();
+    ZoneValue(msgSize);
     msgBuffer.resize(msgSize);
     if (!msg->SerializeToArray(msgBuffer.data(), msgBuffer.size())) {
         throw std::runtime_error("Error serialising message");
@@ -65,6 +68,7 @@ void MessageEndpointClient::syncSend(int header,
                                      google::protobuf::Message* response)
 {
     ZoneScopedNS("MessageEndpointClient::syncSend@4", 6);
+    ZoneValue(bufferSize);
     syncEndpoint.sendHeader(header);
     TracyMessageL("Header sent");
 
