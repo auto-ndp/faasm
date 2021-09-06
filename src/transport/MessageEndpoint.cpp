@@ -4,6 +4,7 @@
 #include <faabric/util/gids.h>
 #include <faabric/util/logging.h>
 #include <faabric/util/macros.h>
+#include <faabric/util/timing.h>
 
 #include <unistd.h>
 
@@ -67,6 +68,8 @@ MessageEndpoint::MessageEndpoint(const std::string& hostIn,
 zmq::socket_t MessageEndpoint::setUpSocket(zmq::socket_type socketType,
                                            int socketPort)
 {
+    ZoneScopedNS("MessageEndpoint::setUpSocket", 6);
+    ZoneValue(socketPort);
     zmq::socket_t socket;
 
     // Create the socket
@@ -117,6 +120,8 @@ void MessageEndpoint::doSend(zmq::socket_t& socket,
                              size_t dataSize,
                              bool more)
 {
+    ZoneScopedNS("MessageEndpoint::doSend", 6);
+    ZoneValue(dataSize);
     assert(tid == std::this_thread::get_id());
     zmq::send_flags sendFlags =
       more ? zmq::send_flags::sndmore : zmq::send_flags::none;
@@ -150,6 +155,8 @@ std::optional<Message> MessageEndpoint::doRecv(zmq::socket_t& socket, int size)
 std::optional<Message> MessageEndpoint::recvBuffer(zmq::socket_t& socket,
                                                    int size)
 {
+    ZoneScopedNS("MessageEndpoint::recvBuffer", 6);
+    ZoneValue(size);
     // Pre-allocate buffer to avoid copying data
     Message msg(size);
 
@@ -184,6 +191,7 @@ std::optional<Message> MessageEndpoint::recvBuffer(zmq::socket_t& socket,
 
 std::optional<Message> MessageEndpoint::recvNoBuffer(zmq::socket_t& socket)
 {
+    ZoneScopedNS("MessageEndpoint::recvNoBuffer", 6);
     // Allocate a message to receive data
     zmq::message_t msg;
     CATCH_ZMQ_ERR(
@@ -202,6 +210,7 @@ std::optional<Message> MessageEndpoint::recvNoBuffer(zmq::socket_t& socket)
       },
       "recv_no_buffer")
 
+    ZoneValue(msg.size());
     // Copy the received message to a buffer whose scope we control
     return Message(msg);
 }
