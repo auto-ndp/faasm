@@ -140,8 +140,7 @@ void FunctionCallClient::sendDirectResult(faabric::Message msg)
     ZoneScopedNS("FunctionCallClient::sendDirectResult", 6);
     faabric::DirectResultTransmission drt;
     drt.mutable_result()->CopyFrom(msg);
-    faabric::EmptyResponse response;
-    syncSend(faabric::scheduler::FunctionCalls::DirectResult, &drt, &response);
+    asyncSend(faabric::scheduler::FunctionCalls::DirectResult, &drt);
 }
 
 void FunctionCallClient::unregister(faabric::UnregisterRequest& req)

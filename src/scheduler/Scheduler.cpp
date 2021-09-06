@@ -821,6 +821,7 @@ void Scheduler::flushLocally()
 void Scheduler::setFunctionResult(faabric::Message& msg)
 {
     ZoneScopedNS("Scheduler::setFunctionResult", 5);
+    ZoneValue(msg->ByteSizeLong());
 
     const auto& myHostname = faabric::util::getSystemConfig().endpointHost;
 
