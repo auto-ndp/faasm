@@ -153,6 +153,7 @@ message Message {
     bool isOutputMemoryDelta = 39;
     bytes zygoteDelta = 40;
     string directResultHost = 41;
+    repeated int32 wasmGlobals = 42;
 }
 
 message DirectResultTransmission {
