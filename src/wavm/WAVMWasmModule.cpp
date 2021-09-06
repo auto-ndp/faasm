@@ -906,18 +906,6 @@ int32_t WAVMWasmModule::executeFunction(faabric::Message& msg)
                                           base + this->getMemorySizeBytes());
     }
 
-    // Restore globals if necessary
-    if (!msg.wasmglobals().empty()) {
-        const auto& globals = moduleInstance->globals;
-        for (size_t i = 0;
-             i < std::min(globals.size(), (size_t)msg.wasmglobals_size());
-             i++) {
-            Runtime::setGlobalValue(executionContext,
-                                    globals.at(i),
-                                    WAVM::IR::Value((I32)msg.wasmglobals(i)));
-        }
-    }
-
     // Run a specific function if requested
     if (funcPtr > 0) {
         // Get the function this pointer refers to
@@ -956,6 +944,16 @@ int32_t WAVMWasmModule::executeFunction(faabric::Message& msg)
         // Get the main entrypoint function
         funcInstance = getMainFunction(moduleInstance);
         funcType = IR::FunctionType({}, {});
+    }
+
+    // Restore globals if necessary
+    if (!msg.wasmglobals().empty()) {
+        const auto& globals = moduleInstance->globals;
+        for (size_t i = 0;
+             i < std::min(globals.size(), (size_t)msg.wasmglobals_size());
+             i++) {
+            this->updateGlobal(i, msg.wasmglobals(i));
+        }
     }
 
     // Call the function
@@ -1013,8 +1011,11 @@ std::vector<int32_t> WAVMWasmModule::getGlobals()
     const auto& globals = moduleInstance->globals;
     out.reserve(globals.size());
     for (size_t i = 0; i < globals.size(); i++) {
+        auto global = globals.at(i);
         out.push_back(
-          Runtime::getGlobalValue(executionContext, globals.at(i)).i32);
+          global == nullptr
+            ? 0
+            : Runtime::getGlobalValue(executionContext, global).i32);
     }
     return out;
 }
@@ -1025,9 +1026,18 @@ void WAVMWasmModule::updateGlobal(size_t idx, int32_t value)
         SPDLOG_WARN("WAVMWasmModule::updateGlobal out out range {}", idx);
         return;
     }
-    Runtime::setGlobalValue(executionContext,
-                            moduleInstance->globals.at(idx),
-                            WAVM::IR::Value((I32)value));
+    auto global = moduleInstance->globals.at(idx);
+    if (global == nullptr) {
+        SPDLOG_WARN("WAVMWasmModule::updateGlobal is nullptr {}", idx);
+        return;
+    }
+    I32 newVal = value;
+    I32 oldVal = Runtime::getGlobalValue(executionContext, global).i32;
+    if (newVal != oldVal) {
+        SPDLOG_DEBUG("Changing global #{} to {} from {}", i, newVal, oldVal);
+        Runtime::setGlobalValue(
+          executionContext, global, WAVM::IR::Value(newVal));
+    }
 }
 
 int32_t WAVMWasmModule::executePthread(int threadPoolIdx,
