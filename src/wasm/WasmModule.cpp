@@ -141,6 +141,7 @@ void WasmModule::restore(const std::string& snapshotKey)
     }
 
     // Map the snapshot into memory
+    ZoneValue(data.size);
     uint8_t* memoryBase = getMemoryBase();
     reg.mapSnapshot(snapshotKey, memoryBase);
 }
@@ -170,8 +171,14 @@ void WasmModule::zygoteDeltaRestore(const std::vector<uint8_t>& zygoteDelta)
     }
     uint8_t* memoryBase = getMemoryBase();
     auto kv = state.getKV(this->getBoundUser(), zKey, zygSnapSize);
-    kv->get(memoryBase);
-    this->deltaRestore(zygoteDelta);
+    {
+        ZoneScopedN("kv->get");
+        kv->get(memoryBase);
+    }
+    {
+        ZoneScopedN("deltaRestore(zygoteDelta)");
+        this->deltaRestore(zygoteDelta);
+    }
 }
 
 std::shared_ptr<faabric::state::StateKeyValue> WasmModule::getZygoteSnapshot()
@@ -186,6 +193,7 @@ std::shared_ptr<faabric::state::StateKeyValue> WasmModule::getZygoteSnapshot()
         throw std::runtime_error("Couldn't find zygote snapshot " + zKey);
     }
     SPDLOG_DEBUG("Found zygote snapshot {} of size {}", zKey, zygSnapSize);
+    ZoneValue(zygSnapSize);
     return state.getKV(this->getBoundUser(), zKey, zygSnapSize);
 }
 
@@ -209,6 +217,7 @@ void WasmModule::storeZygoteSnapshot()
                  this->getBoundUser(),
                  zKey,
                  memorySize);
+    ZoneValue(memorySize);
     auto kv = state.getKV(this->getBoundUser(), zKey, memorySize);
     kv->set(memoryBase);
     kv->pushFull();
@@ -221,25 +230,38 @@ std::vector<uint8_t> WasmModule::deltaSnapshot(
     ZoneScopedNS("WasmModule::deltaSnapshot", 6);
     auto newMemData = getMemoryBase();
     auto newMemSize = getMemorySizeBytes();
-    for (const auto& [ptr, len] : this->snapshotExcludedPtrLens) {
-        std::fill_n(newMemData + ptr, len, uint8_t(0));
+    {
+        ZoneScopedN("exclude zones");
+        size_t total_len = 0;
+        for (const auto& [ptr, len] : this->snapshotExcludedPtrLens) {
+            std::fill_n(newMemData + ptr, len, uint8_t(0));
+            total_len += len;
+        }
+        (void)total_len;
+        ZoneValue(total_len);
     }
     const auto& cfg = faabric::util::getSystemConfig();
     faabric::util::DeltaSettings dcfg(cfg.deltaSnapshotEncoding);
-    return faabric::util::serializeDelta(
-      dcfg, oldMemory.data, oldMemory.size, newMemData, newMemSize);
+    {
+        ZoneScopedN("Serialize delta");
+        ZoneValue(newMemSize);
+        return faabric::util::serializeDelta(
+          dcfg, oldMemory.data, oldMemory.size, newMemData, newMemSize);
+    }
 }
 
 void WasmModule::deltaRestore(const std::vector<uint8_t>& delta)
 {
     ZoneScopedNS("WasmModule::deltaRestore", 6);
     auto memSize = getMemorySizeBytes();
+    ZoneValue(memSize);
 
     faabric::util::applyDelta(
       delta,
       [&](uint32_t newSize) {
           if (newSize > getCurrentBrk()) {
               this->growMemory(newSize - getCurrentBrk());
+              ZoneValue(newSize);
               memSize = newSize;
           }
       },
@@ -455,7 +477,7 @@ int32_t WasmModule::executeTask(
     if (req->type() == faabric::BatchExecuteRequest::THREADS) {
         // Modules must have provisioned their own thread stacks
         assert(!threadStacks.empty());
-        while(threadStacks.size() <= threadPoolIdx) {
+        while (threadStacks.size() <= threadPoolIdx) {
             addThreadStack();
         }
         uint32_t stackTop = threadStacks.at(threadPoolIdx);
