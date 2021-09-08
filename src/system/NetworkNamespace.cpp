@@ -21,6 +21,9 @@ std::mutex namespacesLock;
 
 void returnNetworkNamespace(std::shared_ptr<NetworkNamespace> ns)
 {
+    if (ns->getMode() == NetworkIsolationMode::ns_off) {
+        return;
+    }
     faabric::util::UniqueLock lock(namespacesLock);
     namespaces.emplace_back(ns);
 }
@@ -51,6 +54,9 @@ std::shared_ptr<NetworkNamespace> claimNetworkNamespace()
     faabric::util::UniqueLock lock(namespacesLock);
 
     std::shared_ptr<NetworkNamespace> res = namespaces.back();
+    if (res->getMode() == NetworkIsolationMode::ns_off) {
+        return res;
+    }
     namespaces.pop_back();
     return res;
 }
