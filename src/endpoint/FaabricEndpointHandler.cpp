@@ -48,6 +48,9 @@ void FaabricEndpointHandler::onRequest(const Pistache::Http::Request& request,
 
     // Parse message from JSON in request
     const std::string requestStr = request.body();
+    if (requestStr.size() > 1) {
+        ZoneText(requestStr.data(), std::min(requestStr.size(), size_t(48)));
+    }
     std::pair<int, std::string> result = handleFunction(requestStr);
 
     PROF_END(endpointRoundTrip)
