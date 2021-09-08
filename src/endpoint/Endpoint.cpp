@@ -41,7 +41,7 @@ void Endpoint::start(bool awaitSignal)
     // Configure endpoint
     auto opts = Pistache::Http::Endpoint::options()
                   .threads(threadCount)
-                  .backlog(256)
+                  .backlog(-1)
                   .flags(Pistache::Tcp::Options::ReuseAddr);
 
     httpEndpoint.init(opts);
