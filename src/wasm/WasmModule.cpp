@@ -657,7 +657,7 @@ bool WasmModule::isBound()
 
 void WasmModule::reset(faabric::Message& msg)
 {
-    SPDLOG_WARN("Using default reset of wasm module");
+    snapshotExcludedPtrLens.clear();
 }
 
 void WasmModule::doBindToFunction(faabric::Message& msg, bool cache)

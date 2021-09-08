@@ -79,6 +79,7 @@ void WAVMWasmModule::clearCaches()
 void WAVMWasmModule::reset(faabric::Message& msg)
 {
     ZoneScopedNS("WAVMWasmModule::reset", 5);
+    WasmModule::reset(msg);
     if (!_isBound) {
         return;
     }
