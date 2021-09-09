@@ -522,6 +522,7 @@ std::vector<std::string> Scheduler::callFunctions(
         this->thisHostUsedSlots.fetch_add((int32_t)localMessageIdxs.size(),
                                           std::memory_order_acquire);
 
+        bool executed = false;
         if (isThreads) {
             // Threads use the existing executor. We assume there's only
             // one running at a time.
@@ -532,7 +533,12 @@ std::vector<std::string> Scheduler::callFunctions(
             if (thisExecutors.empty()) {
                 ZoneScopedN("Scheduler::callFunctions claiming new executor");
                 // Create executor if not exists
-                e = claimExecutor(firstMsg, lock);
+                claimExecutor(
+                  firstMsg,
+                  [req, localMessageIdxs](std::shared_ptr<Executor> exec) {
+                      exec->executeTasks(localMessageIdxs, req);
+                  });
+                executed = true;
             } else if (thisExecutors.size() == 1) {
                 // Use existing executor if exists
                 e = thisExecutors.back();
@@ -547,8 +553,10 @@ std::vector<std::string> Scheduler::callFunctions(
             assert(e != nullptr);
 
             // Execute the tasks
-            ZoneScopedN("Scheduler::callFunctions execute tasks");
-            e->executeTasks(localMessageIdxs, req);
+            if (!executed) {
+                ZoneScopedN("Scheduler::callFunctions execute tasks");
+                e->executeTasks(localMessageIdxs, req);
+            }
         } else {
             // Non-threads require one executor per task
             for (auto i : localMessageIdxs) {
@@ -561,14 +569,11 @@ std::vector<std::string> Scheduler::callFunctions(
                     localResults.insert(
                       { localMsg.id(), MessageLocalResult() });
                 }
-                std::shared_ptr<Executor> e;
-                {
-                    ZoneScopedN("Scheduler::callFunctions claim executor");
-                    e = claimExecutor(localMsg, lock);
-                }
-                ZoneScopedN("Scheduler::callFunctions execute tasks");
-                ZoneValue(i);
-                e->executeTasks({ i }, req);
+                ZoneScopedN("Scheduler::callFunctions claim executor");
+                claimExecutor(firstMsg,
+                              [req, i](std::shared_ptr<Executor> exec) {
+                                  exec->executeTasks({ i }, req);
+                              });
             }
         }
     }
@@ -757,16 +762,13 @@ Scheduler::getRecordedMessagesShared()
     return recordedMessagesShared;
 }
 
-std::shared_ptr<Executor> Scheduler::claimExecutor(
+void Scheduler::claimExecutor(
   faabric::Message& msg,
-  faabric::util::FullLock& schedulerLock)
+  std::function<void(std::shared_ptr<Executor>)> runOnExecutor)
 {
     std::string funcStr = faabric::util::funcToString(msg, false);
 
     std::vector<std::shared_ptr<Executor>>& thisExecutors = executors[funcStr];
-
-    std::shared_ptr<faabric::scheduler::ExecutorFactory> factory =
-      getExecutorFactory();
 
     std::shared_ptr<Executor> claimed = nullptr;
     for (auto& e : thisExecutors) {
@@ -786,18 +788,26 @@ std::shared_ptr<Executor> Scheduler::claimExecutor(
           "Scaling {} from {} -> {}", funcStr, nExecutors, nExecutors + 1);
         // Spinning up a new executor can be lengthy, allow other things to run
         // in parallel
-        schedulerLock.unlock();
-        auto executor = factory->createExecutor(msg);
-        schedulerLock.lock();
-        thisExecutors.push_back(std::move(executor));
-        claimed = thisExecutors.back();
-
-        // Claim it
-        claimed->tryClaim();
+        std::thread([&mx = this->mx,
+                     sched = this,
+                     &msg,
+                     funcStr,
+                     runOnExecutor = std::move(runOnExecutor)]() {
+            std::shared_ptr<faabric::scheduler::ExecutorFactory> factory =
+              getExecutorFactory();
+            auto executor = factory->createExecutor(msg);
+            executor->tryClaim();
+            faabric::util::FullLock schedLock(mx);
+            std::vector<std::shared_ptr<Executor>>& thisExecutors =
+              sched->executors[funcStr];
+            thisExecutors.push_back(std::move(executor));
+            runOnExecutor(thisExecutors.back());
+        }).detach();
+        return;
     }
 
     assert(claimed != nullptr);
-    return claimed;
+    runOnExecutor(claimed);
 }
 
 std::string Scheduler::getThisHost()
