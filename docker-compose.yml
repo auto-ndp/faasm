@@ -78,6 +78,7 @@ services:
       - STATE_MODE=redis
       - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
       - ENDPOINT_HOST=worker
+      - ENDPOINT_NUM_THREADS=1
       - OVERRIDE_CPU_COUNT=8
 
   worker-storage:
@@ -112,6 +113,7 @@ services:
       - STATE_MODE=redis
       - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
       - ENDPOINT_HOST=worker-storage
+      - ENDPOINT_NUM_THREADS=1
       - OVERRIDE_CPU_COUNT=8
 
   nginx:
