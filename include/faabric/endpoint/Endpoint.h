@@ -4,6 +4,8 @@
 #include <faabric/util/config.h>
 #include <pistache/endpoint.h>
 #include <pistache/http.h>
+#include <boost/asio.hpp>
+#include <boost/beast.hpp>
 
 namespace faabric::endpoint {
 class Endpoint
