@@ -37,7 +37,7 @@ add_dependencies(util cppcodec_ext)
 target_link_libraries(
         util PUBLIC
         proto
-        boost_system
-        boost_filesystem
+        Boost::system
+        Boost::filesystem
         zstd::libzstd_static
 )

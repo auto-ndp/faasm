@@ -102,8 +102,8 @@ add_dependencies(faabric pistache_ext spdlog_ext)
 target_link_libraries(faabric PUBLIC
     faabricmpi
     hiredis
-    boost_system
-    boost_filesystem
+    Boost::system
+    Boost::filesystem
     Boost::Boost
     zstd::libzstd_static
     Tracy::TracyClient

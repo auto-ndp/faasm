@@ -21,8 +21,8 @@ function(add_example example_name)
         ${FAABRIC_LIB_DIR}/libprotobuf.so
         ${FAABRIC_LIB_DIR}/libpistache-0.0.002-git20210107.so
         ${FAABRIC_LIB_DIR}/libzmq.so
-        boost_system
-        boost_filesystem
+        Boost::system
+        Boost::filesystem
         hiredis
         pthread
     )

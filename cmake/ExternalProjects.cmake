@@ -139,6 +139,21 @@ target_include_directories(Boost INTERFACE ${boost_ext_SOURCE_DIR})
 target_link_libraries(Boost INTERFACE Threads::Threads)
 target_compile_features(Boost INTERFACE cxx_std_17)
 add_library(Boost::Boost ALIAS Boost)
+# Header-only aliases
+add_library(Boost::atomic ALIAS Boost)
+add_library(Boost::core ALIAS Boost)
+add_library(Boost::assert ALIAS Boost)
+add_library(Boost::config ALIAS Boost)
+add_library(Boost::container_hash ALIAS Boost)
+add_library(Boost::detail ALIAS Boost)
+add_library(Boost::io ALIAS Boost)
+add_library(Boost::iterator ALIAS Boost)
+add_library(Boost::smart_ptr ALIAS Boost)
+add_library(Boost::system ALIAS Boost)
+add_library(Boost::type_traits ALIAS Boost)
+add_library(Boost::predef ALIAS Boost)
+add_library(Boost::Boost ALIAS Boost)
+add_subdirectory(${boost_ext_SOURCE_DIR}/libs/filesystem ${boost_ext_BINARY_DIR}/libs/filesystem EXCLUDE_FROM_ALL)
 
 # Tracy
 FetchContent_Declare(tracy_ext
