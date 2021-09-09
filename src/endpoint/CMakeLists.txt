@@ -2,7 +2,6 @@ file(GLOB HEADERS "${FAABRIC_INCLUDE_DIR}/faabric/endpoint/*.h")
 
 set(LIB_FILES
         Endpoint.cpp
-        FaabricEndpoint.cpp
         FaabricEndpointHandler.cpp
         ${HEADERS}
         )

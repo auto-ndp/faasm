@@ -104,6 +104,7 @@ target_link_libraries(faabric PUBLIC
     hiredis
     boost_system
     boost_filesystem
+    Boost::Boost
     zstd::libzstd_static
     Tracy::TracyClient
     ${PISTACHE_LIBRARY}

@@ -1,30 +1,56 @@
 #pragma once
 
+#include <functional>
+#include <memory>
+
 #include <faabric/proto/faabric.pb.h>
+#include <faabric/util/asio.h>
 #include <faabric/util/config.h>
 #include <pistache/endpoint.h>
 #include <pistache/http.h>
-#include <boost/asio.hpp>
-#include <boost/beast.hpp>
 
 namespace faabric::endpoint {
+namespace detail {
+struct EndpointState;
+}
+
+struct HttpRequestContext
+{
+    asio::io_context& ioc;
+    asio::any_io_executor executor;
+    std::function<void(faabric::util::BeastHttpResponse&&)> sendFunction;
+};
+
+class HttpRequestHandler
+  : public std::enable_shared_from_this<HttpRequestHandler>
+{
+  public:
+    virtual void onRequest(HttpRequestContext&& ctx,
+                           faabric::util::BeastHttpRequest&& request) = 0;
+};
+
 class Endpoint
 {
   public:
-    Endpoint();
+    Endpoint() = delete;
+    Endpoint(const Endpoint&) = delete;
+    Endpoint(Endpoint&&) = delete;
+    Endpoint& operator=(const Endpoint&) = delete;
+    Endpoint& operator=(Endpoint&&) = delete;
+    virtual ~Endpoint();
 
-    Endpoint(int port, int threadCount);
+    Endpoint(int port,
+             int threadCount,
+             std::shared_ptr<HttpRequestHandler> requestHandlerIn);
 
     void start(bool awaitSignal = true);
 
     void stop();
 
-    virtual std::shared_ptr<Pistache::Http::Handler> getHandler() = 0;
-
   private:
-    int port = faabric::util::getSystemConfig().endpointPort;
-    int threadCount = faabric::util::getSystemConfig().endpointNumThreads;
-
-    Pistache::Http::Endpoint httpEndpoint;
+    int port;
+    int threadCount;
+    std::unique_ptr<detail::EndpointState> state;
+    std::shared_ptr<HttpRequestHandler> requestHandler;
 };
 }

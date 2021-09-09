@@ -2,7 +2,7 @@
 
 #include "faabric_utils.h"
 
-#include <faabric/endpoint/FaabricEndpoint.h>
+#include <faabric/endpoint/Endpoint.h>
 #include <faabric/endpoint/FaabricEndpointHandler.h>
 #include <faabric/scheduler/ExecutorFactory.h>
 #include <faabric/scheduler/Scheduler.h>
@@ -88,9 +88,10 @@ TEST_CASE_METHOD(EndpointApiTestFixture,
 {
     port++;
 
-    faabric::endpoint::FaabricEndpoint endpoint(port, 2);
+    faabric::endpoint::Endpoint endpoint(
+      port, 2, std::make_shared<faabric::endpoint::FaabricEndpointHandler>());
 
-    std::thread serverThread([&endpoint]() { endpoint.start(false); });
+    endpoint.start(false);
 
     // Wait for the server to start
     SLEEP_MS(2000);
@@ -101,7 +102,7 @@ TEST_CASE_METHOD(EndpointApiTestFixture,
 
     SECTION("Empty request")
     {
-        expectedReturnCode = 500;
+        expectedReturnCode = 400;
         expectedResponseBody = "Empty request";
     }
 
@@ -132,16 +133,12 @@ TEST_CASE_METHOD(EndpointApiTestFixture,
           "Task {} threw exception. What: Endpoint API error\n", msg.id());
     }
 
-    /*std::pair<int, std::string> result =
+    std::pair<int, std::string> result =
       submitGetRequestToUrl(LOCALHOST, port, body);
     REQUIRE(result.first == expectedReturnCode);
-    REQUIRE(result.second == expectedResponseBody);*/
+    REQUIRE(result.second == expectedResponseBody);
 
     endpoint.stop();
-
-    if (serverThread.joinable()) {
-        serverThread.join();
-    }
 }
 
 TEST_CASE_METHOD(EndpointApiTestFixture,
@@ -149,9 +146,10 @@ TEST_CASE_METHOD(EndpointApiTestFixture,
                  "[endpoint]")
 {
     port++;
-    faabric::endpoint::FaabricEndpoint endpoint(port, 2);
+    faabric::endpoint::Endpoint endpoint(
+      port, 2, std::make_shared<faabric::endpoint::FaabricEndpointHandler>());
 
-    std::thread serverThread([&endpoint]() { endpoint.start(false); });
+    endpoint.start(false);
 
     // Wait for the server to start
     SLEEP_MS(2000);
@@ -193,9 +191,5 @@ TEST_CASE_METHOD(EndpointApiTestFixture,
             fmt::format("SUCCESS: Finished async message {}", msg.id()));
 
     endpoint.stop();
-
-    if (serverThread.joinable()) {
-        serverThread.join();
-    }
 }
 }
