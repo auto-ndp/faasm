@@ -2,6 +2,7 @@
 #include <faabric/util/logging.h>
 #include <faabric/util/timing.h>
 
+#include <optional>
 #include <pistache/endpoint.h>
 #include <pistache/listener.h>
 #include <signal.h>
@@ -215,11 +216,14 @@ void Endpoint::start(bool awaitSignal)
                                        this->requestHandler)
       ->run();
 
+    std::optional<asio::signal_set> signals;
     if (awaitSignal) {
-        asio::signal_set signals(state->ioc, SIGINT, SIGHUP, SIGQUIT);
-        signals.async_wait([&](beast::error_code const&, int) {
-            SPDLOG_INFO("Received signal: {}", signal);
-            state->ioc.stop();
+        signals.emplace(state->ioc, SIGINT, SIGTERM);
+        signals->async_wait([&](beast::error_code const& ec, int sig) {
+            if (!ec) {
+                SPDLOG_INFO("Received signal: {}", sig);
+                state->ioc.stop();
+            }
         });
     }
 
