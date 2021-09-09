@@ -15,6 +15,8 @@
 #include <faabric/util/testing.h>
 #include <faabric/util/timing.h>
 
+#include <sys/eventfd.h>
+
 #include <chrono>
 #include <unordered_set>
 
@@ -36,6 +38,24 @@ static thread_local std::unordered_map<std::string,
 static thread_local std::unordered_map<std::string,
                                        faabric::snapshot::SnapshotClient>
   snapshotClients;
+
+MessageLocalResult::MessageLocalResult()
+{
+    event_fd = eventfd(0, EFD_CLOEXEC);
+}
+
+MessageLocalResult::~MessageLocalResult()
+{
+    if (event_fd >= 0) {
+        close(event_fd);
+    }
+}
+
+void MessageLocalResult::set_value(std::unique_ptr<faabric::Message>&& msg)
+{
+    this->promise.set_value(std::move(msg));
+    eventfd_write(this->event_fd, (eventfd_t)1);
+}
 
 Scheduler& getScheduler()
 {
@@ -539,8 +559,7 @@ std::vector<std::string> Scheduler::callFunctions(
                 if (localMsg.executeslocally()) {
                     faabric::util::UniqueLock resultsLock(localResultsMutex);
                     localResults.insert(
-                      { localMsg.id(),
-                        std::promise<std::unique_ptr<faabric::Message>>() });
+                      { localMsg.id(), MessageLocalResult() });
                 }
                 std::shared_ptr<Executor> e;
                 {
@@ -661,9 +680,7 @@ int Scheduler::scheduleFunctionsOnHost(
         if (!newMsg->directresulthost().empty()) {
             ZoneScopedN("Create local result promise");
             faabric::util::UniqueLock resultsLock(localResultsMutex);
-            localResults.insert(
-              { newMsg->id(),
-                std::promise<std::unique_ptr<faabric::Message>>() });
+            localResults.insert({ newMsg->id(), MessageLocalResult() });
         }
         records.at(i) = host;
     }
@@ -945,7 +962,7 @@ faabric::Message Scheduler::getFunctionResult(unsigned int messageId,
             if (it == localResults.end()) {
                 break; // fallback to redis
             }
-            fut = it->second.get_future();
+            fut = it->second.promise.get_future();
         }
         if (!isBlocking) {
             ZoneScopedNS("Wait for future", 5);
@@ -1002,6 +1019,100 @@ faabric::Message Scheduler::getFunctionResult(unsigned int messageId,
     }
 
     return msgResult;
+}
+
+void Scheduler::getFunctionResultAsync(
+  unsigned int messageId,
+  int timeoutMs,
+  asio::io_context& ioc,
+  asio::any_io_executor& executor,
+  std::function<void(faabric::Message&)> handler)
+{
+    ZoneScopedNS("Scheduler::getFunctionResultAsync", 5);
+    ZoneValue(messageId);
+
+    if (messageId == 0) {
+        throw std::runtime_error("Must provide non-zero message ID");
+    }
+
+    do {
+        MessageLocalResult* mlr;
+        {
+            faabric::util::UniqueLock resultsLock(localResultsMutex);
+            auto it = localResults.find(messageId);
+            if (it == localResults.end()) {
+                break; // fallback to redis
+            }
+            mlr = &it->second;
+        }
+        struct MlrAwaiter : public std::enable_shared_from_this<MlrAwaiter>
+        {
+            unsigned int messageId;
+            Scheduler* sched;
+            MessageLocalResult* mlr;
+            asio::posix::stream_descriptor dsc;
+            std::function<void(faabric::Message&)> handler;
+            MlrAwaiter(unsigned int messageId,
+                       Scheduler* sched,
+                       MessageLocalResult* mlr,
+                       asio::posix::stream_descriptor dsc,
+                       std::function<void(faabric::Message&)> handler)
+              : messageId(messageId)
+              , sched(sched)
+              , mlr(mlr)
+              , dsc(std::move(dsc))
+              , handler(handler)
+            {}
+            ~MlrAwaiter() {}
+            void await(const boost::system::error_code& ec)
+            {
+                if (!ec) {
+                    auto msg = mlr->promise.get_future().get();
+                    handler(*msg);
+                    {
+                        faabric::util::UniqueLock resultsLock(
+                          sched->localResultsMutex);
+                        sched->localResults.erase(messageId);
+                    }
+                } else {
+                    doAwait();
+                }
+            }
+            void doAwait()
+            {
+                dsc.async_wait(asio::posix::stream_descriptor::wait_read,
+                               beast::bind_front_handler(
+                                 &MlrAwaiter::await, this->shared_from_this()));
+            }
+        };
+        auto awaiter = std::make_shared<MlrAwaiter>(
+          messageId,
+          this,
+          mlr,
+          asio::posix::stream_descriptor(ioc, mlr->event_fd),
+          std::move(handler));
+        awaiter->doAwait();
+        return;
+    } while (0);
+
+    // TODO: Non-blocking redis
+    redis::Redis& redis = redis::Redis::getQueue();
+    TracyMessageL("Got redis queue");
+
+    std::string resultKey = faabric::util::resultKeyFromMessageId(messageId);
+
+    faabric::Message msgResult;
+
+    // Blocking version will throw an exception when timing out
+    // which is handled by the caller.
+    TracyMessageL("Dequeueing bytes");
+    std::vector<uint8_t> result = redis.dequeueBytes(resultKey, timeoutMs);
+    {
+        ZoneScopedN("Parse result message");
+        msgResult.ParseFromArray(result.data(), (int)result.size());
+    }
+
+    handler(msgResult);
 }
 
 faabric::HostResources Scheduler::getThisHostResources()

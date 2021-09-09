@@ -22,7 +22,6 @@ struct HttpRequestContext
 };
 
 class HttpRequestHandler
-  : public std::enable_shared_from_this<HttpRequestHandler>
 {
   public:
     virtual void onRequest(HttpRequestContext&& ctx,

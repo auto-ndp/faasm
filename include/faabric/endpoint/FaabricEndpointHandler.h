@@ -4,7 +4,9 @@
 #include <faabric/proto/faabric.pb.h>
 
 namespace faabric::endpoint {
-class FaabricEndpointHandler final : public HttpRequestHandler
+class FaabricEndpointHandler final
+  : public HttpRequestHandler
+  , public std::enable_shared_from_this<FaabricEndpointHandler>
 {
   public:
     void onRequest(HttpRequestContext&& ctx,
@@ -14,5 +16,9 @@ class FaabricEndpointHandler final : public HttpRequestHandler
     void executeFunction(HttpRequestContext&& ctx,
                          faabric::util::BeastHttpResponse&& partialResponse,
                          faabric::Message&& msg);
+
+    void onFunctionResult(HttpRequestContext&& ctx,
+                         faabric::util::BeastHttpResponse&& partialResponse,
+                         faabric::Message& msg);
 };
 }

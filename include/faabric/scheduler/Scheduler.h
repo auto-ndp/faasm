@@ -5,6 +5,7 @@
 #include <faabric/scheduler/FunctionCallClient.h>
 #include <faabric/scheduler/InMemoryMessageQueue.h>
 #include <faabric/snapshot/SnapshotClient.h>
+#include <faabric/util/asio.h>
 #include <faabric/util/config.h>
 #include <faabric/util/func.h>
 #include <faabric/util/queue.h>
@@ -13,6 +14,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <functional>
 #include <future>
 #include <shared_mutex>
 
@@ -96,6 +98,29 @@ class Executor
     void threadPoolThread(int threadPoolIdx);
 };
 
+struct MessageLocalResult final
+{
+    std::promise<std::unique_ptr<faabric::Message>> promise;
+    int event_fd = -1;
+
+    MessageLocalResult();
+    MessageLocalResult(const MessageLocalResult&) = delete;
+    inline MessageLocalResult(MessageLocalResult&& other)
+    {
+        this->operator=(std::move(other));
+    }
+    MessageLocalResult& operator=(const MessageLocalResult&) = delete;
+    inline MessageLocalResult& operator=(MessageLocalResult&& other)
+    {
+        this->promise = std::move(other.promise);
+        this->event_fd = other.event_fd;
+        other.event_fd = -1;
+        return *this;
+    }
+    ~MessageLocalResult();
+    void set_value(std::unique_ptr<faabric::Message>&& msg);
+};
+
 class Scheduler
 {
   public:
@@ -129,7 +154,13 @@ class Scheduler
 
     void setFunctionResult(faabric::Message& msg);
 
-    faabric::Message getFunctionResult(unsigned int messageId, int timeout);
+    faabric::Message getFunctionResult(unsigned int messageId, int timeoutMs);
+
+    void getFunctionResultAsync(unsigned int messageId,
+                                int timeoutMs,
+                                asio::io_context& ioc,
+                                asio::any_io_executor& executor,
+                                std::function<void(faabric::Message&)> handler);
 
     void setThreadResult(const faabric::Message& msg, int32_t returnValue);
 
@@ -218,9 +249,7 @@ class Scheduler
     std::set<std::string> availableHostsCache;
     std::unordered_map<std::string, std::set<std::string>> registeredHosts;
 
-    std::unordered_map<uint32_t,
-                       std::promise<std::unique_ptr<faabric::Message>>>
-      localResults;
+    std::unordered_map<uint32_t, MessageLocalResult> localResults;
     std::mutex localResultsMutex;
 
     std::vector<faabric::Message> recordedMessagesAll;

@@ -142,30 +142,45 @@ void FaabricEndpointHandler::executeFunction(
     }
 
     SPDLOG_DEBUG("Worker thread {} awaiting {}", tid, funcStr);
-    ZoneNamedN(__zoneAwait, "Await result", true);
-    // TODO: Async await result
-    try {
-        const faabric::Message result =
-          sch.getFunctionResult(msg.id(), conf.globalMessageTimeout);
-        beast::http::status statusCode =
-          (result.returnvalue() == 0)
-            ? beast::http::status::ok
-            : beast::http::status::internal_server_error;
-        response.result(statusCode);
-        TracyMessageL("Got result");
-        SPDLOG_DEBUG("Worker thread {} result {}", tid, funcStr);
+    sch.getFunctionResultAsync(
+      msg.id(),
+      conf.globalMessageTimeout,
+      ctx.ioc,
+      ctx.executor,
+      beast::bind_front_handler(&FaabricEndpointHandler::onFunctionResult,
+                                this->shared_from_this(),
+                                std::move(ctx),
+                                std::move(response)));
+}
 
-        if (result.sgxresult().empty()) {
-            response.body() = result.outputdata() + "\n";
-            return ctx.sendFunction(std::move(response));
-        }
+void FaabricEndpointHandler::onFunctionResult(
+  HttpRequestContext&& ctx,
+  faabric::util::BeastHttpResponse&& response,
+  faabric::Message& result)
+{
+    ZoneScopedNS("Respond to HTTP function", 4);
+    faabric::util::SystemConfig& conf = faabric::util::getSystemConfig();
+    beast::http::status statusCode =
+      (result.returnvalue() == 0) ? beast::http::status::ok
+                                  : beast::http::status::internal_server_error;
+    response.result(statusCode);
+    SPDLOG_DEBUG("Worker thread {} result {}",
+                 (pid_t)syscall(SYS_gettid),
+                 faabric::util::funcToString(result, true));
 
-        response.body() = faabric::util::getJsonOutput(result);
+    if (result.sgxresult().empty()) {
+        response.body() = result.outputdata() + "\n";
         return ctx.sendFunction(std::move(response));
+    }
+
+    response.body() = faabric::util::getJsonOutput(result);
+    return ctx.sendFunction(std::move(response));
+    /*
     } catch (faabric::redis::RedisNoResponseException& ex) {
         response.result(beast::http::status::internal_server_error);
         response.body() = "No response from function\n";
         return ctx.sendFunction(std::move(response));
-    }
+    }*/
 }
+
 }
