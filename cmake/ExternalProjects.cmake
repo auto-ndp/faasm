@@ -119,6 +119,27 @@ FetchContent_MakeAvailable(zstd_ext)
 target_include_directories(libzstd_static INTERFACE $<BUILD_INTERFACE:${zstd_ext_SOURCE_DIR}/lib>)
 add_library(zstd::libzstd_static ALIAS libzstd_static)
 
+# Boost libraries, the header-only ones
+FetchContent_Declare(boost_ext
+    URL "https://boostorg.jfrog.io/artifactory/main/release/1.77.0/source/boost_1_77_0.tar.bz2"
+    URL_HASH "SHA256=fc9f85fc030e233142908241af7a846e60630aa7388de9a5fafb1f3a26840854"
+)
+FetchContent_GetProperties(boost_ext)
+if(NOT boost_ext_POPULATED)
+  FetchContent_Populate(boost_ext)
+endif()
+add_library(Boost INTERFACE)
+target_compile_definitions(Boost INTERFACE
+    BOOST_BEAST_USE_STD_STRING_VIEW
+    BOOST_ASIO_NO_DEPRECATED
+    BOOST_ASIO_NO_TS_EXECUTORS
+    BOOST_ASIO_NO_DEFAULT_LINKED_LIBS
+)
+target_include_directories(Boost INTERFACE ${boost_ext_SOURCE_DIR})
+target_link_libraries(Boost INTERFACE Threads::Threads)
+target_compile_features(Boost INTERFACE cxx_std_17)
+add_library(Boost::Boost ALIAS Boost)
+
 # Tracy
 FetchContent_Declare(tracy_ext
     GIT_REPOSITORY "https://github.com/wolfpld/tracy.git"
