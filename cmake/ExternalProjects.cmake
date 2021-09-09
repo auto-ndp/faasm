@@ -124,6 +124,7 @@ FetchContent_Declare(tracy_ext
     GIT_REPOSITORY "https://github.com/wolfpld/tracy.git"
     GIT_TAG "dfb4020a924e45e44eaaffb952afb822b2b8acea"
 )
+FetchContent_GetProperties(tracy_ext)
 if(NOT tracy_ext_POPULATED)
   FetchContent_Populate(tracy_ext)
 endif()
