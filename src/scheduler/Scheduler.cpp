@@ -41,21 +41,18 @@ static thread_local std::unordered_map<std::string,
 
 MessageLocalResult::MessageLocalResult()
 {
-    event_fd = eventfd(0, 0);
-    SPDLOG_WARN("MLR + {}", event_fd);
+    event_fd = eventfd(0, EFD_CLOEXEC);
 }
 
 MessageLocalResult::~MessageLocalResult()
 {
     if (event_fd >= 0) {
-        SPDLOG_WARN("MLR - {}", event_fd);
         close(event_fd);
     }
 }
 
 void MessageLocalResult::set_value(std::unique_ptr<faabric::Message>&& msg)
 {
-    SPDLOG_WARN("MLR * {}", event_fd);
     this->promise.set_value(std::move(msg));
     eventfd_write(this->event_fd, (eventfd_t)1);
 }
