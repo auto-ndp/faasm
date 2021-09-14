@@ -1066,7 +1066,7 @@ void Scheduler::getFunctionResultAsync(
               , dsc(std::move(dsc))
               , handler(handler)
             {}
-            ~MlrAwaiter() {}
+            ~MlrAwaiter() { dsc.release(); }
             void await(const boost::system::error_code& ec)
             {
                 if (!ec) {
