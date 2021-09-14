@@ -8,6 +8,7 @@
 #include <signal.h>
 #include <stdexcept>
 #include <thread>
+#include <typeinfo>
 #include <vector>
 
 namespace faabric::endpoint {
@@ -229,11 +230,21 @@ void Endpoint::start(bool awaitSignal)
 
     int extraThreads = std::max(awaitSignal ? 0 : 1, this->threadCount - 1);
     state->ioThreads.reserve(extraThreads);
+    auto ioc_run = [&ioc{ state->ioc }]() {
+        try {
+            ioc.run();
+        } catch (std::exception& ex) {
+            SPDLOG_CRITICAL("Asio runner caught exception of type {}: {}",
+                            typeid(ex).name(),
+                            ex.what());
+            throw;
+        }
+    };
     for (int i = 0; i < extraThreads; i++) {
-        state->ioThreads.emplace_back([&ioc{ state->ioc }]() { ioc.run(); });
+        state->ioThreads.emplace_back(ioc_run);
     }
     if (awaitSignal) {
-        state->ioc.run();
+        ioc_run();
     }
 }
 
