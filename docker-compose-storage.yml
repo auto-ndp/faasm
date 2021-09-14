@@ -57,6 +57,10 @@ services:
     image: kubasz51/faasm-worker-storage:${FAASM_VERSION}
     security_opt:
       - seccomp:unconfined
+    ulimits:
+      nofile:
+        soft: 1073741824
+        hard: 1073741824
     depends_on:
       - upload
     ports:
