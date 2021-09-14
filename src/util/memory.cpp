@@ -154,13 +154,16 @@ std::vector<int> getDirtyPageNumbers(const uint8_t* ptr, int nPages)
 }
 
 namespace dirty_tracker {
-constexpr uint64_t WASM_MEMORY_MAX_SIZE_BYTES = 4 * 1024 * 1024 * 1024;
-constexpr uint64_t TRACKER_PAGE_SIZE = 4096;
+constexpr uint64_t WASM_MEMORY_MAX_SIZE_BYTES =
+  4ULL * 1024ULL * 1024ULL * 1024ULL;
+constexpr uint64_t TRACKER_PAGE_SIZE = 4096ULL;
 constexpr uint64_t TRACKER_MAX_SIZE_BYTES =
-  WASM_MEMORY_MAX_SIZE_BYTES / TRACKER_PAGE_SIZE / 8;
+  WASM_MEMORY_MAX_SIZE_BYTES / TRACKER_PAGE_SIZE / 8ULL;
+struct MRToken
+{};
 struct MemoryRange
 {
-    MemoryRange(uint8_t* start, size_t byteLength)
+    MemoryRange(uint8_t* start, size_t byteLength, MRToken dummy = {})
       : start(start)
       , byteLength(byteLength)
     {
@@ -181,6 +184,17 @@ struct MemoryRange
     }
     MemoryRange(const MemoryRange&) = delete;
     MemoryRange& operator=(const MemoryRange&) = delete;
+    MemoryRange(MemoryRange&& rhs) { this->operator=(std::move(rhs)); }
+    MemoryRange& operator=(MemoryRange&& rhs)
+    {
+        this->start = rhs.start;
+        this->byteLength = rhs.byteLength;
+        this->dirtyBitmap = rhs.dirtyBitmap;
+        rhs.start = nullptr;
+        rhs.byteLength = 0;
+        rhs.dirtyBitmap = nullptr;
+        return *this;
+    }
     ~MemoryRange()
     {
         if (dirtyBitmap != nullptr) {
@@ -198,7 +212,7 @@ struct MemoryRange
         const size_t endOffsetPage =
           (startOffsetBytes + lengthBytes + TRACKER_PAGE_SIZE - 1) /
           TRACKER_PAGE_SIZE;
-        const size_t numSubPages = endOffsetPage - startOffsetPage + 1;
+        const ptrdiff_t numSubPages = endOffsetPage - startOffsetPage + 1;
         // first byte of the bitmap
         const size_t firstBytePagesEnd =
           startOffsetPage + (8 - (startOffsetPage % 8));
@@ -211,7 +225,10 @@ struct MemoryRange
             }
         }
         // bulk set
-        std::fill_n(dirtyBitmap, 1, uint8_t(dirty ? 0xFF : 0x00));
+        if (numSubPages > 2) {
+            std::fill_n(
+              dirtyBitmap, numSubPages - 2, uint8_t(dirty ? 0xFF : 0x00));
+        }
         // last byte
         const size_t lastBytePagesStart = endOffsetPage - (endOffsetPage % 8);
         for (size_t pageIdx = lastBytePagesStart; pageIdx < endOffsetPage;
@@ -236,7 +253,7 @@ void trackMemoryRange(uint8_t* start, size_t byteLength)
     ZoneScopedNS("trackMemoryRange", 6);
     ZoneValue(byteLength);
     std::unique_lock _lock(memoryRangesMx);
-    memoryRanges.emplace_back(start, byteLength);
+    memoryRanges.emplace_back(start, byteLength, MRToken());
 }
 
 void markClean(uint8_t* rangeStart, size_t substartOffset, size_t sublength)
