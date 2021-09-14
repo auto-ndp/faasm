@@ -721,7 +721,7 @@ int Scheduler::scheduleFunctionsOnHost(
 
 void Scheduler::callFunction(faabric::Message& msg,
                              bool forceLocal,
-                             faabric::Message* caller = nullptr)
+                             faabric::Message* caller)
 {
     // TODO - avoid this copy
     auto req = faabric::util::batchExecFactory();
