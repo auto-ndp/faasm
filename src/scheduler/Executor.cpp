@@ -35,6 +35,7 @@ Executor::Executor(faabric::Message& msg)
   , threadPoolSize(faabric::util::getUsableCores())
   , threadPoolThreads(threadPoolSize)
   , threadTaskQueues(threadPoolSize)
+  , resetDone(false)
 {
     faabric::util::SystemConfig& conf = faabric::util::getSystemConfig();
 
@@ -187,7 +188,21 @@ void Executor::executeTasks(std::vector<int> msgIdxs,
 void Executor::threadPoolThread(int threadPoolIdx)
 {
     SPDLOG_DEBUG("Thread pool thread {}:{} starting up", id, threadPoolIdx);
-    tracy::SetThreadName(("Executor threadPoolThread: "+this->id+" "+faabric::util::funcToString(this->boundMessage, false)).c_str());
+    tracy::SetThreadName(
+      ("Executor threadPoolThread: " + this->id + " " +
+       faabric::util::funcToString(this->boundMessage, false))
+        .c_str());
+    if (threadPoolIdx == 0) {
+        std::unique_lock<std::shared_mutex> _lock(resetMutex);
+        reset(boundMessage);
+        resetDone.store(true);
+        _lock.unlock();
+        resetCondvar.notify_all();
+    } else {
+        std::shared_lock<std::shared_mutex> lock(resetMutex);
+        resetCondvar.wait(
+          lock, [&]() { return resetDone.load(std::memory_order_acq_rel); });
+    }
 
     auto& sch = faabric::scheduler::getScheduler();
     const auto& conf = faabric::util::getSystemConfig();
@@ -200,7 +215,7 @@ void Executor::threadPoolThread(int threadPoolIdx)
         ExecutorTask task;
 
         try {
-            ZoneScopedN("Dequeue task");
+            ZoneScopedNC("Dequeue task", 0x111111);
             task = threadTaskQueues[threadPoolIdx].dequeue(conf.boundTimeout);
         } catch (faabric::util::QueueTimeoutException& ex) {
             // If the thread has had no messages, it needs to

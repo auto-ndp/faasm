@@ -786,24 +786,12 @@ void Scheduler::claimExecutor(
         int nExecutors = thisExecutors.size();
         SPDLOG_DEBUG(
           "Scaling {} from {} -> {}", funcStr, nExecutors, nExecutors + 1);
-        // Spinning up a new executor can be lengthy, allow other things to run
-        // in parallel
-        std::thread([&mx = this->mx,
-                     sched = this,
-                     &msg,
-                     funcStr,
-                     runOnExecutor = std::move(runOnExecutor)]() {
-            std::shared_ptr<faabric::scheduler::ExecutorFactory> factory =
-              getExecutorFactory();
-            auto executor = factory->createExecutor(msg);
-            executor->tryClaim();
-            faabric::util::FullLock schedLock(mx);
-            std::vector<std::shared_ptr<Executor>>& thisExecutors =
-              sched->executors[funcStr];
-            thisExecutors.push_back(std::move(executor));
-            runOnExecutor(thisExecutors.back());
-        }).detach();
-        return;
+        std::shared_ptr<faabric::scheduler::ExecutorFactory> factory =
+          getExecutorFactory();
+        auto executor = factory->createExecutor(msg);
+        executor->tryClaim();
+        thisExecutors.push_back(std::move(executor));
+        claimed = thisExecutors.back();
     }
 
     assert(claimed != nullptr);

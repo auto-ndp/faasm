@@ -17,6 +17,7 @@
 #include <functional>
 #include <future>
 #include <shared_mutex>
+#include <condition_variable>
 
 #define AVAILABLE_HOST_SET "available_hosts"
 #define AVAILABLE_STORAGE_HOST_SET "available_storage_hosts"
@@ -92,6 +93,10 @@ class Executor
     std::mutex threadsMutex;
     std::vector<std::shared_ptr<std::thread>> threadPoolThreads;
     std::vector<std::shared_ptr<std::thread>> deadThreads;
+
+    std::shared_mutex resetMutex;
+    std::condition_variable_any resetCondvar;
+    std::atomic_bool resetDone;
 
     std::vector<faabric::util::Queue<ExecutorTask>> threadTaskQueues;
 
