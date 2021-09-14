@@ -5,8 +5,8 @@
 #include <system/NetworkNamespace.h>
 #include <threads/ThreadState.h>
 #include <wamr/WAMRWasmModule.h>
-#include <wavm/WAVMWasmModule.h>
 #include <wavm/NdpBuiltinModule.h>
+#include <wavm/WAVMWasmModule.h>
 
 #include <faabric/scheduler/Scheduler.h>
 #include <faabric/util/config.h>
@@ -82,9 +82,6 @@ Faaslet::Faaslet(faabric::Message& msg)
         SPDLOG_ERROR("Unrecognised wasm VM: {}", conf.wasmVm);
         throw std::runtime_error("Unrecognised wasm VM");
     }
-
-    // Bind to the function
-    module->bindToFunction(msg);
 }
 
 int32_t Faaslet::executeTask(int threadPoolIdx,
@@ -113,7 +110,11 @@ int32_t Faaslet::executeTask(int threadPoolIdx,
 
 void Faaslet::reset(faabric::Message& msg)
 {
-    module->reset(msg);
+    if (module->isBound()) {
+        module->reset(msg);
+    } else {
+        module->bindToFunction(msg);
+    }
 }
 
 void Faaslet::postFinish()
