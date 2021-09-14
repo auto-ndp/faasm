@@ -254,7 +254,7 @@ class Scheduler
     std::set<std::string> availableHostsCache;
     std::unordered_map<std::string, std::set<std::string>> registeredHosts;
 
-    std::unordered_map<uint32_t, MessageLocalResult> localResults;
+    std::unordered_map<uint32_t, std::shared_ptr<MessageLocalResult>> localResults;
     std::mutex localResultsMutex;
 
     std::vector<faabric::Message> recordedMessagesAll;

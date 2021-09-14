@@ -567,7 +567,8 @@ std::vector<std::string> Scheduler::callFunctions(
                 if (localMsg.executeslocally()) {
                     faabric::util::UniqueLock resultsLock(localResultsMutex);
                     localResults.insert(
-                      { localMsg.id(), MessageLocalResult() });
+                      { localMsg.id(),
+                        std::make_shared<MessageLocalResult>() });
                 }
                 ZoneScopedN("Scheduler::callFunctions claim executor");
                 claimExecutor(firstMsg,
@@ -685,7 +686,8 @@ int Scheduler::scheduleFunctionsOnHost(
         if (!newMsg->directresulthost().empty()) {
             ZoneScopedN("Create local result promise");
             faabric::util::UniqueLock resultsLock(localResultsMutex);
-            localResults.insert({ newMsg->id(), MessageLocalResult() });
+            localResults.insert(
+              { newMsg->id(), std::make_shared<MessageLocalResult>() });
         }
         records.at(i) = host;
     }
@@ -845,7 +847,7 @@ void Scheduler::setFunctionResult(faabric::Message& msg)
         faabric::util::UniqueLock resultsLock(localResultsMutex);
         auto it = localResults.find(msg.id());
         if (it != localResults.end()) {
-            it->second.set_value(std::make_unique<faabric::Message>(msg));
+            it->second->set_value(std::make_unique<faabric::Message>(msg));
         } else {
             throw std::runtime_error(
               "Got direct result, but promise is registered");
@@ -876,7 +878,7 @@ void Scheduler::setFunctionResult(faabric::Message& msg)
         faabric::util::UniqueLock resultsLock(localResultsMutex);
         auto it = localResults.find(msg.id());
         if (it != localResults.end()) {
-            it->second.set_value(std::make_unique<faabric::Message>(msg));
+            it->second->set_value(std::make_unique<faabric::Message>(msg));
         }
         return;
     }
@@ -960,7 +962,7 @@ faabric::Message Scheduler::getFunctionResult(unsigned int messageId,
             if (it == localResults.end()) {
                 break; // fallback to redis
             }
-            fut = it->second.promise.get_future();
+            fut = it->second->promise.get_future();
         }
         if (!isBlocking) {
             ZoneScopedNS("Wait for future", 5);
@@ -1034,30 +1036,30 @@ void Scheduler::getFunctionResultAsync(
     }
 
     do {
-        MessageLocalResult* mlr;
+        std::shared_ptr<MessageLocalResult> mlr;
         {
             faabric::util::UniqueLock resultsLock(localResultsMutex);
             auto it = localResults.find(messageId);
             if (it == localResults.end()) {
                 break; // fallback to redis
             }
-            mlr = &it->second;
+            mlr = it->second;
         }
         struct MlrAwaiter : public std::enable_shared_from_this<MlrAwaiter>
         {
             unsigned int messageId;
             Scheduler* sched;
-            MessageLocalResult* mlr;
+            std::shared_ptr<MessageLocalResult> mlr;
             asio::posix::stream_descriptor dsc;
             std::function<void(faabric::Message&)> handler;
             MlrAwaiter(unsigned int messageId,
                        Scheduler* sched,
-                       MessageLocalResult* mlr,
+                       std::shared_ptr<MessageLocalResult> mlr,
                        asio::posix::stream_descriptor dsc,
                        std::function<void(faabric::Message&)> handler)
               : messageId(messageId)
               , sched(sched)
-              , mlr(mlr)
+              , mlr(std::move(mlr))
               , dsc(std::move(dsc))
               , handler(handler)
             {}
