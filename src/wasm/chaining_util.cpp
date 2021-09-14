@@ -19,7 +19,7 @@ int awaitChainedCall(unsigned int messageId)
     try {
         faabric::scheduler::Scheduler& sch = faabric::scheduler::getScheduler();
         const faabric::Message result =
-          sch.getFunctionResult(messageId, callTimeoutMs);
+          sch.getFunctionResult(messageId, callTimeoutMs, getExecutingCall());
         returnCode = result.returnvalue();
     } catch (faabric::redis::RedisNoResponseException& ex) {
         SPDLOG_ERROR("Timed out waiting for chained call: {}", messageId);
@@ -83,7 +83,7 @@ int makeChainedCall(const std::string& functionName,
                     msg.id());
     }
 
-    sch.callFunctions(req);
+    sch.callFunctions(req, false, originalCall);
     sch.logChainedFunction(originalCall->id(), msg.id());
 
     return msg.id();
@@ -116,7 +116,7 @@ int spawnChainedThread(const std::string& snapshotKey,
     const std::string chainedStr = faabric::util::funcToString(call, false);
 
     // Schedule the call
-    sch.callFunction(call);
+    sch.callFunction(call, false, originalCall);
 
     return call.id();
 }
@@ -130,7 +130,7 @@ int awaitChainedCallOutput(unsigned int messageId,
 
     faabric::scheduler::Scheduler& sch = faabric::scheduler::getScheduler();
     const faabric::Message result =
-      sch.getFunctionResult(messageId, callTimeoutMs);
+      sch.getFunctionResult(messageId, callTimeoutMs, getExecutingCall());
 
     if (result.type() == faabric::Message_MessageType_EMPTY) {
         SPDLOG_ERROR("Cannot find output for {}", messageId);
@@ -155,7 +155,7 @@ faabric::Message awaitChainedCallMessage(unsigned int messageId)
 
     faabric::scheduler::Scheduler& sch = faabric::scheduler::getScheduler();
     const faabric::Message result =
-      sch.getFunctionResult(messageId, callTimeoutMs);
+      sch.getFunctionResult(messageId, callTimeoutMs, getExecutingCall());
 
     if (result.type() == faabric::Message_MessageType_EMPTY) {
         SPDLOG_ERROR("Cannot find output for {}", messageId);
@@ -187,7 +187,8 @@ int chainNdpCall(const std::string& zygoteDelta,
     call.set_inputdata(inputData);
     call.set_isstorage(true);
     call.set_isoutputmemorydelta(true);
-    call.mutable_wasmglobals()->Assign(wasmGlobals.cbegin(), wasmGlobals.cend());
+    call.mutable_wasmglobals()->Assign(wasmGlobals.cbegin(),
+                                       wasmGlobals.cend());
     call.set_cmdline(originalCall->cmdline());
     call.set_directresulthost(fcfg.endpointHost);
 
@@ -203,7 +204,7 @@ int chainNdpCall(const std::string& zygoteDelta,
     const std::string chainedStr = faabric::util::funcToString(call, false);
 
     // Schedule the call
-    sch.callFunction(call);
+    sch.callFunction(call, false, originalCall);
     SPDLOG_DEBUG("Chained NDP call {} ({}) -> {} {}() py?:{}",
                  origStr,
                  faabric::util::getSystemConfig().endpointHost,
