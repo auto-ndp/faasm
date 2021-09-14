@@ -257,7 +257,8 @@ void Scheduler::notifyExecutorShutdown(Executor* exec,
 
 std::vector<std::string> Scheduler::callFunctions(
   std::shared_ptr<faabric::BatchExecuteRequest> req,
-  bool forceLocal)
+  bool forceLocal,
+  faabric::Message* caller)
 {
     ZoneScopedNS("Scheduler::callFunctions", 5);
     auto& config = faabric::util::getSystemConfig();
@@ -282,6 +283,13 @@ std::vector<std::string> Scheduler::callFunctions(
 
     // TODO - more granular locking, this is incredibly conservative
     faabric::util::FullLock lock(mx);
+
+    std::atomic_int* suspendedCtr = nullptr;
+    if (caller != nullptr) {
+        suspendedCtr =
+          &suspendedExecutors[faabric::util::funcToString(*caller, false)];
+        suspendedCtr->fetch_add(1, std::memory_order_acq_rel);
+    }
 
     // If we're not the master host, we need to forward the request back to the
     // master host. This will only happen if a nested batch execution happens.
@@ -595,6 +603,10 @@ std::vector<std::string> Scheduler::callFunctions(
         }
     }
 
+    if (suspendedCtr) {
+        suspendedCtr->fetch_sub(1, std::memory_order_acq_rel);
+    }
+
     return executed;
 }
 
@@ -707,7 +719,9 @@ int Scheduler::scheduleFunctionsOnHost(
     return nOnThisHost;
 }
 
-void Scheduler::callFunction(faabric::Message& msg, bool forceLocal)
+void Scheduler::callFunction(faabric::Message& msg,
+                             bool forceLocal,
+                             faabric::Message* caller = nullptr)
 {
     // TODO - avoid this copy
     auto req = faabric::util::batchExecFactory();
@@ -717,7 +731,7 @@ void Scheduler::callFunction(faabric::Message& msg, bool forceLocal)
     req->set_type(req->FUNCTIONS);
 
     // Make the call
-    callFunctions(req, forceLocal);
+    callFunctions(req, forceLocal, caller);
 }
 
 void Scheduler::clearRecordedMessages()
@@ -772,6 +786,10 @@ void Scheduler::claimExecutor(
 
     std::vector<std::shared_ptr<Executor>>& thisExecutors = executors[funcStr];
 
+    if (thisExecutors.empty()) {
+        suspendedExecutors[funcStr] = 0;
+    }
+
     std::shared_ptr<Executor> claimed = nullptr;
     for (auto& e : thisExecutors) {
         if (e->tryClaim()) {
@@ -784,16 +802,36 @@ void Scheduler::claimExecutor(
 
     // We have no warm executors available, so scale up
     if (claimed == nullptr) {
-        ZoneScopedN("Scheduler::claimExecutor scaling up");
         int nExecutors = thisExecutors.size();
-        SPDLOG_DEBUG(
-          "Scaling {} from {} -> {}", funcStr, nExecutors, nExecutors + 1);
-        std::shared_ptr<faabric::scheduler::ExecutorFactory> factory =
-          getExecutorFactory();
-        auto executor = factory->createExecutor(msg);
-        executor->tryClaim();
-        thisExecutors.push_back(std::move(executor));
-        claimed = thisExecutors.back();
+        int nSuspended = suspendedExecutors[funcStr];
+        if (nExecutors - nSuspended >
+            std::max(1u, 4 * std::thread::hardware_concurrency())) {
+            ZoneScopedN("Scheduler::claimExecutor oversubscribed");
+            // oversubscribed, enqueue onto one of the other executors
+            int minQueueSize = thisExecutors.at(0)->getQueueLength();
+            int minQueueIdx = 0;
+            for (int i = 1; i < nExecutors && minQueueSize > 0; i++) {
+                int qs = thisExecutors.at(i)->getQueueLength();
+                if (qs < minQueueSize) {
+                    minQueueSize = qs;
+                    minQueueIdx = i;
+                }
+            }
+            SPDLOG_DEBUG("Queueing {} onto oversubscribed executor {}",
+                         funcStr,
+                         minQueueIdx);
+            claimed = thisExecutors.at(minQueueIdx);
+        } else {
+            ZoneScopedN("Scheduler::claimExecutor scaling up");
+            SPDLOG_DEBUG(
+              "Scaling {} from {} -> {}", funcStr, nExecutors, nExecutors + 1);
+            std::shared_ptr<faabric::scheduler::ExecutorFactory> factory =
+              getExecutorFactory();
+            auto executor = factory->createExecutor(msg);
+            executor->tryClaim();
+            thisExecutors.push_back(std::move(executor));
+            claimed = thisExecutors.back();
+        }
     }
 
     assert(claimed != nullptr);
@@ -943,8 +981,29 @@ int32_t Scheduler::awaitThreadResult(uint32_t messageId)
 }
 
 faabric::Message Scheduler::getFunctionResult(unsigned int messageId,
-                                              int timeoutMs)
+                                              int timeoutMs,
+                                              faabric::Message* caller)
 {
+    std::atomic_int* suspendedCtr = nullptr;
+    if (caller != nullptr) {
+        faabric::util::SharedLock _l(mx);
+        suspendedCtr =
+          &suspendedExecutors[faabric::util::funcToString(*caller, false)];
+        _l.unlock();
+        suspendedCtr->fetch_add(1, std::memory_order_acq_rel);
+    }
+    struct SuspendedGuard
+    {
+        std::atomic_int* ctr;
+        ~SuspendedGuard()
+        {
+            if (ctr != nullptr) {
+                ctr->fetch_sub(1, std::memory_order_acq_rel);
+                ctr = nullptr;
+            }
+        }
+    } suspendedGuard{ suspendedCtr };
+
     ZoneScopedNS("Scheduler::getFunctionResult", 5);
     ZoneValue(messageId);
 

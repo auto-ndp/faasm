@@ -13,11 +13,12 @@
 #include <faabric/util/timing.h>
 
 #include <atomic>
+#include <condition_variable>
 #include <cstdint>
 #include <functional>
 #include <future>
+#include <optional>
 #include <shared_mutex>
-#include <condition_variable>
 
 #define AVAILABLE_HOST_SET "available_hosts"
 #define AVAILABLE_STORAGE_HOST_SET "available_storage_hosts"
@@ -76,6 +77,8 @@ class Executor
 
     virtual faabric::util::SnapshotData snapshot();
 
+    int32_t getQueueLength();
+
   protected:
     virtual void restore(faabric::Message& msg);
 
@@ -131,11 +134,14 @@ class Scheduler
   public:
     Scheduler();
 
-    void callFunction(faabric::Message& msg, bool forceLocal = false);
+    void callFunction(faabric::Message& msg,
+                      bool forceLocal = false,
+                      faabric::Message* caller = nullptr);
 
     std::vector<std::string> callFunctions(
       std::shared_ptr<faabric::BatchExecuteRequest> req,
-      bool forceLocal = false);
+      bool forceLocal = false,
+      faabric::Message* caller = nullptr);
 
     void reset();
 
@@ -159,7 +165,9 @@ class Scheduler
 
     void setFunctionResult(faabric::Message& msg);
 
-    faabric::Message getFunctionResult(unsigned int messageId, int timeoutMs);
+    faabric::Message getFunctionResult(unsigned int messageId,
+                                       int timeoutMs,
+                                       faabric::Message* caller = nullptr);
 
     void getFunctionResultAsync(unsigned int messageId,
                                 int timeoutMs,
@@ -238,6 +246,7 @@ class Scheduler
 
     std::unordered_map<std::string, std::vector<std::shared_ptr<Executor>>>
       executors;
+    std::unordered_map<std::string, std::atomic_int> suspendedExecutors;
 
     std::shared_mutex mx;
 
@@ -254,7 +263,8 @@ class Scheduler
     std::set<std::string> availableHostsCache;
     std::unordered_map<std::string, std::set<std::string>> registeredHosts;
 
-    std::unordered_map<uint32_t, std::shared_ptr<MessageLocalResult>> localResults;
+    std::unordered_map<uint32_t, std::shared_ptr<MessageLocalResult>>
+      localResults;
     std::mutex localResultsMutex;
 
     std::vector<faabric::Message> recordedMessagesAll;

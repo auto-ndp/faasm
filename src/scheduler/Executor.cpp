@@ -380,6 +380,15 @@ void Executor::releaseClaim()
     claimed.store(false);
 }
 
+int32_t Executor::getQueueLength()
+{
+    int32_t result = 0;
+    for (auto& queue: threadTaskQueues) {
+        result += queue.size();
+    }
+    return result;
+}
+
 // ------------------------------------------
 // HOOKS
 // ------------------------------------------
