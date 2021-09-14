@@ -206,7 +206,7 @@ ExternalProject_Get_Property(libzeromq_ext SOURCE_DIR)
 set(LIBZEROMQ_INCLUDE_DIR ${SOURCE_DIR})
 ExternalProject_Add(cppzeromq_ext
     GIT_REPOSITORY "https://github.com/zeromq/cppzmq.git"
-    GIT_TAG "v4.7.1"
+    GIT_TAG "v4.8.0"
     CMAKE_CACHE_ARGS "-DCPPZMQ_BUILD_TESTS:BOOL=OFF"
         "-DCMAKE_INSTALL_PREFIX:STRING=${CMAKE_INSTALL_PREFIX}"
 )
