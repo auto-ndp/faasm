@@ -67,7 +67,7 @@ services:
       - ./dev/container/shared_store/:/usr/local/faasm/debug_shared_store/
       - ./bin/entrypoint_worker.sh:/entrypoint.sh
     environment:
-      - CAPTURE_STDOUT=off
+      - CAPTURE_STDOUT=on
       - CGROUP_MODE=off
       - DELTA_SNAPSHOT_ENCODING=pages=64
       - GLOBAL_MESSAGE_TIMEOUT=600000
