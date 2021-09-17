@@ -154,6 +154,7 @@ message Message {
     bytes zygoteDelta = 40;
     string directResultHost = 41;
     repeated int32 wasmGlobals = 42;
+    optional bool forbidNdp = 43;
 }
 
 message DirectResultTransmission {
