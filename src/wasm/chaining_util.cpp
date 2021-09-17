@@ -57,6 +57,10 @@ int makeChainedCall(const std::string& functionName,
     msg.set_executeslocally(true);
     msg.set_forbidndp(originalCall->forbidndp());
 
+    // Propagate the app ID
+    msg.set_appid(originalCall->appid());
+
+    // Python properties
     msg.set_pythonuser(originalCall->pythonuser());
     msg.set_pythonfunction(originalCall->pythonfunction());
     if (pyFuncName != nullptr) {
@@ -103,6 +107,9 @@ int spawnChainedThread(const std::string& snapshotKey,
     call.set_isasync(true);
     call.set_forbidndp(originalCall->forbidndp());
 
+    // Propagate app ID
+    call.set_appid(originalCall->appid());
+
     // Snapshot details
     call.set_snapshotkey(snapshotKey);
 
@@ -127,7 +134,6 @@ int awaitChainedCallOutput(unsigned int messageId,
                            uint8_t* buffer,
                            int bufferLen)
 {
-
     int callTimeoutMs = conf::getFaasmConfig().chainedCallTimeout;
 
     faabric::scheduler::Scheduler& sch = faabric::scheduler::getScheduler();
