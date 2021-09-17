@@ -172,7 +172,8 @@ I32 storageCallAndAwaitImpl(I32 wasmFuncPtr, I32 pyFuncNamePtr)
     WAVMWasmModule* thisModule = static_cast<WAVMWasmModule*>(
       getCurrentWasmExecutionContext()->executingModule);
 
-    if (config.isStorageNode) {
+    if (config.isStorageNode || call->forbidndp()) {
+        ZoneScopedN("call locally");
         if (isPython) {
             return -0x12345678;
         }
@@ -191,31 +192,25 @@ I32 storageCallAndAwaitImpl(I32 wasmFuncPtr, I32 pyFuncNamePtr)
                                 &result);
         return result.i32;
     } else {
-        TracyMessageL("Get zygote snapshot");
         auto zygoteSnapshotKV = thisModule->getZygoteSnapshot();
         auto zygoteSnapshot = zygoteSnapshotKV->get();
         faabric::util::SnapshotData zygoteSnap;
         zygoteSnap.fd = -1;
         zygoteSnap.data = zygoteSnapshot;
         zygoteSnap.size = zygoteSnapshotKV->size();
-        TracyMessageL("Create zygote->now delta");
         auto zygoteDelta =
           faabric::util::bytesToString(thisModule->deltaSnapshot(zygoteSnap));
-        TracyMessageL("Made delta");
 
         SPDLOG_INFO("{} - NDP sending snapshot of {} bytes",
                     call->id(),
                     zygoteDelta.size());
-        TracyMessageL("Chain call");
         std::vector<int32_t> wasmGlobals = thisModule->getGlobals();
         int ndpCallId = chainNdpCall(zygoteDelta,
                                      call->inputdata(),
                                      wasmFuncPtr,
                                      pyFuncName.c_str(),
                                      wasmGlobals);
-        TracyMessageL("Await call");
         faabric::Message ndpResult = awaitChainedCallMessage(ndpCallId);
-        TracyMessageL("Call returned");
 
         if (ndpResult.returnvalue() != 0) {
             call->set_outputdata(ndpResult.outputdata());
@@ -242,11 +237,9 @@ I32 storageCallAndAwaitImpl(I32 wasmFuncPtr, I32 pyFuncNamePtr)
         // faabric::util::writeBytesToFile(
         //   "/usr/local/faasm/debug_shared_store/debug_delta.bin",
         //   faabric::util::stringToBytes(ndpResult.outputdata()));
-        TracyMessageL("Restore delta");
         std::vector<uint8_t> memoryDelta =
           faabric::util::stringToBytes(ndpResult.outputdata());
         thisModule->deltaRestore(memoryDelta);
-        TracyMessageL("Restored");
     }
 
     return 0;

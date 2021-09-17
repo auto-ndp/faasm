@@ -55,6 +55,7 @@ int makeChainedCall(const std::string& functionName,
     msg.set_isstorage(isStorage);
     msg.set_directresulthost(fcfg.endpointHost);
     msg.set_executeslocally(true);
+    msg.set_forbidndp(originalCall->forbidndp());
 
     msg.set_pythonuser(originalCall->pythonuser());
     msg.set_pythonfunction(originalCall->pythonfunction());
@@ -100,6 +101,7 @@ int spawnChainedThread(const std::string& snapshotKey,
     faabric::Message call = faabric::util::messageFactory(
       originalCall->user(), originalCall->function());
     call.set_isasync(true);
+    call.set_forbidndp(originalCall->forbidndp());
 
     // Snapshot details
     call.set_snapshotkey(snapshotKey);
@@ -176,6 +178,7 @@ int chainNdpCall(const std::string& zygoteDelta,
     faabric::Message* originalCall = getExecutingCall();
     faabric::Message call = faabric::util::messageFactory(
       originalCall->user(), originalCall->function());
+    call.set_forbidndp(originalCall->forbidndp());
     call.set_isasync(true);
 
     // Snapshot details
