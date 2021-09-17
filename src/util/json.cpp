@@ -183,6 +183,24 @@ std::string messageToJson(const faabric::Message& msg)
           a);
     }
 
+    if (msg.isstorage()) {
+        d.AddMember("is_storage", Value(msg.isstorage()), a);
+    }
+    if (msg.isoutputmemorydelta()) {
+        d.AddMember(
+          "is_output_memory_delta", Value(msg.isoutputmemorydelta()), a);
+    }
+    if (!msg.directresulthost().empty()) {
+        d.AddMember(
+          "direct_result_host",
+          Value(msg.directresulthost().c_str(), msg.directresulthost().size())
+            .Move(),
+          a);
+    }
+    if (msg.forbidndp()) {
+        d.AddMember("forbid_ndp", Value(msg.forbidndp()), a);
+    }
+
     StringBuffer sb;
     Writer<StringBuffer> writer(sb);
     d.Accept(writer);
@@ -323,6 +341,12 @@ faabric::Message jsonToMessage(const std::string& jsonIn)
     msg.set_sgxtag(getStringFromJson(d, "sgxtag", ""));
     msg.set_sgxpolicy(getStringFromJson(d, "sgxpolicy", ""));
     msg.set_sgxresult(getStringFromJson(d, "sgxresult", ""));
+
+    msg.set_isstorage(getBoolFromJson(d, "is_storage", false));
+    msg.set_isoutputmemorydelta(
+      getBoolFromJson(d, "is_output_memory_delta", false));
+    msg.set_directresulthost(getStringFromJson(d, "direct_result_host", ""));
+    msg.set_forbidndp(getBoolFromJson(d, "forbid_ndp", false));
 
     PROF_END(jsonDecode)
 
