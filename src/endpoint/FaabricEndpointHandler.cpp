@@ -169,7 +169,7 @@ void FaabricEndpointHandler::onFunctionResult(
                  faabric::util::funcToString(result, true));
 
     if (result.sgxresult().empty()) {
-        response.body() = result.outputdata() + "\n";
+        response.body() = result.outputdata();
         return ctx.sendFunction(std::move(response));
     }
 
