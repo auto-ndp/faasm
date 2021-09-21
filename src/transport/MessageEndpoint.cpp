@@ -78,6 +78,7 @@ zmq::socket_t MessageEndpoint::setUpSocket(zmq::socket_type socketType,
                   "socket_create")
     socket.set(zmq::sockopt::rcvtimeo, timeoutMs);
     socket.set(zmq::sockopt::sndtimeo, timeoutMs);
+    socket.set(zmq::sockopt::immediate, 1);
 
     // Note - setting linger here is essential to avoid infinite hangs
     socket.set(zmq::sockopt::linger, LINGER_MS);
