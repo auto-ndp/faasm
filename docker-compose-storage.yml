@@ -35,11 +35,14 @@ services:
       - redis-state
       - minio
     volumes:
+      - ./:/usr/local/code/faasm/
       - ./dev/faasm/build/:${FAASM_BUILD_MOUNT}
+      - ./dev/faasm-local/wasm/:/usr/local/faasm/wasm
+      - ./dev/faasm-local/object/:/usr/local/faasm/object
     environment:
       - DELTA_SNAPSHOT_ENCODING=pages=64
       - LOG_LEVEL=debug
-      - PYTHON_CODEGEN=${PYTHON_CODEGEN}
+      - PYTHON_CODEGEN=${PYTHON_CODEGEN:-off}
       - REDIS_QUEUE_HOST=${COMPUTE_NODE}
       - REDIS_STATE_HOST=${STORAGE_NODE}
       - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
@@ -72,6 +75,7 @@ services:
     volumes:
       - ./:/usr/local/code/faasm/
       - ./dev/faasm/build/:${FAASM_BUILD_MOUNT}
+      - ./dev/faasm-local/:${FAASM_LOCAL_MOUNT}
       - ./dev/container/shared_store/:/usr/local/faasm/shared/
       - ./bin/entrypoint_worker.sh:/entrypoint.sh
     environment:

@@ -25,6 +25,7 @@ services:
     volumes:
       - ./:/usr/local/code/faasm/
       - ./dev/faasm/build/:${FAASM_BUILD_MOUNT}
+      - ./dev/faasm-local/:${FAASM_LOCAL_MOUNT}
       - ./dev/container/shared_store/:/usr/local/faasm/debug_shared_store/
       - ./bin/entrypoint_worker.sh:/entrypoint.sh
     environment:

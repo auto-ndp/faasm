@@ -8,6 +8,7 @@ export PYTHON_VERSION=$(cat clients/python/VERSION)
 
 # Mount our local build into the local cluster
 export FAASM_BUILD_MOUNT=/build/faasm
+export FAASM_LOCAL_MOUNT=/usr/local/faasm
 
 if [[ -z "$FAASM_CLI_IMAGE" ]]; then
     export FAASM_CLI_IMAGE=kubasz51/faasm-cli:${FAASM_VERSION}

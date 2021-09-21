@@ -33,12 +33,14 @@ services:
       - redis-state
       - minio
     volumes:
+      - ./:/usr/local/code/faasm/
       - ./dev/faasm/build/:${FAASM_BUILD_MOUNT}
+      - ./dev/faasm-local/wasm/:/usr/local/faasm/wasm
       - ./dev/faasm-local/object/:/usr/local/faasm/object
     environment:
       - DELTA_SNAPSHOT_ENCODING=pages=64
       - LOG_LEVEL=debug
-      - PYTHON_CODEGEN=${PYTHON_CODEGEN}
+      - PYTHON_CODEGEN=${PYTHON_CODEGEN:-off}
       - REDIS_QUEUE_HOST=redis-queue
       - REDIS_STATE_HOST=redis-state
       - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
@@ -65,6 +67,7 @@ services:
     volumes:
       - ./:/usr/local/code/faasm/
       - ./dev/faasm/build/:${FAASM_BUILD_MOUNT}
+      - ./dev/faasm-local/:${FAASM_LOCAL_MOUNT}
       - ./dev/container/shared_store/:/usr/local/faasm/debug_shared_store/
       - ./bin/entrypoint_worker.sh:/entrypoint.sh
     environment:
@@ -99,6 +102,7 @@ services:
     volumes:
       - ./:/usr/local/code/faasm/
       - ./dev/faasm/build/:${FAASM_BUILD_MOUNT}
+      - ./dev/faasm-local/:${FAASM_LOCAL_MOUNT}
       - ./dev/container/shared_store/:/usr/local/faasm/shared/
       - ./bin/entrypoint_worker.sh:/entrypoint.sh
     environment:
@@ -137,6 +141,7 @@ services:
       - upload
     volumes:
       - ./clients/cpp:/code/cpp
+      - ./dev/faasm-local/:${FAASM_LOCAL_MOUNT}
 
   python:
     image: ${PYTHON_CLI_IMAGE}
@@ -148,6 +153,7 @@ services:
       - upload
     volumes:
       - ./clients/python:/code/python
+      - ./dev/faasm-local/:${FAASM_LOCAL_MOUNT}
 
   # --- Local cluster dev ---
   # The following containers are only needed for local cluster dev
@@ -158,9 +164,9 @@ services:
     tty: true
     privileged: true
     depends_on:
-      - worker
-      - worker-storage
-      - nginx
+      - redis-state
+      - redis-queue
+      - minio
     environment:
       - UPLOAD_HOST=${UPLOAD_HOST:-upload}
       - INVOKE_HOST=${INVOKE_HOST:-nginx}
