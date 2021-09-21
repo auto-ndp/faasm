@@ -804,8 +804,11 @@ void Scheduler::claimExecutor(
     if (claimed == nullptr) {
         int nExecutors = thisExecutors.size();
         int nSuspended = suspendedExecutors[funcStr];
-        if (nExecutors - nSuspended >
-            std::max(1u, 4 * std::thread::hardware_concurrency())) {
+        // allow for 4 threads per available core, 12 threads in case of
+        // suspended threads
+        int maxSubscription = 4 * std::thread::hardware_concurrency();
+        if (nExecutors - std::min(nSuspended, maxSubscription * 3) >
+            std::max(1, maxSubscription)) {
             ZoneScopedN("Scheduler::claimExecutor oversubscribed");
             // oversubscribed, enqueue onto one of the other executors
             int minQueueSize = thisExecutors.at(0)->getQueueLength();
