@@ -12,6 +12,8 @@ services:
     image: kubasz51/faasm-worker:${FAASM_VERSION}
     security_opt:
       - seccomp:unconfined
+    # Allows for tracy thread&ctx switch tracking to work better
+    pid: "host"
     ulimits:
       nofile:
         soft: 1073741824
