@@ -78,6 +78,8 @@ services:
       - ./dev/faasm-local/:${FAASM_LOCAL_MOUNT}
       - ./dev/container/shared_store/:/usr/local/faasm/shared/
       - ./bin/entrypoint_worker.sh:/entrypoint.sh
+      - /sys/kernel/debug:/sys/kernel/debug
+      - /sys/kernel/debug/tracing:/sys/kernel/debug/tracing
     environment:
       - CAPTURE_STDOUT=off
       - CGROUP_MODE=off
@@ -92,7 +94,7 @@ services:
       - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
       - ENDPOINT_HOST=${STORAGE_NODE}
       - ENDPOINT_NUM_THREADS=2
-      - OVERRIDE_CPU_COUNT=15
+      - OVERRIDE_CPU_COUNT=7
     extra_hosts:
       - "luna-fast:192.168.3.10"
       - "saturno-fast:192.168.3.20"

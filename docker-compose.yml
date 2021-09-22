@@ -37,6 +37,8 @@ services:
       - ./dev/faasm/build/:${FAASM_BUILD_MOUNT}
       - ./dev/faasm-local/wasm/:/usr/local/faasm/wasm
       - ./dev/faasm-local/object/:/usr/local/faasm/object
+      - /sys/kernel/debug:/sys/kernel/debug
+      - /sys/kernel/debug/tracing:/sys/kernel/debug/tracing
     environment:
       - DELTA_SNAPSHOT_ENCODING=pages=64
       - LOG_LEVEL=debug
@@ -70,6 +72,8 @@ services:
       - ./dev/faasm-local/:${FAASM_LOCAL_MOUNT}
       - ./dev/container/shared_store/:/usr/local/faasm/debug_shared_store/
       - ./bin/entrypoint_worker.sh:/entrypoint.sh
+      - /sys/kernel/debug:/sys/kernel/debug
+      - /sys/kernel/debug/tracing:/sys/kernel/debug/tracing
     environment:
       - CAPTURE_STDOUT=on
       - CGROUP_MODE=off
@@ -105,6 +109,8 @@ services:
       - ./dev/faasm-local/:${FAASM_LOCAL_MOUNT}
       - ./dev/container/shared_store/:/usr/local/faasm/shared/
       - ./bin/entrypoint_worker.sh:/entrypoint.sh
+      - /sys/kernel/debug:/sys/kernel/debug
+      - /sys/kernel/debug/tracing:/sys/kernel/debug/tracing
     environment:
       - CAPTURE_STDOUT=off
       - CGROUP_MODE=off
