@@ -1,6 +1,8 @@
 #include <conf/FaasmConfig.h>
 #include <faabric/util/environment.h>
 #include <faabric/util/logging.h>
+#include <faabric/util/timing.h>
+#include <new>
 
 using namespace faabric::util;
 
@@ -75,3 +77,24 @@ void FaasmConfig::print()
     SPDLOG_INFO("Shared files dir:     {}", sharedFilesDir);
 }
 }
+
+/*
+#ifdef TRACY_ENABLE
+void* operator new(std::size_t count)
+{
+    if (count == 0) {
+        count++;
+    }
+    void* ptr = malloc(count);
+    if (!ptr) {
+        throw std::bad_alloc{};
+    }
+    TracySecureAlloc(ptr, count);
+    return ptr;
+}
+void operator delete(void* ptr) noexcept
+{
+    TracySecureFree(ptr);
+}
+#endif
+*/

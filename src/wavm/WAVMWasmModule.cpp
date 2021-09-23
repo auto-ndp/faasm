@@ -107,6 +107,11 @@ Runtime::Instance* WAVMWasmModule::getWasiModule()
     return baseWasiModule;
 }
 
+void WAVMWasmModule::warmUp()
+{
+    instantiateBaseModules();
+}
+
 WAVMWasmModule* getExecutingWAVMModule()
 {
     return reinterpret_cast<WAVMWasmModule*>(getExecutingModule());
@@ -147,8 +152,16 @@ void WAVMWasmModule::clone(const WAVMWasmModule& other)
     ZoneScopedNS("WAVMWasmModule::clone", 5);
     // If bound, we want to reclaim all the memory we've created _before_
     // cloning from the zygote otherwise it's lost forever
-    if (_isBound) {
-        doWAVMGarbageCollection();
+    {
+        // don't destroy the compartment when cloning, but clear all of our
+        // pointers
+        WAVM::Runtime::GCPointer<WAVM::Runtime::Compartment> keepCompartment =
+          compartment;
+        compartment = nullptr;
+        if (_isBound) {
+            doWAVMGarbageCollection();
+        }
+        compartment = keepCompartment;
     }
 
     if (!other._isBound) {
@@ -184,8 +197,14 @@ void WAVMWasmModule::clone(const WAVMWasmModule& other)
 
         // Clone compartment
         {
-            ZoneScopedN("WAVMWasmModule::clone::compartment");
-            compartment = Runtime::cloneCompartment(other.compartment);
+            if (static_cast<WAVM::Runtime::Compartment*>(compartment) ==
+                nullptr) {
+                ZoneScopedN("WAVMWasmModule::clone::compartment");
+                compartment = Runtime::cloneCompartment(other.compartment);
+            } else {
+                ZoneScopedN("WAVMWasmModule::cloneInto::compartment");
+                Runtime::cloneCompartmentInto(*compartment, other.compartment);
+            }
         }
 
         // Clone context

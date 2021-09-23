@@ -151,6 +151,14 @@ void Faaslet::restore(faabric::Message& msg)
     }
 }
 
+FaasletFactory::FaasletFactory()
+{
+    conf::FaasmConfig& conf = conf::getFaasmConfig();
+    if (conf.wasmVm == "wavm") {
+        wasm::WAVMWasmModule::warmUp();
+    }
+}
+
 FaasletFactory::~FaasletFactory() {}
 
 std::shared_ptr<faabric::scheduler::Executor> FaasletFactory::createExecutor(

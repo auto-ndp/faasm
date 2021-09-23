@@ -35,6 +35,8 @@ class WAVMWasmModule final
 
     static void clearCaches();
 
+    static void warmUp();
+
     // ----- Module lifecycle -----
     void doBindToFunction(faabric::Message& msg, bool cache) override;
 

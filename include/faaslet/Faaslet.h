@@ -41,6 +41,7 @@ class Faaslet final : public faabric::scheduler::Executor
 class FaasletFactory final : public faabric::scheduler::ExecutorFactory
 {
   public:
+    FaasletFactory();
     ~FaasletFactory();
 
   protected:
