@@ -87,7 +87,8 @@ void MessageEndpointServerThread::start(
                 size_t respSize = resp->ByteSizeLong();
 
                 msgBuffer.resize(respSize);
-                if (!resp->SerializeToArray(msgBuffer.data(), msgBuffer.size())) {
+                if (!resp->SerializeToArray(msgBuffer.data(),
+                                            msgBuffer.size())) {
                     throw std::runtime_error("Error serialising message");
                 }
 
@@ -117,8 +118,8 @@ MessageEndpointServer::MessageEndpointServer(int asyncPortIn, int syncPortIn)
   , syncPort(syncPortIn)
   , asyncThread(this, true)
   , syncThread(this, false)
-  , asyncShutdownSender(LOCALHOST, asyncPort)
-  , syncShutdownSender(LOCALHOST, syncPort)
+  , asyncShutdownSender(LOCALHOST, asyncPortIn)
+  , syncShutdownSender(LOCALHOST, syncPortIn)
 {}
 
 void MessageEndpointServer::start()
