@@ -135,9 +135,10 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
     U32 outPtr{ 0 };
     if (get_result.returnvalue() == 0) {
         ZoneScopedN("NDP get map memory");
-        std::vector<uint8_t> outputData =
-          faabric::util::stringToBytes(get_result.outputdata());
-        size_t copyLen = std::min(outputData.size(), (size_t)maxRequestedLen);
+        const uint8_t* outputData =
+          reinterpret_cast<const uint8_t*>(get_result.outputdata().data());
+        size_t copyLen =
+          std::min(get_result.outputdata().size(), (size_t)maxRequestedLen);
         U32 oldPagesEnd = module_->mmapMemory(copyLen);
         U32 oldPageNumberEnd = oldPagesEnd / WASM_BYTES_PER_PAGE;
         SPDLOG_DEBUG("ndpos_getMmap data start at addr {:08x} page {} len {}",
@@ -146,7 +147,7 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
                      copyLen);
         U8* outDataPtr =
           Runtime::memoryArrayPtr<U8>(memoryPtr, oldPagesEnd, (Uptr)copyLen);
-        std::copy_n(outputData.begin(), copyLen, outDataPtr);
+        std::copy_n(outputData, copyLen, outDataPtr);
         *outDataLen = copyLen;
         outPtr = oldPagesEnd;
         module_->snapshotExcludedPtrLens.push_back(

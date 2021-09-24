@@ -15,6 +15,7 @@ docker-compose -f docker-compose.yml exec redis-queue redis-cli flushall
 
 docker-compose -f docker-compose.yml exec redis-state redis-cli flushall
 
+docker-compose -f docker-compose.yml stop --timeout 1 worker worker-storage
 docker-compose -f docker-compose.yml \
     up \
     --force-recreate --no-deps \

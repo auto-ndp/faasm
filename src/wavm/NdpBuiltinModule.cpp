@@ -4,8 +4,10 @@
 #include <array>
 #include <boost/filesystem.hpp>
 #include <stdexcept>
+#include <stdio.h>
 #include <sys/mman.h>
 #include <sys/types.h>
+#include <unistd.h>
 
 #include <conf/FaasmConfig.h>
 #include <faabric/util/bytes.h>
@@ -52,20 +54,42 @@ static int ndpGet(NDPBuiltinModule& module, faabric::Message& msg)
         return 1;
     }
     TracyMessageL("Checked file existance");
-    auto bytes = faabric::util::readFileToBytes(objPath);
+
+    int fd = open(objPath.c_str(), O_RDONLY);
+    if (fd < 0) {
+        throw std::runtime_error("Couldn't open file " + objPath);
+    }
+    struct stat statbuf;
+    int staterr = fstat(fd, &statbuf);
+    if (staterr < 0) {
+        throw std::runtime_error("Couldn't stat file " + objPath);
+    }
+    size_t fsize = statbuf.st_size;
+    args.offset = std::min(fsize, args.offset);
+    args.uptoBytes = std::min(args.uptoBytes, fsize - args.offset);
+    posix_fadvise(fd, args.offset, args.uptoBytes, POSIX_FADV_SEQUENTIAL);
+    std::string* outdata = msg.mutable_outputdata();
+    outdata->resize(fsize, '\0');
+    lseek(fd, args.offset, SEEK_SET);
+    int cpos = 0;
+    while (cpos < args.uptoBytes) {
+        int rc = read(fd, outdata->data() + cpos, args.uptoBytes - cpos);
+        if (rc < 0) {
+            perror("Couldn't read file");
+            throw std::runtime_error("Couldn't read file " + objPath);
+        } else {
+            cpos += rc;
+        }
+    }
+    close(fd);
+
     TracyMessageL("Read file to bytes");
-    size_t startOffset = std::min(bytes.size(), args.offset);
-    size_t dataLen = std::min(bytes.size() - startOffset, args.uptoBytes);
-    SPDLOG_INFO("NDP GET {} bytes starting at offset {} from file {} "
+    SPDLOG_INFO("NDP GET from file {} "
                 "[bytes={}, args.offset={}, uptoBytes={}]",
-                dataLen,
-                startOffset,
                 objPath,
-                bytes.size(),
+                msg.outputdata().size(),
                 args.offset,
                 args.uptoBytes);
-    msg.set_outputdata(static_cast<void*>(bytes.data() + startOffset),
-                       startOffset + dataLen);
     return 0;
 }
 

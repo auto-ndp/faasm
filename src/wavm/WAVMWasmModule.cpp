@@ -198,7 +198,7 @@ void WAVMWasmModule::clone(const WAVMWasmModule& other)
         // Clone compartment
         {
             if (static_cast<WAVM::Runtime::Compartment*>(compartment) ==
-                nullptr) {
+               nullptr) {
                 ZoneScopedN("WAVMWasmModule::clone::compartment");
                 compartment = Runtime::cloneCompartment(other.compartment);
             } else {
