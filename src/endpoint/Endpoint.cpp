@@ -1,4 +1,5 @@
 #include <faabric/endpoint/Endpoint.h>
+#include <faabric/scheduler/Scheduler.h>
 #include <faabric/util/logging.h>
 #include <faabric/util/timing.h>
 
@@ -202,6 +203,27 @@ Endpoint::Endpoint(int portIn,
 
 Endpoint::~Endpoint() {}
 
+struct SchedulerMonitoringTask
+  : public std::enable_shared_from_this<SchedulerMonitoringTask>
+{
+    asio::io_context& ioc;
+    asio::deadline_timer timer;
+
+    SchedulerMonitoringTask(asio::io_context& ioc)
+      : ioc(ioc)
+      , timer(ioc, boost::posix_time::milliseconds(1))
+    {}
+
+    void run()
+    {
+        faabric::scheduler::getScheduler().updateMonitoring();
+        timer.expires_at(timer.expires_at() +
+                         boost::posix_time::milliseconds(500));
+        timer.async_wait(
+          std::bind(&SchedulerMonitoringTask::run, this->shared_from_this()));
+    }
+};
+
 void Endpoint::start(bool awaitSignal)
 {
     SPDLOG_INFO("Starting HTTP endpoint on {}, {} threads", port, threadCount);
@@ -227,6 +249,8 @@ void Endpoint::start(bool awaitSignal)
             }
         });
     }
+
+    std::make_shared<SchedulerMonitoringTask>(state->ioc)->run();
 
     int extraThreads = std::max(awaitSignal ? 0 : 1, this->threadCount - 1);
     state->ioThreads.reserve(extraThreads);

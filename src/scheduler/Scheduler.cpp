@@ -16,6 +16,7 @@
 #include <faabric/util/timing.h>
 
 #include <sys/eventfd.h>
+#include <sys/file.h>
 
 #include <chrono>
 #include <unordered_set>
@@ -74,6 +75,17 @@ Scheduler::Scheduler()
     if (this->conf.isStorageNode) {
         redis::Redis& redis = redis::Redis::getQueue();
         redis.sadd(ALL_STORAGE_HOST_SET, this->thisHost);
+    }
+
+    if (!this->conf.schedulerMonitorFile.empty()) {
+        this->monitorFd = open(conf.schedulerMonitorFile.c_str(),
+                               O_RDWR | O_CREAT | O_NOATIME | O_TRUNC,
+                               S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+        if (this->monitorFd < 0) {
+            perror("Couldn't open monitoring fd");
+            this->monitorFd = -1;
+        }
+        this->updateMonitoring();
     }
 }
 
@@ -804,10 +816,10 @@ void Scheduler::claimExecutor(
     if (claimed == nullptr) {
         int nExecutors = thisExecutors.size();
         int nSuspended = suspendedExecutors[funcStr];
-        // allow for 4 threads per available core, 12 threads in case of
+        // allow for 2 threads per available core, 12 threads in case of
         // suspended threads
-        int maxSubscription = 4 * std::thread::hardware_concurrency();
-        if (nExecutors - std::min(nSuspended, maxSubscription * 3) >
+        int maxSubscription = 2 * std::thread::hardware_concurrency();
+        if (nExecutors - std::min(nSuspended, maxSubscription * 6) >
             std::max(1, maxSubscription)) {
             ZoneScopedN("Scheduler::claimExecutor oversubscribed");
             // oversubscribed, enqueue onto one of the other executors
@@ -994,6 +1006,7 @@ faabric::Message Scheduler::getFunctionResult(unsigned int messageId,
           &suspendedExecutors[faabric::util::funcToString(*caller, false)];
         _l.unlock();
         suspendedCtr->fetch_add(1, std::memory_order_acq_rel);
+        monitorWaitingTasks.fetch_add(1, std::memory_order_acq_rel);
     }
     struct SuspendedGuard
     {
@@ -1001,6 +1014,8 @@ faabric::Message Scheduler::getFunctionResult(unsigned int messageId,
         ~SuspendedGuard()
         {
             if (ctr != nullptr) {
+                getScheduler().monitorWaitingTasks.fetch_sub(
+                  1, std::memory_order_acq_rel);
                 ctr->fetch_sub(1, std::memory_order_acq_rel);
                 ctr = nullptr;
             }
@@ -1228,6 +1243,48 @@ std::set<unsigned int> Scheduler::getChainedFunctions(unsigned int msgId)
     }
 
     return chainedIds;
+}
+
+void Scheduler::updateMonitoring()
+{
+    if (this->monitorFd < 0) {
+        return;
+    }
+    static std::mutex monitorMx;
+    std::unique_lock<std::mutex> monitorLock(monitorMx);
+    thread_local std::string wrBuffer = std::string(size_t(128), char('\0'));
+    wrBuffer.clear();
+    constexpr auto ord = std::memory_order_acq_rel;
+    int32_t locallySched = monitorLocallyScheduledTasks.load(ord);
+    int32_t started = monitorStartedTasks.load(ord);
+    int32_t waiting = monitorWaitingTasks.load(ord);
+    fmt::format_to(
+      std::back_inserter(wrBuffer),
+      "local_sched,{},waiting_queued,{},started,{},waiting,{},active,{}\n",
+      locallySched,
+      locallySched - started,
+      started,
+      waiting,
+      started - waiting);
+    const size_t size = wrBuffer.size();
+    flock(monitorFd, LOCK_EX);
+    ftruncate(monitorFd, size);
+    lseek(monitorFd, 0, SEEK_SET);
+    ssize_t pos = 0;
+    while (pos < size) {
+        ssize_t written = write(monitorFd, wrBuffer.data() + pos, size - pos);
+        if (written < 0 && errno != EAGAIN) {
+            perror("Couldn't write monitoring data");
+        }
+        if (written == 0) {
+            SPDLOG_WARN("Couldn't write monitoring data");
+            break;
+        }
+        if (written > 0) {
+            pos += written;
+        }
+    }
+    flock(monitorFd, LOCK_UN);
 }
 
 ExecGraph Scheduler::getFunctionExecGraph(unsigned int messageId)

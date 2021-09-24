@@ -52,6 +52,9 @@ void SystemConfig::initialise()
     endpointNumThreads =
       this->getSystemConfIntParam("ENDPOINT_NUM_THREADS", "4");
 
+    // Monitoring
+    schedulerMonitorFile = getEnvVar("SCHEDULER_MONITOR_FILE", "");
+
     if (endpointHost.empty()) {
         // Get the IP for this host
         endpointHost =
@@ -104,5 +107,8 @@ void SystemConfig::print()
     SPDLOG_INFO("ENDPOINT_HOST              {}", endpointHost);
     SPDLOG_INFO("ENDPOINT_PORT              {}", endpointPort);
     SPDLOG_INFO("ENDPOINT_NUM_THREADS       {}", endpointNumThreads);
+
+    SPDLOG_INFO("--- Monitoring ---");
+    SPDLOG_INFO("SCHEDULER_MONITOR_FILE     {}", schedulerMonitorFile);
 }
 }

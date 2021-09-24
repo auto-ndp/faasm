@@ -237,7 +237,15 @@ class Scheduler
 
     ExecGraph getFunctionExecGraph(unsigned int msgId);
 
+    void updateMonitoring();
+
+    std::atomic_int32_t monitorLocallyScheduledTasks;
+    std::atomic_int32_t monitorStartedTasks;
+    std::atomic_int32_t monitorWaitingTasks;
+
   private:
+    int monitorFd = -1;
+
     std::string thisHost;
 
     faabric::util::SystemConfig& conf;

@@ -155,6 +155,9 @@ void Executor::executeTasks(std::vector<int> msgIdxs,
     // original function call will cause a reset
     bool skipReset = isMaster && isThreads;
 
+    getScheduler().monitorLocallyScheduledTasks.fetch_add(
+      msgIdxs.size(), std::memory_order_acq_rel);
+
     // Iterate through and invoke tasks
     for (int msgIdx : msgIdxs) {
         ZoneScopedNS("Executor::executeTasks[msgIdx]", 5);
@@ -249,6 +252,8 @@ void Executor::threadPoolThread(int threadPoolIdx)
                      msg.id(),
                      isThreads);
 
+        getScheduler().monitorStartedTasks.fetch_add(1,
+                                                     std::memory_order_acq_rel);
         int32_t returnValue;
         try {
 
@@ -328,6 +333,11 @@ void Executor::threadPoolThread(int threadPoolIdx)
             releaseClaim();
         }
 
+        getScheduler().monitorStartedTasks.fetch_sub(1,
+                                                     std::memory_order_acq_rel);
+        getScheduler().monitorLocallyScheduledTasks.fetch_sub(
+          1, std::memory_order_acq_rel);
+
         // Vacate the slot occupied by this task. This must be done after
         // releasing the claim on this executor, otherwise the scheduler may try
         // to schedule another function and be unable to reuse this executor.
@@ -383,7 +393,7 @@ void Executor::releaseClaim()
 int32_t Executor::getQueueLength()
 {
     int32_t result = 0;
-    for (auto& queue: threadTaskQueues) {
+    for (auto& queue : threadTaskQueues) {
         result += queue.size();
     }
     return result;
