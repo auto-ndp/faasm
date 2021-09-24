@@ -22,4 +22,7 @@ if [[ -z "$PYTHON_CLI_IMAGE" ]]; then
     export PYTHON_CLI_IMAGE=kubasz51/faasm-cpython:${PYTHON_VERSION}
 fi
 
+touch /tmp/faasm-monitor
+touch /tmp/faasm-monitor-storage
+
 export INNER_SHELL=/bin/bash

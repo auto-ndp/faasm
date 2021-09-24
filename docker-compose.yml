@@ -70,6 +70,7 @@ services:
     privileged: true
     volumes:
       - ./:/usr/local/code/faasm/
+      - /tmp/faasm-monitor:/var/faasm-monitor
       - ./dev/faasm/build/:${FAASM_BUILD_MOUNT}
       - ./dev/faasm-local/:${FAASM_LOCAL_MOUNT}
       - ./dev/container/shared_store/:/usr/local/faasm/debug_shared_store/
@@ -85,6 +86,7 @@ services:
       - NETNS_MODE=off
       - REDIS_QUEUE_HOST=redis-queue
       - REDIS_STATE_HOST=redis-state
+      - SCHEDULER_MONITOR_FILE=/var/faasm-monitor
       - STATE_MODE=redis
       - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
       - ENDPOINT_HOST=worker
@@ -109,6 +111,7 @@ services:
     privileged: true
     volumes:
       - ./:/usr/local/code/faasm/
+      - /tmp/faasm-monitor-storage:/var/faasm-monitor-storage
       - ./dev/faasm/build/:${FAASM_BUILD_MOUNT}
       - ./dev/faasm-local/:${FAASM_LOCAL_MOUNT}
       - ./dev/container/shared_store/:/usr/local/faasm/shared/
@@ -125,6 +128,7 @@ services:
       - NETNS_MODE=off
       - REDIS_QUEUE_HOST=redis-queue
       - REDIS_STATE_HOST=redis-state
+      - SCHEDULER_MONITOR_FILE=/var/faasm-monitor-storage
       - STATE_MODE=redis
       - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
       - ENDPOINT_HOST=worker-storage

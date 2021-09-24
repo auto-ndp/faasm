@@ -26,6 +26,7 @@ services:
     privileged: true
     volumes:
       - ./:/usr/local/code/faasm/
+      - /tmp/faasm-monitor:/var/faasm-monitor
       - ./dev/faasm/build/:${FAASM_BUILD_MOUNT}
       - ./dev/faasm-local/:${FAASM_LOCAL_MOUNT}
       - ./dev/container/shared_store/:/usr/local/faasm/debug_shared_store/
@@ -41,6 +42,7 @@ services:
       - NETNS_MODE=off
       - REDIS_QUEUE_HOST=${COMPUTE_NODE}
       - REDIS_STATE_HOST=${STORAGE_NODE}
+      - SCHEDULER_MONITOR_FILE=/var/faasm-monitor
       - STATE_MODE=redis
       - S3_HOST=${STORAGE_NODE}
       - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
