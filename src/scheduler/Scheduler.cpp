@@ -296,13 +296,6 @@ std::vector<std::string> Scheduler::callFunctions(
     // TODO - more granular locking, this is incredibly conservative
     faabric::util::FullLock lock(mx);
 
-    std::atomic_int* suspendedCtr = nullptr;
-    if (caller != nullptr) {
-        suspendedCtr =
-          &suspendedExecutors[faabric::util::funcToString(*caller, false)];
-        suspendedCtr->fetch_add(1, std::memory_order_acq_rel);
-    }
-
     // If we're not the master host, we need to forward the request back to the
     // master host. This will only happen if a nested batch execution happens.
     std::vector<int> localMessageIdxs;
@@ -613,10 +606,6 @@ std::vector<std::string> Scheduler::callFunctions(
                 recordedMessagesShared.emplace_back(executedHost, msg);
             }
         }
-    }
-
-    if (suspendedCtr) {
-        suspendedCtr->fetch_sub(1, std::memory_order_acq_rel);
     }
 
     return executed;
