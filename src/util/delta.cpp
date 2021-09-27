@@ -57,54 +57,88 @@ std::string DeltaSettings::toString() const
     return ss.str();
 }
 
-std::vector<uint8_t> serializeDelta(const DeltaSettings& cfg,
-                                    const uint8_t* oldDataStart,
-                                    size_t oldDataLen,
-                                    const uint8_t* newDataStart,
-                                    size_t newDataLen)
+std::vector<uint8_t> serializeDelta(
+  const DeltaSettings& cfg,
+  const uint8_t* oldDataStart,
+  size_t oldDataLen,
+  const uint8_t* newDataStart,
+  size_t newDataLen,
+  const std::vector<std::pair<uint32_t, uint32_t>>* excludedPtrLens)
 {
     std::vector<uint8_t> outb;
     outb.reserve(16384);
     outb.push_back(DELTA_PROTOCOL_VERSION);
     outb.push_back(DELTACMD_TOTAL_SIZE);
     appendBytesOf(outb, uint32_t(newDataLen));
+    auto encodeChangedRegionRaw =
+      [&](size_t startByte, size_t newLength, auto& recursiveCall) {
+          if (newLength == 0) {
+              return;
+          }
+          assert(startByte <= newDataLen);
+          size_t endByte = startByte + newLength;
+          assert(endByte <= newDataLen);
+          assert(startByte <= oldDataLen);
+          assert(endByte <= oldDataLen);
+          if (excludedPtrLens != nullptr) {
+              for (const auto& [xptr, xlen] : *excludedPtrLens) {
+                  auto xend = xptr + xlen;
+                  bool startExcluded = startByte >= xptr && startByte < xend;
+                  bool endExcluded = endByte > xptr && endByte <= xend;
+                  bool startEndOutside = startByte < xptr && endByte > xend;
+                  if (startExcluded && endExcluded) {
+                      return;
+                  } else if (startExcluded) {
+                      return recursiveCall(xend, endByte - xend, recursiveCall);
+                  } else if (endExcluded) {
+                      return recursiveCall(
+                        startByte, xptr - startByte, recursiveCall);
+                  } else if (startEndOutside) {
+                      recursiveCall(startByte, xptr - startByte, recursiveCall);
+                      return recursiveCall(xend, endByte - xend, recursiveCall);
+                  }
+              }
+          }
+          if (cfg.xorWithOld) {
+              outb.push_back(DELTACMD_DELTA_XOR);
+              appendBytesOf(outb, uint32_t(startByte));
+              appendBytesOf(outb, uint32_t(newLength));
+              size_t xorStart = outb.size();
+              outb.insert(
+                outb.end(), newDataStart + startByte, newDataStart + endByte);
+              auto xorBegin = outb.begin() + xorStart;
+              std::transform(oldDataStart + startByte,
+                             oldDataStart + endByte,
+                             xorBegin,
+                             xorBegin,
+                             std::bit_xor<uint8_t>());
+          } else {
+              outb.push_back(DELTACMD_DELTA_OVERWRITE);
+              appendBytesOf(outb, uint32_t(startByte));
+              appendBytesOf(outb, uint32_t(newLength));
+              outb.insert(
+                outb.end(), newDataStart + startByte, newDataStart + endByte);
+          }
+      };
     auto encodeChangedRegion = [&](size_t startByte, size_t newLength) {
-        if (newLength == 0) {
-            return;
-        }
-        assert(startByte <= newDataLen);
-        size_t endByte = startByte + newLength;
-        assert(endByte <= newDataLen);
-        assert(startByte <= oldDataLen);
-        assert(endByte <= oldDataLen);
-        if (cfg.xorWithOld) {
-            outb.push_back(DELTACMD_DELTA_XOR);
-            appendBytesOf(outb, uint32_t(startByte));
-            appendBytesOf(outb, uint32_t(newLength));
-            size_t xorStart = outb.size();
-            outb.insert(
-              outb.end(), newDataStart + startByte, newDataStart + endByte);
-            auto xorBegin = outb.begin() + xorStart;
-            std::transform(oldDataStart + startByte,
-                           oldDataStart + endByte,
-                           xorBegin,
-                           xorBegin,
-                           std::bit_xor<uint8_t>());
-        } else {
-            outb.push_back(DELTACMD_DELTA_OVERWRITE);
-            appendBytesOf(outb, uint32_t(startByte));
-            appendBytesOf(outb, uint32_t(newLength));
-            outb.insert(
-              outb.end(), newDataStart + startByte, newDataStart + endByte);
-        }
+        return encodeChangedRegionRaw(
+          startByte, newLength, encodeChangedRegionRaw);
     };
     auto encodeNewRegion = [&](size_t newStart, size_t newLength) {
-        if (newLength == 0) {
-            return;
+        while (newLength > 0 && newDataStart[newStart] == uint8_t(0)) {
+            newStart++;
+            newLength--;
+        }
+        while (newLength > 0 &&
+               newDataStart[newStart + newLength] == uint8_t(0)) {
+            newLength--;
         }
         assert(newStart <= newDataLen);
         size_t newEnd = newStart + newLength;
         assert(newEnd <= newDataLen);
+        if (newLength == 0) {
+            return;
+        }
         outb.push_back(DELTACMD_DELTA_OVERWRITE);
         appendBytesOf(outb, uint32_t(newStart));
         appendBytesOf(outb, uint32_t(newLength));

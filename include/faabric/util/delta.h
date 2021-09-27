@@ -4,6 +4,7 @@
 #include <functional>
 #include <string>
 #include <vector>
+#include <utility>
 
 namespace faabric::util {
 
@@ -44,7 +45,8 @@ std::vector<uint8_t> serializeDelta(const DeltaSettings& cfg,
                                     const uint8_t* oldDataStart,
                                     size_t oldDataLen,
                                     const uint8_t* newDataStart,
-                                    size_t newDataLen);
+                                    size_t newDataLen,
+                                    const std::vector<std::pair<uint32_t, uint32_t>> *excludedPtrLens = nullptr);
 
 void applyDelta(const std::vector<uint8_t>& delta,
                 std::function<void(uint32_t)> setDataSize,
