@@ -285,23 +285,18 @@ std::vector<uint8_t> WasmModule::deltaSnapshot(
     ZoneScopedNS("WasmModule::deltaSnapshot", 6);
     auto newMemData = getMemoryBase();
     auto newMemSize = getMemorySizeBytes();
-    {
-        ZoneScopedN("exclude zones");
-        size_t total_len = 0;
-        for (const auto& [ptr, len] : this->snapshotExcludedPtrLens) {
-            std::fill_n(newMemData + ptr, len, uint8_t(0));
-            total_len += len;
-        }
-        (void)total_len;
-        ZoneValue(total_len);
-    }
     const auto& cfg = faabric::util::getSystemConfig();
     faabric::util::DeltaSettings dcfg(cfg.deltaSnapshotEncoding);
     {
         ZoneScopedN("Serialize delta");
         ZoneValue(newMemSize);
-        return faabric::util::serializeDelta(
-          dcfg, oldMemory.data, oldMemory.size, newMemData, newMemSize);
+        ZoneValue(this->snapshotExcludedPtrLens.size());
+        return faabric::util::serializeDelta(dcfg,
+                                             oldMemory.data,
+                                             oldMemory.size,
+                                             newMemData,
+                                             newMemSize,
+                                             &this->snapshotExcludedPtrLens);
     }
 }
 
