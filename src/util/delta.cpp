@@ -124,25 +124,49 @@ std::vector<uint8_t> serializeDelta(
         return encodeChangedRegionRaw(
           startByte, newLength, encodeChangedRegionRaw);
     };
-    auto encodeNewRegion = [&](size_t newStart, size_t newLength) {
+    auto encodeNewRegionRaw = [&](size_t newStart,
+                                  size_t newLength,
+                                  auto& recursiveCall) {
+        assert(newStart <= newDataLen);
         while (newLength > 0 && newDataStart[newStart] == uint8_t(0)) {
             newStart++;
             newLength--;
         }
         while (newLength > 0 &&
-               newDataStart[newStart + newLength] == uint8_t(0)) {
+               newDataStart[newStart + newLength - 1] == uint8_t(0)) {
             newLength--;
         }
-        assert(newStart <= newDataLen);
         size_t newEnd = newStart + newLength;
         assert(newEnd <= newDataLen);
         if (newLength == 0) {
             return;
         }
+        if (excludedPtrLens != nullptr) {
+            for (const auto& [xptr, xlen] : *excludedPtrLens) {
+                auto xend = xptr + xlen;
+                bool startExcluded = newStart >= xptr && newStart < xend;
+                bool endExcluded = newEnd > xptr && newEnd <= xend;
+                bool startEndOutside = newStart < xptr && newEnd > xend;
+                if (startExcluded && endExcluded) {
+                    return;
+                } else if (startExcluded) {
+                    return recursiveCall(xend, newEnd - xend, recursiveCall);
+                } else if (endExcluded) {
+                    return recursiveCall(
+                      newStart, xptr - newStart, recursiveCall);
+                } else if (startEndOutside) {
+                    recursiveCall(newStart, xptr - newStart, recursiveCall);
+                    return recursiveCall(xend, newEnd - xend, recursiveCall);
+                }
+            }
+        }
         outb.push_back(DELTACMD_DELTA_OVERWRITE);
         appendBytesOf(outb, uint32_t(newStart));
         appendBytesOf(outb, uint32_t(newLength));
         outb.insert(outb.end(), newDataStart + newStart, newDataStart + newEnd);
+    };
+    auto encodeNewRegion = [&](size_t newStart, size_t newLength) {
+        return encodeNewRegionRaw(newStart, newLength, encodeNewRegionRaw);
     };
     if (cfg.usePages) {
         for (size_t pageStart = 0; pageStart < newDataLen;
@@ -156,15 +180,6 @@ std::vector<uint8_t> serializeDelta(
                                               oldDataStart);
                 if (anyChanges) {
                     encodeChangedRegion(pageStart, cfg.pageSize);
-                }
-            } else if (!startInBoth) {
-                using namespace std::placeholders;
-                if (std::any_of(
-                      newDataStart + pageStart,
-                      newDataStart + pageEnd,
-                      std::bind(std::not_equal_to<uint8_t>(), 0, _1))) {
-                    encodeNewRegion(pageStart,
-                                    std::min(pageEnd, newDataLen) - pageStart);
                 }
             } else {
                 encodeNewRegion(pageStart,
