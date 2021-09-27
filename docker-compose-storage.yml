@@ -18,6 +18,7 @@ services:
     extra_hosts:
       - "luna-fast:192.168.3.10"
       - "saturno-fast:192.168.3.20"
+      - "kone-fast:192.168.3.30"
     volumes:
       - ./dev/minio/data:/data/minio
     healthcheck:
@@ -49,6 +50,7 @@ services:
     extra_hosts:
       - "luna-fast:192.168.3.10"
       - "saturno-fast:192.168.3.20"
+      - "kone-fast:192.168.3.30"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8002/ping"]
       interval: 5s
@@ -97,11 +99,12 @@ services:
       - STATE_MODE=redis
       - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
       - ENDPOINT_HOST=${STORAGE_NODE}
-      - ENDPOINT_NUM_THREADS=2
-      - OVERRIDE_CPU_COUNT=7
+      - ENDPOINT_NUM_THREADS=4
+      - OVERRIDE_CPU_COUNT=12
     extra_hosts:
       - "luna-fast:192.168.3.10"
       - "saturno-fast:192.168.3.20"
+      - "kone-fast:192.168.3.30"
 
   # Both
   cpp:
@@ -117,6 +120,7 @@ services:
     extra_hosts:
       - "luna-fast:192.168.3.10"
       - "saturno-fast:192.168.3.20"
+      - "kone-fast:192.168.3.30"
     volumes:
       - ./clients/cpp:/code/cpp
 
@@ -134,6 +138,7 @@ services:
     extra_hosts:
       - "luna-fast:192.168.3.10"
       - "saturno-fast:192.168.3.20"
+      - "kone-fast:192.168.3.30"
     volumes:
       - ./clients/python:/code/python
 
@@ -158,6 +163,7 @@ services:
     extra_hosts:
       - "luna-fast:192.168.3.10"
       - "saturno-fast:192.168.3.20"
+      - "kone-fast:192.168.3.30"
     volumes:
       - ./:/usr/local/code/faasm/
       - ./dev/faasm/build/:/build/faasm/

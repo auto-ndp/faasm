@@ -47,11 +47,12 @@ services:
       - S3_HOST=${STORAGE_NODE}
       - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
       - ENDPOINT_HOST=${COMPUTE_NODE}
-      - ENDPOINT_NUM_THREADS=2
-      - OVERRIDE_CPU_COUNT=15
+      - ENDPOINT_NUM_THREADS=4
+      - OVERRIDE_CPU_COUNT=26
     extra_hosts:
       - "luna-fast:192.168.3.10"
       - "saturno-fast:192.168.3.20"
+      - "kone-fast:192.168.3.30"
 
   # Compute
   nginx:
@@ -78,6 +79,7 @@ services:
     extra_hosts:
       - "luna-fast:192.168.3.10"
       - "saturno-fast:192.168.3.20"
+      - "kone-fast:192.168.3.30"
     volumes:
       - ./clients/cpp:/code/cpp
 
@@ -96,6 +98,7 @@ services:
     extra_hosts:
       - "luna-fast:192.168.3.10"
       - "saturno-fast:192.168.3.20"
+      - "kone-fast:192.168.3.30"
     volumes:
       - ./clients/python:/code/python
 
@@ -122,6 +125,7 @@ services:
     extra_hosts:
       - "luna-fast:192.168.3.10"
       - "saturno-fast:192.168.3.20"
+      - "kone-fast:192.168.3.30"
     volumes:
       - ./:/usr/local/code/faasm/
       - ./dev/faasm/build/:/build/faasm/
