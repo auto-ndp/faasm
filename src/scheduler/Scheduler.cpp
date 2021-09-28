@@ -237,12 +237,16 @@ void Scheduler::notifyExecutorShutdown(Executor* exec,
     int execIdx = -1;
     std::vector<std::shared_ptr<Executor>>& thisExecutors = executors[funcStr];
     for (int i = 0; i < thisExecutors.size(); i++) {
-        if (thisExecutors.at(i)->id == exec->id) {
+        if (thisExecutors.at(i).get() == exec) {
             execIdx = i;
             break;
         }
     }
 
+    if (execIdx < 0) {
+        SPDLOG_ERROR("Couldn't find executor with id {}, current executor count: {}", exec->id, thisExecutors.size());
+        return;
+    }
     // We assume it's been found or something has gone very wrong
     assert(execIdx >= 0);
 
