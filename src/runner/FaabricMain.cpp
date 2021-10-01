@@ -26,8 +26,7 @@ FaabricMain::FaabricMain(
 }
 
 namespace {
-const std::string_view ABORT_MSG_SEGV = "Caught SIGSEGV, stack backtrace:\n";
-const std::string_view ABORT_MSG_ABRT = "Caught SIGABRT, stack backtrace:\n";
+const std::string_view ABORT_MSG = "Caught stack backtrace:\n";
 constexpr int TEST_SIGNAL = 12341234;
 
 // must be async-signal-safe - don't call allocating functions
@@ -35,10 +34,8 @@ void crashHandler(int sig) noexcept
 {
     std::array<void*, 32> stackPtrs;
     size_t filledStacks = backtrace(stackPtrs.data(), stackPtrs.size());
-    if (sig == SIGSEGV) {
-        write(STDERR_FILENO, ABORT_MSG_SEGV.data(), ABORT_MSG_SEGV.size());
-    } else if (sig == SIGABRT) {
-        write(STDERR_FILENO, ABORT_MSG_ABRT.data(), ABORT_MSG_ABRT.size());
+    if (sig != TEST_SIGNAL) {
+        write(STDERR_FILENO, ABORT_MSG.data(), ABORT_MSG.size());
     }
     backtrace_symbols_fd(stackPtrs.data(),
                          std::min(filledStacks, stackPtrs.size()),
