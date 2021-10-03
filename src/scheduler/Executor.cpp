@@ -254,19 +254,28 @@ void Executor::threadPoolThread(int threadPoolIdx)
 
         getScheduler().monitorStartedTasks.fetch_add(1,
                                                      std::memory_order_acq_rel);
+
+        int64_t msgTimestamp = msg.timestamp();
+        int64_t nowTimestamp = faabric::util::getGlobalClock().epochMillis();
         int32_t returnValue;
-        try {
-
-            ZoneScopedN("Execute task");
-            returnValue =
-              executeTask(threadPoolIdx, task.messageIndex, task.req);
-        } catch (const std::exception& ex) {
+        bool skippedExec = false;
+        if ((nowTimestamp - msgTimestamp) >= conf.globalMessageTimeout) {
             returnValue = 1;
+            skippedExec = true;
+        } else {
+            try {
 
-            std::string errorMessage = fmt::format(
-              "Task {} threw exception. What: {}", msg.id(), ex.what());
-            SPDLOG_ERROR(errorMessage);
-            msg.set_outputdata(errorMessage);
+                ZoneScopedN("Execute task");
+                returnValue =
+                  executeTask(threadPoolIdx, task.messageIndex, task.req);
+            } catch (const std::exception& ex) {
+                returnValue = 1;
+
+                std::string errorMessage = fmt::format(
+                  "Task {} threw exception. What: {}", msg.id(), ex.what());
+                SPDLOG_ERROR(errorMessage);
+                msg.set_outputdata(errorMessage);
+            }
         }
 
         // Set the return value
@@ -284,7 +293,7 @@ void Executor::threadPoolThread(int threadPoolIdx)
                      oldTaskCount - 1);
 
         // Handle snapshot diffs _before_ we reset the executor
-        if (isLastInBatch && task.needsSnapshotPush) {
+        if (!skippedExec && isLastInBatch && task.needsSnapshotPush) {
             ZoneScopedN("Task snapshot diff push");
             // Get diffs between original snapshot and after execution
             faabric::util::SnapshotData snapshotPostExecution = snapshot();
@@ -321,7 +330,7 @@ void Executor::threadPoolThread(int threadPoolIdx)
         // Note that we have to release the claim _after_ resetting, otherwise
         // the executor won't be ready for reuse.
         if (isLastInBatch) {
-            if (task.skipReset) {
+            if (task.skipReset || skippedExec) {
                 SPDLOG_TRACE("Skipping reset for {}",
                              faabric::util::funcToString(msg, true));
             } else {
