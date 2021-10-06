@@ -379,6 +379,7 @@ void Executor::threadPoolThread(int threadPoolIdx)
         if (isFinished) {
             // Notify that this executor is finished
             sch.notifyExecutorShutdown(this, boundMessage);
+            softShutdown();
         }
     }
 
@@ -398,6 +399,8 @@ void Executor::releaseClaim()
 {
     claimed.store(false);
 }
+
+void Executor::softShutdown() {}
 
 int32_t Executor::getQueueLength()
 {

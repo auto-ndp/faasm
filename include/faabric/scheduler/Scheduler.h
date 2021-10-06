@@ -82,6 +82,8 @@ class Executor
   protected:
     virtual void restore(faabric::Message& msg);
 
+    virtual void softShutdown();
+
     virtual void postFinish();
 
     faabric::Message boundMessage;
