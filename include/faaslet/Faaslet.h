@@ -32,6 +32,8 @@ class Faaslet final : public faabric::scheduler::Executor
   protected:
     void postFinish() override;
 
+    void softShutdown() override;
+
   private:
     bool isIsolated = false;
 

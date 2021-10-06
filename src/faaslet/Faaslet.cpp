@@ -117,6 +117,11 @@ void Faaslet::reset(faabric::Message& msg)
     }
 }
 
+void Faaslet::softShutdown()
+{
+    this->module.reset(nullptr);
+}
+
 void Faaslet::postFinish()
 {
     if (ns != nullptr) {
