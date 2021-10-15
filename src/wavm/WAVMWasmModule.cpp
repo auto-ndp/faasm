@@ -80,7 +80,7 @@ void WAVMWasmModule::reset(faabric::Message& msg,
                            const std::string& snapshotKey)
 {
     ZoneScopedNS("WAVMWasmModule::reset", 5);
-    WasmModule::reset(msg);
+    WasmModule::reset(msg, snapshotKey);
     if (!_isBound) {
         return;
     }
@@ -201,7 +201,7 @@ void WAVMWasmModule::clone(const WAVMWasmModule& other,
         if (snapshotKey.empty()) {
             // Clone compartment with memory if no snapshot key provided
             if (static_cast<WAVM::Runtime::Compartment*>(compartment) ==
-               nullptr) {
+                nullptr) {
                 ZoneScopedN("WAVMWasmModule::clone::compartment");
                 compartment = Runtime::cloneCompartment(other.compartment);
             } else {
@@ -211,7 +211,8 @@ void WAVMWasmModule::clone(const WAVMWasmModule& other,
         } else {
             // Exclude memory if snapshot key provided
             ZoneScopedN("WAVMWasmModule::cloneInto::compartment:noMemory");
-                Runtime::cloneCompartmentInto(*compartment, other.compartment, "", false);
+            Runtime::cloneCompartmentInto(
+              *compartment, other.compartment, "", false);
         }
 
         // Clone context
@@ -1069,7 +1070,7 @@ void WAVMWasmModule::updateGlobal(size_t idx, int32_t value)
     I32 newVal = value;
     I32 oldVal = Runtime::getGlobalValue(executionContext, global).i32;
     if (newVal != oldVal) {
-        SPDLOG_DEBUG("Changing global #{} to {} from {}", i, newVal, oldVal);
+        SPDLOG_DEBUG("Changing global #{} to {} from {}", idx, newVal, oldVal);
         Runtime::setGlobalValue(
           executionContext, global, WAVM::IR::Value(newVal));
     }

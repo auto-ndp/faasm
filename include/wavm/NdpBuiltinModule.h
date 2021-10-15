@@ -18,7 +18,7 @@ class NDPBuiltinModule final : public WasmModule
     ~NDPBuiltinModule();
 
     // ----- Module lifecycle -----
-    inline void reset(faabric::Message& msg) override { tearDown(); }
+    inline void reset(faabric::Message& msg, const std::string& snapshotKey) override { tearDown(); }
 
     int32_t executeFunction(faabric::Message& msg) override;
 
@@ -62,7 +62,7 @@ class NDPBuiltinModule final : public WasmModule
         return 0;
     }
 
-    inline uint8_t* wasmPointerToNative(int32_t wasmPtr) override
+    inline uint8_t* wasmPointerToNative(uint32_t wasmPtr) override
     {
         return nullptr;
     }

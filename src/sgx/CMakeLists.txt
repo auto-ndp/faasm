@@ -283,7 +283,7 @@ target_link_libraries(enclave_untrusted
     wasm
 )
 
-add_library(faasm::sgx ALIAS faasm_sgx)
+add_library(faasm::sgx ALIAS enclave_untrusted)
 
 # --------------------------------------------------------
 # Trusted Enclave Build + Signature

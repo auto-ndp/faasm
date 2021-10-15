@@ -33,7 +33,7 @@ else
     exit 1
 fi
 
-INNER_SHELL=${SHELL:-"/bin/bash"}
+INNER_SHELL="/bin/bash"
 
 # This is how we ensure the development mode is on, mounting our local
 # directories into the containers to override what's already there

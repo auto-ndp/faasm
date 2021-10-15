@@ -115,24 +115,26 @@ void Faaslet::reset(faabric::Message& msg)
     if (module->isBound()) {
         module->reset(msg, localResetSnapshotKey);
     } else {
+        conf::FaasmConfig& conf = conf::getFaasmConfig();
         module->bindToFunction(msg);
-        // Create the reset snapshot for this function if it doesn't already exist
-        // (currently only supported in WAVM)
+        // Create the reset snapshot for this function if it doesn't already
+        // exist (currently only supported in WAVM)
         if (conf.wasmVm == "wavm") {
             localResetSnapshotKey =
-            faabric::util::funcToString(msg, false) + "_reset";
+              faabric::util::funcToString(msg, false) + "_reset";
             faabric::util::SnapshotData snapData = module->getSnapshotData();
 
             faabric::snapshot::SnapshotRegistry& snapReg =
-            faabric::snapshot::getSnapshotRegistry();
-            snapReg.takeSnapshotIfNotExists(localResetSnapshotKey, snapData, true);
+              faabric::snapshot::getSnapshotRegistry();
+            snapReg.takeSnapshotIfNotExists(
+              localResetSnapshotKey, snapData, true);
         }
     }
 }
 
 void Faaslet::softShutdown()
 {
-    this->module.reset(nullptr, "");
+    this->module.reset(nullptr);
 }
 
 void Faaslet::postFinish()
