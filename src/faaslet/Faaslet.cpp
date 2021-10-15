@@ -9,8 +9,10 @@
 #include <wavm/WAVMWasmModule.h>
 
 #include <faabric/scheduler/Scheduler.h>
+#include <faabric/snapshot/SnapshotRegistry.h>
 #include <faabric/util/config.h>
 #include <faabric/util/environment.h>
+#include <faabric/util/func.h>
 #include <faabric/util/locks.h>
 #include <faabric/util/logging.h>
 #include <faabric/util/timing.h>
@@ -19,7 +21,7 @@
 
 #if (FAASM_SGX)
 #include <sgx/SGXWAMRWasmModule.h>
-#include <sgx/faasm_sgx_system.h>
+#include <sgx/system.h>
 #else
 #include <storage/FileLoader.h>
 #include <storage/FileSystem.h>
@@ -111,15 +113,26 @@ int32_t Faaslet::executeTask(int threadPoolIdx,
 void Faaslet::reset(faabric::Message& msg)
 {
     if (module->isBound()) {
-        module->reset(msg);
+        module->reset(msg, localResetSnapshotKey);
     } else {
         module->bindToFunction(msg);
+        // Create the reset snapshot for this function if it doesn't already exist
+        // (currently only supported in WAVM)
+        if (conf.wasmVm == "wavm") {
+            localResetSnapshotKey =
+            faabric::util::funcToString(msg, false) + "_reset";
+            faabric::util::SnapshotData snapData = module->getSnapshotData();
+
+            faabric::snapshot::SnapshotRegistry& snapReg =
+            faabric::snapshot::getSnapshotRegistry();
+            snapReg.takeSnapshotIfNotExists(localResetSnapshotKey, snapData, true);
+        }
     }
 }
 
 void Faaslet::softShutdown()
 {
-    this->module.reset(nullptr);
+    this->module.reset(nullptr, "");
 }
 
 void Faaslet::postFinish()
@@ -162,6 +175,11 @@ FaasletFactory::FaasletFactory()
     if (conf.wasmVm == "wavm") {
         wasm::WAVMWasmModule::warmUp();
     }
+}
+
+std::string Faaslet::getLocalResetSnapshotKey()
+{
+    return localResetSnapshotKey;
 }
 
 FaasletFactory::~FaasletFactory() {}

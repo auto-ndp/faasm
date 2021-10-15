@@ -710,7 +710,7 @@ bool WasmModule::isBound()
 // Functions to be implemented by subclasses
 // ------------------------------------------
 
-void WasmModule::reset(faabric::Message& msg)
+void WasmModule::reset(faabric::Message& msg, const std::string& snapshotKey)
 {
     snapshotExcludedPtrLens.clear();
 }
@@ -756,7 +756,7 @@ void WasmModule::unmapMemory(uint32_t offset, uint32_t nBytes)
     throw std::runtime_error("unmapMemory not implemented");
 }
 
-uint8_t* WasmModule::wasmPointerToNative(int32_t wasmPtr)
+uint8_t* WasmModule::wasmPointerToNative(uint32_t wasmPtr)
 {
     throw std::runtime_error("wasmPointerToNative not implemented");
 }

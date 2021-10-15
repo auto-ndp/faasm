@@ -20,6 +20,6 @@ target_link_libraries(faaslet_lib PUBLIC
 
 # Include SGX lib if enabled
 if(SGX_FOUND)
-    target_link_libraries(faaslet_lib PUBLIC faasm_sgx)
+    target_link_libraries(faaslet_lib PUBLIC enclave_untrusted)
     target_include_directories(faaslet_lib PUBLIC ${FAASM_INCLUDE_DIR}/sgx)
 endif()

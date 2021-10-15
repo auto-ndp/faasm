@@ -1,7 +1,7 @@
 #pragma once
 
-#include <sgx/faasm_sgx_attestation.h>
-#include <sgx/faasm_sgx_error.h>
+#include <sgx/attestation.h>
+#include <sgx/error.h>
 
 #include <storage/FileLoader.h>
 #include <storage/FileSystem.h>
@@ -31,12 +31,7 @@ extern "C"
       faasm_sgx_status_t* ret_val,
       const void* wasm_opcode_ptr,
       const uint32_t wasm_opcode_size,
-      uint32_t* thread_id
-#if (FAASM_SGX_ATTESTATION)
-      ,
-      sgx_wamr_msg_t** response_ptr
-#endif
-    );
+      uint32_t* thread_id);
 
     extern sgx_status_t faasm_sgx_enclave_unload_module(
       sgx_enclave_id_t enclave_id,

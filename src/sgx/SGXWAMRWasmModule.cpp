@@ -2,8 +2,8 @@
 
 #include <faabric/util/func.h>
 #include <sgx/SGXWAMRWasmModule.h>
-#include <sgx/faasm_sgx_attestation.h>
-#include <sgx/faasm_sgx_system.h>
+#include <sgx/attestation.h>
+#include <sgx/system.h>
 #include <wasm/WasmExecutionContext.h>
 
 extern "C"
@@ -67,12 +67,7 @@ void SGXWAMRWasmModule::doBindToFunction(faabric::Message& msg, bool cache)
                                     &returnValue,
                                     (void*)wasmBytes.data(),
                                     (uint32_t)wasmBytes.size(),
-                                    &threadId
-#if (FAASM_SGX_ATTESTATION)
-                                    ,
-                                    &(faasletSgxMsgBufferPtr->buffer_ptr)
-#endif
-      );
+                                    &threadId);
 
     if (status != SGX_SUCCESS) {
         SPDLOG_ERROR("Unable to enter enclave: {}", sgxErrorString(status));

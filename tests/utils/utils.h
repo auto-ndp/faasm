@@ -9,6 +9,9 @@ void cleanSystem();
 void execFunction(faabric::Message& msg,
                   const std::string& expectedOutput = "");
 
+void execWamrFunction(faabric::Message& msg,
+                      const std::string& expectedOutput = "");
+
 std::string execFunctionWithStringResult(faabric::Message& msg);
 
 void execBatchWithPool(std::shared_ptr<faabric::BatchExecuteRequest> req,
@@ -19,9 +22,13 @@ void execFuncWithPool(faabric::Message& call,
                       bool clean = true,
                       int timeout = 1000);
 
-void executeWithWamrPool(const std::string& user, const std::string& func);
+void executeWithWamrPool(const std::string& user,
+                         const std::string& func,
+                         int timeout = 1000);
 
-void executeWithSGX(const std::string& user, const std::string& func);
+void executeWithSGX(const std::string& user,
+                    const std::string& func,
+                    int timeout = 1000);
 
 void checkMultipleExecutions(faabric::Message& msg, int nExecs);
 

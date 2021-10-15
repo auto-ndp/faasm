@@ -14,6 +14,34 @@ LIB_FAKE_FILES = [
     join(FAASM_RUNTIME_ROOT, "lib", "fake", "libfakeLibB.so"),
 ]
 
+WAMR_WHITELISTED_FUNCS = [
+    # Misc
+    ["demo", "chain"],
+    ["ffmpeg", "check"],
+    # Environment
+    ["demo", "argc_argv_test"],
+    ["demo", "exit"],
+    ["demo", "getenv"],
+    # Filesystem
+    ["demo", "fcntl"],
+    ["demo", "file"],
+    ["demo", "filedescriptor"],
+    ["demo", "fstat"],
+    ["demo", "fread"],
+    # Input output
+    ["demo", "check_input"],
+    ["demo", "echo"],
+    ["demo", "stdout"],
+    ["demo", "stderr"],
+]
+
+SGX_WHITELISTED_FUNCS = [
+    ["demo", "hello"],
+    ["demo", "chain_named_a"],
+    ["demo", "chain_named_b"],
+    ["demo", "chain_named_c"],
+]
+
 
 @task(default=True)
 def codegen(ctx, user, function, wamr=False, sgx=False):
@@ -93,11 +121,9 @@ def local(ctx):
         _do_codegen_file(so)
 
     # Run the WAMR codegen required by the tests
-    codegen(ctx, "demo", "echo", wamr=True)
-    codegen(ctx, "demo", "chain", wamr=True)
+    for user, func in WAMR_WHITELISTED_FUNCS:
+        codegen(ctx, user, func, wamr=True)
 
     # Run the SGX codegen required by the tests
-    codegen(ctx, "demo", "hello", wamr=True, sgx=True)
-    codegen(ctx, "demo", "chain_named_a", wamr=True, sgx=True)
-    codegen(ctx, "demo", "chain_named_b", wamr=True, sgx=True)
-    codegen(ctx, "demo", "chain_named_c", wamr=True, sgx=True)
+    for user, func in SGX_WHITELISTED_FUNCS:
+        codegen(ctx, user, func, wamr=True, sgx=True)
