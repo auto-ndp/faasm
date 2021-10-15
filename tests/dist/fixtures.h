@@ -13,17 +13,36 @@ class DistTestsFixture
   : public SchedulerTestFixture
   , public ConfTestFixture
   , public SnapshotTestFixture
+  , public PointToPointTestFixture
 {
   public:
     DistTestsFixture()
     {
-        // Get other hosts
-        std::string thisHost = conf.endpointHost;
+        // Make sure the host list is up to date
+        sch.addHostToGlobalSet(getMasterIP());
+        sch.addHostToGlobalSet(getWorkerIP());
 
         // Set up executor
         std::shared_ptr<tests::DistTestExecutorFactory> fac =
           std::make_shared<tests::DistTestExecutorFactory>();
         faabric::scheduler::setExecutorFactory(fac);
     }
+
+    ~DistTestsFixture() {}
+
+    std::string getWorkerIP()
+    {
+        if (workerIP.empty()) {
+            workerIP = faabric::util::getIPFromHostname("dist-test-server");
+        }
+
+        return workerIP;
+    }
+
+    std::string getMasterIP() { return conf.endpointHost; }
+
+  private:
+    std::string workerIP;
+    std::string masterIP;
 };
 }

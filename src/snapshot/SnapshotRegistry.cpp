@@ -63,13 +63,35 @@ uint8_t* SnapshotRegistry::mapSnapshot(const std::string& key, uint8_t* target)
     return reinterpret_cast<uint8_t*>(mmapRes);
 }
 
+void SnapshotRegistry::takeSnapshotIfNotExists(const std::string& key,
+                                               faabric::util::SnapshotData data,
+                                               bool locallyRestorable)
+{
+    doTakeSnapshot(key, data, locallyRestorable, false);
+}
+
 void SnapshotRegistry::takeSnapshot(const std::string& key,
                                     faabric::util::SnapshotData data,
                                     bool locallyRestorable)
 {
+    doTakeSnapshot(key, data, locallyRestorable, true);
+}
+
+void SnapshotRegistry::doTakeSnapshot(const std::string& key,
+                                      faabric::util::SnapshotData data,
+                                      bool locallyRestorable,
+                                      bool overwrite)
+{
     if (data.size == 0) {
         SPDLOG_ERROR("Cannot take snapshot {} of size zero", key);
         throw std::runtime_error("Taking snapshot size zero");
+    }
+
+    faabric::util::UniqueLock lock(snapshotsMx);
+
+    if (snapshotExists(key) && !overwrite) {
+        SPDLOG_TRACE("Skipping already existing snapshot {}", key);
+        return;
     }
 
     SPDLOG_TRACE("Registering snapshot {} size {} (restorable={})",
@@ -79,7 +101,6 @@ void SnapshotRegistry::takeSnapshot(const std::string& key,
 
     // Note - we only preserve the snapshot in the in-memory file, and do not
     // take ownership for the original data referenced in SnapshotData
-    faabric::util::UniqueLock lock(snapshotsMx);
     snapshotMap[key] = data;
 
     // Write to fd to be locally restorable

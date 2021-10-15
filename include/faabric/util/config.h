@@ -36,6 +36,7 @@ class SystemConfig
 
     // MPI
     int defaultMpiWorldSize;
+    int mpiBasePort;
 
     // Endpoint
     std::string endpointInterface;
@@ -45,6 +46,12 @@ class SystemConfig
 
     // Monitoring
     std::string schedulerMonitorFile;
+
+    // Transport
+    int functionServerThreads;
+    int stateServerThreads;
+    int snapshotServerThreads;
+    int pointToPointServerThreads;
 
     SystemConfig();
 

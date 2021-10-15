@@ -180,11 +180,15 @@ class MpiWorld
 
     double getWTime();
 
+    std::vector<bool> getInitedRemoteMpiEndpoints();
+
+    std::vector<bool> getInitedUMB();
+
   private:
     int id = -1;
     int size = -1;
     std::string thisHost;
-    int basePort = DEFAULT_MPI_BASE_PORT;
+    int basePort;
     faabric::util::TimePoint creationTime;
 
     std::atomic_flag isDestroyed = false;
