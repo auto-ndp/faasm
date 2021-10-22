@@ -263,6 +263,9 @@ void WAVMWasmModule::clone(const WAVMWasmModule& other,
         // Remap dynamic modules
         lastLoadedDynamicModuleHandle = other.lastLoadedDynamicModuleHandle;
         dynamicPathToHandleMap = other.dynamicPathToHandleMap;
+
+        // Recreate map of dynamic modules
+        dynamicModuleMap.clear();
         for (const auto& p : other.dynamicModuleMap) {
             ZoneScopedN("WAVMWasmModule::clone::dynamicModuleMap[_]");
             Runtime::Instance* newInstance =
@@ -701,10 +704,10 @@ Runtime::Instance* WAVMWasmModule::createModuleInstance(
           boundUser, boundFunction, sharedModulePath);
     }
 
-    SPDLOG_INFO("Instantiating module {}/{}  {}",
-                boundUser,
-                boundFunction,
-                sharedModulePath);
+    SPDLOG_DEBUG("Instantiating module {}/{}  {}",
+                 boundUser,
+                 boundFunction,
+                 sharedModulePath);
 
     Runtime::Instance* instance;
     {

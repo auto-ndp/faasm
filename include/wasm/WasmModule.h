@@ -166,6 +166,8 @@ class WasmModule
 
     int awaitPthreadCall(const faabric::Message* msg, int pthreadPtr);
 
+    std::vector<uint32_t> getThreadStacks();
+
     // ----- Debugging -----
     virtual void printDebugInfo();
 
@@ -217,6 +219,8 @@ class WasmModule
 
     // Snapshots
     void snapshotWithKey(const std::string& snapKey, bool locallyRestorable);
+
+    void ignoreAllStacksInSnapshot(const std::string& snapshotKey);
 
     // Threads
     void addThreadStack();

@@ -1,8 +1,7 @@
-#include "wasm/WasmModule.h"
-
 #include <conf/FaasmConfig.h>
 #include <threads/ThreadState.h>
 #include <wasm/WasmExecutionContext.h>
+#include <wasm/WasmModule.h>
 
 #include <faabric/scheduler/Scheduler.h>
 #include <faabric/snapshot/SnapshotRegistry.h>
@@ -16,6 +15,7 @@
 #include <faabric/util/locks.h>
 #include <faabric/util/logging.h>
 #include <faabric/util/memory.h>
+#include <faabric/util/snapshot.h>
 #include <faabric/util/timing.h>
 
 #include <boost/filesystem.hpp>
@@ -423,6 +423,40 @@ void WasmModule::bindToFunction(faabric::Message& msg, bool cache)
     doBindToFunction(msg, cache);
 }
 
+void WasmModule::ignoreAllStacksInSnapshot(const std::string& snapshotKey)
+{
+    faabric::util::SnapshotData& snapData =
+      faabric::snapshot::getSnapshotRegistry().getSnapshot(snapshotKey);
+
+    // First ignore the main wasm stack
+    SPDLOG_TRACE("Ignoring snapshot diffs for {} for wasm stack: 0-{}",
+                 snapshotKey,
+                 STACK_SIZE);
+
+    snapData.addMergeRegion(0,
+                            STACK_SIZE,
+                            faabric::util::SnapshotDataType::Raw,
+                            faabric::util::SnapshotMergeOperation::Ignore);
+
+    uint32_t threadStackRegionStart =
+      threadStacks.at(0) + 1 - THREAD_STACK_SIZE - GUARD_REGION_SIZE;
+    uint32_t threadStackRegionSize =
+      threadPoolSize * (THREAD_STACK_SIZE + (2 * GUARD_REGION_SIZE));
+
+    SPDLOG_TRACE("Ignoring snapshot diffs for {} for thread stacks: {}-{}",
+                 snapshotKey,
+                 threadStackRegionStart,
+                 threadStackRegionStart + threadStackRegionSize);
+
+    // Note - the merge regions for a snapshot are keyed on the offset, so
+    // we will just overwrite the same region if another module has already
+    // set it
+    snapData.addMergeRegion(threadStackRegionStart,
+                            threadStackRegionSize,
+                            faabric::util::SnapshotDataType::Raw,
+                            faabric::util::SnapshotMergeOperation::Ignore);
+}
+
 void WasmModule::prepareArgcArgv(const faabric::Message& msg)
 {
     // Here we set up the arguments to main(), i.e. argc and argv
@@ -520,6 +554,11 @@ int32_t WasmModule::executeTask(
     const auto& zygoteDelta = msg.zygotedelta();
     if (!zygoteDelta.empty()) {
         this->zygoteDeltaRestore(faabric::util::stringToBytes(zygoteDelta));
+    }
+
+    // Ensure we ignore all stacks in a snapshot if it exists
+    if (!msg.snapshotkey().empty()) {
+        ignoreAllStacksInSnapshot(msg.snapshotkey());
     }
 
     // Perform the appropriate type of execution
@@ -694,6 +733,11 @@ void WasmModule::addThreadStack()
     // Add guard regions
     createMemoryGuardRegion(memBase);
     createMemoryGuardRegion(stackTop + 1);
+}
+
+std::vector<uint32_t> WasmModule::getThreadStacks()
+{
+    return threadStacks;
 }
 
 threads::MutexManager& WasmModule::getMutexes()
