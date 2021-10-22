@@ -18,7 +18,7 @@ WORKDIR /usr/local/code/faasm/ansible
 
 RUN ansible-playbook llvm.yml
 
-RUN apt-get clean autoclean
-RUN apt-get autoremove
+RUN apt-get -y clean autoclean
+RUN apt-get -y autoremove
 
 CMD /bin/bash
