@@ -5,7 +5,7 @@ FROM kubasz51/faasm-cpython:0.0.13 as python
 FROM kubasz51/faasm-sgx:0.6.1 as sgx
 
 # Note - we don't often rebuild cpp-root so this dep may be behind
-FROM kubasz51/faasm-cpp-root:0.6.1
+FROM kubasz51/faasm-cpp-root:0.7.0
 ARG FAASM_VERSION
 
 # Flag to say we're in a container
@@ -39,8 +39,8 @@ WORKDIR /build/faasm
 # Build the basics here to set up the CMake build
 RUN cmake \
     -GNinja \
-    -DCMAKE_CXX_COMPILER=/usr/bin/clang++-10 \
-    -DCMAKE_C_COMPILER=/usr/bin/clang-10 \
+    -DCMAKE_CXX_COMPILER=/usr/bin/clang++-13 \
+    -DCMAKE_C_COMPILER=/usr/bin/clang-13 \
     -DCMAKE_BUILD_TYPE=Release \
     /usr/local/code/faasm
 

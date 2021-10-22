@@ -18,7 +18,7 @@ add_executable(
         ${TEST_FILES}
 )
 
-target_link_libraries(tests test_utils)
+target_link_libraries(tests faabric::test_utils)
 
 add_test(NAME tests COMMAND "tests/test/tests")
 
