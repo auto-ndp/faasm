@@ -3,5 +3,6 @@
 - hosts: localhost
   gather_facts: yes
   roles:
+    - llvm10
     - llvm13
 
