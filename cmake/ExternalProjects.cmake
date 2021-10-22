@@ -21,27 +21,28 @@ include(${CMAKE_CURRENT_BINARY_DIR}/conan.cmake)
 
 conan_check(VERSION 1.41.0 REQUIRED)
 
-# conan_cmake_configure(
-#     REQUIRES
-#         boost/1.77.0
-#     GENERATORS
-#         cmake_find_package
-#         cmake_paths
-#     OPTIONS
-#         zeromq:encryption=None
-# )
+conan_cmake_configure(
+    REQUIRES
+        catch2/2.13.7
+    GENERATORS
+        cmake_find_package
+        cmake_paths
+    # OPTIONS
+)
 
-# conan_cmake_autodetect(FAABRIC_CONAN_SETTINGS)
+conan_cmake_autodetect(FAABRIC_CONAN_SETTINGS)
 
-# conan_cmake_install(PATH_OR_REFERENCE .
-#                     BUILD outdated
-#                     REMOTE conancenter
-#                     PROFILE_HOST ${CMAKE_CURRENT_LIST_DIR}/../faabric/conan-profile.txt
-#                     PROFILE_BUILD ${CMAKE_CURRENT_LIST_DIR}/../faabric/conan-profile.txt
-#                     SETTINGS ${FAABRIC_CONAN_SETTINGS}
-# )
+conan_cmake_install(PATH_OR_REFERENCE .
+                    BUILD outdated
+                    REMOTE conancenter
+                    PROFILE_HOST ${CMAKE_CURRENT_LIST_DIR}/../faabric/conan-profile.txt
+                    PROFILE_BUILD ${CMAKE_CURRENT_LIST_DIR}/../faabric/conan-profile.txt
+                    SETTINGS ${FAABRIC_CONAN_SETTINGS}
+)
 
-# include(${CMAKE_CURRENT_BINARY_DIR}/conan_paths.cmake)
+include(${CMAKE_CURRENT_BINARY_DIR}/conan_paths.cmake)
+
+find_package(Catch2 REQUIRED)
 
 # Tightly-coupled dependencies
 set(FETCHCONTENT_QUIET OFF)
@@ -120,11 +121,3 @@ set_target_properties(aws_ext_s3
     ${CMAKE_INSTALL_PREFIX}/lib/libaws-cpp-sdk-s3.so)
 add_dependencies(aws_ext_core aws_ext)
 add_dependencies(aws_ext_s3 aws_ext)
-
-ExternalProject_Add(catch2_ext
-     GIT_REPOSITORY "https://github.com/catchorg/Catch2"
-     GIT_TAG "v2.13.2"
-     CMAKE_ARGS "-DCATCH_INSTALL_DOCS=OFF \
-         -DCATCH_INSTALL_EXTRAS=OFF"
-     CMAKE_CACHE_ARGS "-DCMAKE_INSTALL_PREFIX:STRING=${CMAKE_INSTALL_PREFIX}"
-)
