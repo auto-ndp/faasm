@@ -40,8 +40,9 @@ if [ ! -d "venv" ]; then
         pip install -U pip
         pip install -U setuptools
         pip install -U wheel
-        pip install -r requirements.txt
-        pip install .
+        pip install -r faasmcli/requirements.txt
+        pip install -e faasmcli/
+        pip install -e clients/cpp/
     )
 fi
 
