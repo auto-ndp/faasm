@@ -7,6 +7,7 @@
 
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/syscall.h>
 
 #define FAKE_NAME "faasm"
 #define FAKE_PASSWORD "foobar123"
