@@ -9,4 +9,4 @@ set(LIB_FILES
 
 faabric_lib(snapshot "${LIB_FILES}")
 
-target_link_libraries(snapshot PUBLIC proto flat transport util)
+target_link_libraries(snapshot PRIVATE faabric::proto faabric::flat faabric::transport faabric::util)

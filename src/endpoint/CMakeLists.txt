@@ -8,4 +8,4 @@ set(LIB_FILES
 
 faabric_lib(endpoint "${LIB_FILES}")
 
-target_link_libraries(endpoint PUBLIC Boost::Boost pistache_imported pthread util)
+target_link_libraries(endpoint PRIVATE faabric::util)

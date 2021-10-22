@@ -10,6 +10,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # -----------------------------------------------
 set(FAABRIC_LIB_DIR "/build/faabric/install/lib")
 
+include(../../cmake/ExternalProjects.cmake)
+
 function(add_example example_name)
     add_executable(${example_name} ${example_name}.cpp)
 
@@ -17,14 +19,10 @@ function(add_example example_name)
         ${FAABRIC_LIB_DIR}/libfaabric.so
         ${FAABRIC_LIB_DIR}/libfaabricmpi.so
         ${FAABRIC_LIB_DIR}/libfaabricmpi_native.so
-        ${FAABRIC_LIB_DIR}/libprotobuf.so
-        ${FAABRIC_LIB_DIR}/${PISTACHE_LIBNAME}
-        ${FAABRIC_LIB_DIR}/libzmq.so
-        Boost::system
-        Boost::filesystem
-        hiredis
-        pthread
+        faabric::common_dependencies
     )
+
+    set_property(TARGET ${example_name} PROPERTY BUILD_RPATH "${FAABRIC_LIB_DIR}")
 
     set(ALL_EXAMPLES ${ALL_EXAMPLES} ${example_name} PARENT_SCOPE)
 endfunction()

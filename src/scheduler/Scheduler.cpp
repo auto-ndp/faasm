@@ -15,6 +15,7 @@
 #include <faabric/util/testing.h>
 #include <faabric/util/timing.h>
 
+#include <sys/syscall.h>
 #include <sys/eventfd.h>
 #include <sys/file.h>
 

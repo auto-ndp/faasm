@@ -1,5 +1,5 @@
 #include "faabric_utils.h"
-#include <catch.hpp>
+#include <catch2/catch.hpp>
 
 #include "DistTestExecutor.h"
 #include "init.h"

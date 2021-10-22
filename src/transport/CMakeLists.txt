@@ -31,5 +31,4 @@ set(LIB_FILES
 
 faabric_lib(transport "${LIB_FILES}")
 
-target_link_libraries(transport PUBLIC util proto zeromq_imported)
-
+target_link_libraries(transport PRIVATE faabric::util faabric::proto)

@@ -16,4 +16,4 @@ set(LIB_FILES
 
 faabric_lib(scheduler "${LIB_FILES}")
 
-target_link_libraries(scheduler PUBLIC snapshot state faabricmpi redis)
+target_link_libraries(scheduler PRIVATE faabric::snapshot faabric::state faabric::faabricmpi faabric::redis)
