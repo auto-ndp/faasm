@@ -5,18 +5,18 @@ include (FetchContent)
 find_package (Threads REQUIRED)
 
 # Find conan-generated package descriptions
-list(PREPEND CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR})
-list(PREPEND CMAKE_PREFIX_PATH ${CMAKE_BINARY_DIR})
+list(PREPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_BINARY_DIR})
+list(PREPEND CMAKE_PREFIX_PATH ${CMAKE_CURRENT_BINARY_DIR})
 
-if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan.cmake")
+if(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/conan.cmake")
   message(STATUS "Downloading conan.cmake from https://github.com/conan-io/cmake-conan")
   file(DOWNLOAD "https://raw.githubusercontent.com/conan-io/cmake-conan/v0.16.1/conan.cmake"
-                "${CMAKE_BINARY_DIR}/conan.cmake"
+                "${CMAKE_CURRENT_BINARY_DIR}/conan.cmake"
                 EXPECTED_HASH SHA256=396e16d0f5eabdc6a14afddbcfff62a54a7ee75c6da23f32f7a31bc85db23484
                 TLS_VERIFY ON)
 endif()
 
-include(${CMAKE_BINARY_DIR}/conan.cmake)
+include(${CMAKE_CURRENT_BINARY_DIR}/conan.cmake)
 
 conan_check(VERSION 1.41.0 REQUIRED)
 
