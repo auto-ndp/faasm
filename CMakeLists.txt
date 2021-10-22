@@ -42,8 +42,10 @@ set(FAASM_SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}/src)
 set(FAASM_INCLUDE_DIR ${CMAKE_CURRENT_LIST_DIR}/include)
 set(FAASM_NATIVE_INSTALL "/usr/local/faasm/native")
 
+# Faabric
+add_subdirectory(faabric)
+
 # CPP REST SDK
-set(cpprestsdk_DIR /usr/lib/${CMAKE_LIBRARY_ARCHITECTURE}/cmake/)
 find_package(cpprestsdk REQUIRED NAMES cpprestsdk cpprest)
 
 # Detect SGX
@@ -137,9 +139,6 @@ endif ()
 message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 include_directories(${LLVM_INCLUDE_DIRS})
 add_definitions(${LLVM_DEFINITIONS})
-
-# Faabric
-add_subdirectory(faabric)
 
 # Third party deps
 include(cmake/ExternalProjects.cmake)
