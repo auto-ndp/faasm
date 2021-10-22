@@ -70,7 +70,7 @@ conan_cmake_install(PATH_OR_REFERENCE .
                     SETTINGS ${FAABRIC_CONAN_SETTINGS}
 )
 
-include(${CMAKE_BINARY_DIR}/conan_paths.cmake)
+include(${CMAKE_CURRENT_BINARY_DIR}/conan_paths.cmake)
 
 find_package(Boost 1.77.0 REQUIRED)
 find_package(Catch2 REQUIRED)
