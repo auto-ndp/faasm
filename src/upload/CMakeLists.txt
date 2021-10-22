@@ -9,7 +9,7 @@ faasm_private_lib(upload_lib "${LIB_FILES}")
 
 target_link_libraries(upload_lib PUBLIC
         codegen
-        cpprestsdk::cpprest
+        cpprestsdk::cpprestsdk
         faaslet_lib
         wavmmodule
         wamrmodule

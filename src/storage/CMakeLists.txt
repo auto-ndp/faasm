@@ -23,6 +23,6 @@ target_link_libraries(storage PUBLIC
     wamrmodule
     aws_ext_core
     aws_ext_s3
-    cpprestsdk::cpprest
+    cpprestsdk::cpprestsdk
     curl
 )

@@ -5,6 +5,44 @@ include (FetchContent)
 
 include_directories(${CMAKE_INSTALL_PREFIX}/include)
 
+# Find conan-generated package descriptions
+list(PREPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_BINARY_DIR})
+list(PREPEND CMAKE_PREFIX_PATH ${CMAKE_CURRENT_BINARY_DIR})
+
+if(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/conan.cmake")
+  message(STATUS "Downloading conan.cmake from https://github.com/conan-io/cmake-conan")
+  file(DOWNLOAD "https://raw.githubusercontent.com/conan-io/cmake-conan/v0.16.1/conan.cmake"
+                "${CMAKE_CURRENT_BINARY_DIR}/conan.cmake"
+                EXPECTED_HASH SHA256=396e16d0f5eabdc6a14afddbcfff62a54a7ee75c6da23f32f7a31bc85db23484
+                TLS_VERIFY ON)
+endif()
+
+include(${CMAKE_CURRENT_BINARY_DIR}/conan.cmake)
+
+conan_check(VERSION 1.41.0 REQUIRED)
+
+# conan_cmake_configure(
+#     REQUIRES
+#         boost/1.77.0
+#     GENERATORS
+#         cmake_find_package
+#         cmake_paths
+#     OPTIONS
+#         zeromq:encryption=None
+# )
+
+# conan_cmake_autodetect(FAABRIC_CONAN_SETTINGS)
+
+# conan_cmake_install(PATH_OR_REFERENCE .
+#                     BUILD outdated
+#                     REMOTE conancenter
+#                     PROFILE_HOST ${CMAKE_CURRENT_LIST_DIR}/../faabric/conan-profile.txt
+#                     PROFILE_BUILD ${CMAKE_CURRENT_LIST_DIR}/../faabric/conan-profile.txt
+#                     SETTINGS ${FAABRIC_CONAN_SETTINGS}
+# )
+
+# include(${CMAKE_CURRENT_BINARY_DIR}/conan_paths.cmake)
+
 # Tightly-coupled dependencies
 set(FETCHCONTENT_QUIET OFF)
 FetchContent_Declare(wavm_ext
@@ -58,7 +96,7 @@ set(AWS_CORE_LIBRARY ${CMAKE_INSTALL_PREFIX}/lib/libaws-cpp-sdk-core.so)
 set(AWS_S3_LIBRARY ${CMAKE_INSTALL_PREFIX}/lib/libaws-cpp-sdk-s3.so)
 ExternalProject_Add(aws_ext
     GIT_REPOSITORY   "https://github.com/aws/aws-sdk-cpp.git"
-    GIT_TAG          "b733384b16945818fa5da5b73e410dea1e9ab9d0"
+    GIT_TAG          "1.9.128"
     BUILD_ALWAYS     0
     TEST_COMMAND     ""
     UPDATE_COMMAND   ""
