@@ -37,12 +37,9 @@ conan_cmake_configure(
         cmake_find_package
         cmake_paths
     OPTIONS
-        flatbuffers:shared=True
         flatbuffers:options_from_context=False
         flatbuffers:flatc=True
         flatbuffers:flatbuffers=True
-        protobuf:shared=True
-        boost:shared=False
         boost:error_code_header_only=True
         boost:system_no_deprecated=True
         boost:filesystem_no_deprecated=True
