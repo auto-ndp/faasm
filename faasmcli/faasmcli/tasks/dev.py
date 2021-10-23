@@ -70,7 +70,7 @@ def tools(ctx, clean=False, build="Debug", parallel=0):
 
 
 @task
-def cc(ctx, target, clean=False):
+def cc(ctx, target, clean=False, parallel=0):
     """
     Compiles the given CMake target
     """
