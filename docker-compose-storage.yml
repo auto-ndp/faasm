@@ -59,7 +59,7 @@ services:
 
   # Storage
   worker-storage:
-    image: kubasz51/faasm-worker-storage:${FAASM_VERSION}
+    image: kubasz51/faasm-worker:${FAASM_VERSION}
     security_opt:
       - seccomp:unconfined
     # Allows for tracy thread&ctx switch tracking to work better
