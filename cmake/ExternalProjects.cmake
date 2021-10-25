@@ -24,10 +24,20 @@ conan_check(VERSION 1.41.0 REQUIRED)
 conan_cmake_configure(
     REQUIRES
         catch2/2.13.7
+        aws-sdk-cpp/1.9.100
     GENERATORS
         cmake_find_package
         cmake_paths
-    # OPTIONS
+    OPTIONS
+        aws-sdk-cpp:fPIC=True
+        aws-sdk-cpp:access-management=False
+        aws-sdk-cpp:identity-management=False
+        aws-sdk-cpp:monitoring=False
+        aws-sdk-cpp:queues=False
+        aws-sdk-cpp:s3-encryption=False
+        aws-sdk-cpp:s3=True
+        aws-sdk-cpp:text-to-speech=False
+        aws-sdk-cpp:transfer=False
 )
 
 conan_cmake_autodetect(FAABRIC_CONAN_SETTINGS)
@@ -43,6 +53,7 @@ conan_cmake_install(PATH_OR_REFERENCE .
 include(${CMAKE_CURRENT_BINARY_DIR}/conan_paths.cmake)
 
 find_package(Catch2 REQUIRED)
+find_package(AWSSDK REQUIRED)
 
 # Tightly-coupled dependencies
 set(FETCHCONTENT_QUIET OFF)
@@ -83,41 +94,9 @@ if(FAASM_SGX_XRA)
 endif()
 
 # General 3rd party dependencies
-ExternalProject_Add(eigen_ext
-    GIT_REPOSITORY "https://gitlab.com/shillaker/eigen.git"
-    GIT_TAG "faasm"
-    CMAKE_CACHE_ARGS "-DCMAKE_INSTALL_PREFIX:STRING=${CMAKE_INSTALL_PREFIX}"
-)
-
-# There are some AWS docs on using the cpp sdk as an external project:
-# https://github.com/aws/aws-sdk-cpp/blob/main/Docs/CMake_External_Project.md
-# but they don't specify how to link the libraries, which required adding an
-# extra couple of CMake targets.
-set(AWS_CORE_LIBRARY ${CMAKE_INSTALL_PREFIX}/lib/libaws-cpp-sdk-core.so)
-set(AWS_S3_LIBRARY ${CMAKE_INSTALL_PREFIX}/lib/libaws-cpp-sdk-s3.so)
-ExternalProject_Add(aws_ext
-    GIT_REPOSITORY   "https://github.com/aws/aws-sdk-cpp.git"
-    GIT_TAG          "1.9.128"
-    BUILD_ALWAYS     0
-    TEST_COMMAND     ""
-    UPDATE_COMMAND   ""
-    BUILD_BYPRODUCTS ${AWS_S3_LIBRARY} ${AWS_CORE_LIBRARY}
-    CMAKE_CACHE_ARGS "-DCMAKE_INSTALL_PREFIX:STRING=${CMAKE_INSTALL_PREFIX}"
-    LIST_SEPARATOR    "|"
-    CMAKE_ARGS       -DBUILD_SHARED_LIBS=ON
-                     -DBUILD_ONLY=s3|sts
-                     -DAUTORUN_UNIT_TESTS=OFF
-                     -DENABLE_TESTING=OFF
-                     -DCMAKE_BUILD_TYPE=Release
-)
-
-add_library(aws_ext_core SHARED IMPORTED)
-add_library(aws_ext_s3 SHARED IMPORTED)
-set_target_properties(aws_ext_core
-    PROPERTIES IMPORTED_LOCATION
-    ${CMAKE_INSTALL_PREFIX}/lib/libaws-cpp-sdk-core.so)
-set_target_properties(aws_ext_s3
-    PROPERTIES IMPORTED_LOCATION
-    ${CMAKE_INSTALL_PREFIX}/lib/libaws-cpp-sdk-s3.so)
-add_dependencies(aws_ext_core aws_ext)
-add_dependencies(aws_ext_s3 aws_ext)
+# Eigen is currently not used for anything anywhere currently
+# FetchContent_Declare(eigen_ext
+#     GIT_REPOSITORY "https://gitlab.com/shillaker/eigen.git"
+#     GIT_TAG "faasm"
+# )
+# FetchContent_MakeAvailable(eigen_ext)
