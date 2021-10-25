@@ -86,7 +86,7 @@ find_package(spdlog REQUIRED)
 # Pistache - Conan version is out of date and doesn't support clang
 FetchContent_Declare(pistache_ext
     GIT_REPOSITORY "https://github.com/pistacheio/pistache.git"
-    GIT_TAG "cfd5322e80a31f00e966c23f6bbb9cae67b48bfd"
+    GIT_TAG "ff9db0d9439a4411b24541d97a937968f384a4d3"
 )
 
 FetchContent_MakeAvailable(pistache_ext)
