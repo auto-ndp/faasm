@@ -4,9 +4,9 @@ RUN apt-get update
 RUN apt-get install -y software-properties-common gpg wget curl
 RUN wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key|apt-key add -
 RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc | apt-key add -
-RUN add-apt-repository "deb http://apt.llvm.org/focal/ llvm-toolchain-focal-13 main"
-RUN add-apt-repository "deb https://apt.kitware.com/ubuntu/ focal main"
-RUN add-apt-repository ppa:ubuntu-toolchain-r/test
+RUN add-apt-repository -y -n "deb http://apt.llvm.org/focal/ llvm-toolchain-focal-13 main"
+RUN add-apt-repository -y -n "deb https://apt.kitware.com/ubuntu/ focal main"
+RUN add-apt-repository -y -n ppa:ubuntu-toolchain-r/test
 RUN apt-get update
 
 RUN apt install -y \
