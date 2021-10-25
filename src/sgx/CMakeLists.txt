@@ -203,6 +203,7 @@ add_subdirectory(crypto)
 
 # Common libraries
 target_link_libraries(enclave_trusted
+    faasm::common_deps
     -Wl,--whole-archive
     ${SGX_TRUSTED_RUNTIME_LIB}
     -Wl,--no-whole-archive
@@ -276,6 +277,7 @@ else()
 endif()
 
 target_link_libraries(enclave_untrusted
+    faasm::common_deps
     ${SGX_UNTRUSTED_RUNTIME_LIB}
     ${SGX_UAE_SERVICE_LIB}
     Threads::Threads

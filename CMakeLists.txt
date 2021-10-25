@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.19.0)
+cmake_minimum_required(VERSION 3.21.0)
 project(faasm)
 
 # Optional functionality
@@ -98,20 +98,28 @@ add_definitions(-DWAMR_EXECUTION_MODE_INTERP=0)
 # Library type (for shared libraries)
 if (FAASM_STATIC_LIBS)
     set(FAABRIC_STATIC_LIBS ON CACHE BOOL "Faabric static")
-    function(faasm_public_lib lib_name lib_deps)
-        add_library(${lib_name} STATIC ${lib_deps})
+    function(faasm_public_lib lib_name)
+        add_library(${lib_name} STATIC ${ARGN})
+        target_link_libraries(${lib_name} PRIVATE faasm::common_deps)
+        add_library(faasm::${lib_name} ALIAS ${lib_name})
     endfunction()
-    function(faasm_private_lib lib_name lib_deps)
-        add_library(${lib_name} STATIC ${lib_deps})
+    function(faasm_private_lib lib_name)
+        add_library(${lib_name} STATIC ${ARGN})
+        target_link_libraries(${lib_name} PRIVATE faasm::common_deps)
+        add_library(faasm::${lib_name} ALIAS ${lib_name})
     endfunction()
 else ()
     set(FAABRIC_STATIC_LIBS OFF CACHE BOOL "Faabric static")
-    function(faasm_public_lib lib_name lib_deps)
-        add_library(${lib_name} SHARED ${lib_deps})
+    function(faasm_public_lib lib_name)
+        add_library(${lib_name} SHARED ${ARGN})
+        target_link_libraries(${lib_name} PRIVATE faasm::common_deps)
+        add_library(faasm::${lib_name} ALIAS ${lib_name})
     endfunction()
-    function(faasm_private_lib lib_name lib_deps)
-        add_library(${lib_name} STATIC ${lib_deps})
+    function(faasm_private_lib lib_name)
+        add_library(${lib_name} STATIC ${ARGN})
+        target_link_libraries(${lib_name} PRIVATE faasm::common_deps)
         target_compile_options(${lib_name} PRIVATE "-fPIC")
+        add_library(faasm::${lib_name} ALIAS ${lib_name})
     endfunction()
 endif ()
 
@@ -144,24 +152,24 @@ add_definitions(${LLVM_DEFINITIONS})
 # Third party deps
 include(cmake/ExternalProjects.cmake)
 
-include_directories(${CMAKE_CURRENT_LIST_DIR}/faabric/include)
-
 # See https://github.com/bytecodealliance/wasm-micro-runtime/blob/main/doc/build_wamr.md
 set(WAMR_SHARED_DIR ${WAMR_ROOT_DIR}/core/shared)
 set(WAMR_IWASM_DIR ${WAMR_ROOT_DIR}/core/iwasm)
 set(WAMR_BUILD_TARGET X86_64)
 set(WAMR_NO_LLVM_IMPORT ON)
 
-# WAMR includes
-include_directories(
+add_library(faasm_common_deps INTERFACE)
+add_library(faasm::common_deps ALIAS faasm_common_deps)
+target_link_libraries(faasm_common_deps INTERFACE
+    faabric::faabric
+)
+target_include_directories(faasm_common_deps INTERFACE
+    # WAMR includes
     ${WAMR_SHARED_DIR}/include
     ${WAMR_SHARED_DIR}/utils
     ${WAMR_IWASM_DIR}/include
     ${WAMR_IWASM_DIR}/common
-)
-
-# More include directories
-include_directories(
+    # Faasm
     ${FAASM_INCLUDE_DIR}
     ${FAASM_PYTHON_LIB_DIR}
 )

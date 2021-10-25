@@ -1,4 +1,4 @@
-file(GLOB_RECURSE TEST_FILES ${CMAKE_CURRENT_LIST_DIR} test_*.cpp)
+file(GLOB_RECURSE TEST_FILES ${CMAKE_CURRENT_SOURCE_DIR} test_*.cpp)
 file(GLOB_RECURSE SGX_TEST_FILES sgx test_*.cpp)
 
 # Remove SGX tests if SGX disabled or not found
@@ -13,12 +13,9 @@ add_executable(
 )
 
 target_include_directories(tests PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}
-    ${CMAKE_CURRENT_LIST_DIR}/../utils
-    ${CMAKE_CURRENT_LIST_DIR}/../../faabric/tests/utils
+    ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
 target_link_libraries(tests PRIVATE faasm::test_utils)
 
 add_test(NAME tests COMMAND "tests/test/tests")
-

@@ -1,26 +1,21 @@
-include_directories(${CMAKE_CURRENT_LIST_DIR})
 
-set(LIB_FILES
+faasm_private_lib(test_utils
     system_utils.cpp
     worker_utils.cpp
     utils.h
 )
-
-faasm_private_lib(test_utils "${LIB_FILES}")
-add_library(faasm::test_utils ALIAS test_utils)
+target_include_directories(test_utils PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 target_link_libraries(test_utils PUBLIC
-    codegen
-    upload_lib
-    runner_lib
+    faasm::codegen
+    faasm::upload_lib
+    faasm::runner_lib
     cpprestsdk::cpprestsdk
-    faaslet_lib
-    wavmmodule
-    wamrmodule
-    system
+    faasm::faaslet_lib
+    faasm::wavmmodule
+    faasm::wamrmodule
+    faasm::system
     faasm::sgx
-    faabric
     Catch2::Catch2
     faabric::test_utils
-    faabric::faabric
 )
