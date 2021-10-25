@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <faabric/util/bytes.h>
 #include <sstream>
