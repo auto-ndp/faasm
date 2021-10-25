@@ -9,6 +9,7 @@
 #include <faabric/util/config.h>
 #include <faabric/util/func.h>
 #include <faabric/util/queue.h>
+#include <faabric/util/scheduling.h>
 #include <faabric/util/snapshot.h>
 #include <faabric/util/timing.h>
 
@@ -140,7 +141,7 @@ class Scheduler
                       bool forceLocal = false,
                       faabric::Message* caller = nullptr);
 
-    std::vector<std::string> callFunctions(
+    faabric::util::SchedulingDecision callFunctions(
       std::shared_ptr<faabric::BatchExecuteRequest> req,
       bool forceLocal = false,
       faabric::Message* caller = nullptr);
@@ -298,7 +299,7 @@ class Scheduler
     int scheduleFunctionsOnHost(
       const std::string& host,
       std::shared_ptr<faabric::BatchExecuteRequest> req,
-      std::vector<std::string>& records,
+      faabric::util::SchedulingDecision& decision,
       int offset,
       faabric::util::SnapshotData* snapshot,
       bool forceAll = false);

@@ -4,11 +4,12 @@ set(LIB_FILES
     DummyExecutorFactory.cpp
     DummyExecutorFactory.h
     exec_graph_utils.cpp
+    faabric_utils.h
     fixtures.h
     http_utils.cpp
     message_utils.cpp
+    scheduling_utils.cpp
     system_utils.cpp
-    faabric_utils.h
 )
 
 add_library(faabric_test_utils "${LIB_FILES}")
