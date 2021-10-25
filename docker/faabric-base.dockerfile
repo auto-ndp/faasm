@@ -6,6 +6,8 @@ RUN wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key|apt-key add -
 RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc | apt-key add -
 RUN add-apt-repository "deb http://apt.llvm.org/focal/ llvm-toolchain-focal-13 main"
 RUN add-apt-repository "deb https://apt.kitware.com/ubuntu/ focal main"
+RUN add-apt-repository ppa:ubuntu-toolchain-r/test
+RUN apt-get update
 
 RUN apt install -y \
     ansible \
@@ -29,6 +31,8 @@ RUN apt install -y \
     libcgroup-dev \
     libcurl4-openssl-dev \
     libpython3-dev \
+    libstdc++-11-dev \
+    g++-11 \
     libtool \
     libunwind-13-dev \
     libz-dev \

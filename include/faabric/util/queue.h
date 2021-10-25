@@ -5,6 +5,7 @@
 #include <faabric/util/logging.h>
 
 #include <queue>
+#include <condition_variable>
 
 #define DEFAULT_QUEUE_TIMEOUT_MS 5000
 
