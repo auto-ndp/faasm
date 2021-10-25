@@ -33,19 +33,19 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 include(cmake/ExternalProjects.cmake)
 
 # Library funcs
-function(faabric_lib lib_name lib_deps)
+function(faabric_lib lib_name)
     # Shared dependencies between the object and normal library
     add_library(${lib_name}_deps INTERFACE)
     target_link_libraries(${lib_name}_deps INTERFACE faabric::common_dependencies)
 
     # Object library for bundling everything together (should have the same
     # include dirs and dependencies as the normal library)
-    add_library(${lib_name}_obj OBJECT ${lib_deps})
+    add_library(${lib_name}_obj OBJECT ${ARGN})
     target_link_libraries(${lib_name}_obj PUBLIC ${lib_name}_deps)
     add_library(faabric::${lib_name}_obj ALIAS ${lib_name}_obj)
 
     # "Normal" library used for linking internally
-    add_library(${lib_name} ${lib_deps})
+    add_library(${lib_name} ${ARGN})
     target_link_libraries(${lib_name} PUBLIC ${lib_name}_deps)
     add_library(faabric::${lib_name} ALIAS ${lib_name})
 
