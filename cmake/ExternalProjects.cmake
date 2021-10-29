@@ -53,6 +53,14 @@ conan_cmake_install(PATH_OR_REFERENCE .
 include(${CMAKE_CURRENT_BINARY_DIR}/conan_paths.cmake)
 
 find_package(Catch2 REQUIRED)
+
+# There are some AWS docs on using the cpp sdk as an external project:
+# https://github.com/aws/aws-sdk-cpp/blob/main/Docs/CMake_External_Project.md
+# but they don't specify how to link the libraries, which required adding an
+# extra couple of CMake targets.
+# We now use the Conan package for aws-sdk-cpp: https://conan.io/center/aws-sdk-cpp
+# To enable only S3, all default targets from the Conan recipe
+# have to be explicitly disabled above
 find_package(AWSSDK REQUIRED)
 
 # Tightly-coupled dependencies
@@ -69,7 +77,11 @@ FetchContent_Declare(wamr_ext
     GIT_TAG "5ac9493230902dd6ffdcbef0eeb6d5cc20fa81df"
 )
 
+# WAMR and WAVM both link to LLVM
+# If WAVM is not linked statically like WAMR, there are some obscure
+# static constructor errors in LLVM due to double-registration
 set(WAVM_ENABLE_STATIC_LINKING ON CACHE INTERNAL "")
+
 FetchContent_MakeAvailable(wavm_ext wamr_ext)
 
 # Allow access to headers nested in other projects
@@ -93,10 +105,3 @@ if(FAASM_SGX_XRA)
     set(FAASM_XRA_INCLUDE_PATH ${FAASM_XRA_ROOT_DIR}/include)
 endif()
 
-# General 3rd party dependencies
-# Eigen is currently not used for anything anywhere currently
-# FetchContent_Declare(eigen_ext
-#     GIT_REPOSITORY "https://gitlab.com/shillaker/eigen.git"
-#     GIT_TAG "faasm"
-# )
-# FetchContent_MakeAvailable(eigen_ext)

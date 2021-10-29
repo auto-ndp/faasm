@@ -8,15 +8,18 @@ FROM kubasz51/faasm-faabric-base:0.1.6
 # that already exists in the Ansible playbooks.
 # -------------------------------------------------------------
 
-# We could be more tactical here, adding only what's required, thus
-# avoiding invalidating the Docker cache when anything Ansible-related
-# changes. However, this image is not rebuilt often, so it's probably
-# unnecessary.
+RUN apt-get update
+RUN apt-get install -y software-properties-common
+# Make sure packages from faabric-base are up-to-date
+RUN apt-get upgrade -y
 
-COPY ansible /usr/local/code/faasm/ansible
-WORKDIR /usr/local/code/faasm/ansible
-
-RUN ansible-playbook llvm.yml
+# Faasm-specific dependencies
+RUN apt-get install -y \
+    ansible \
+    cgroup-tools \
+    iproute2 \
+    iptables \
+    libcgroup-dev
 
 RUN apt-get -y clean autoclean
 RUN apt-get -y autoremove

@@ -30,6 +30,9 @@ RUN rm -r /tmp/wabt
 WORKDIR /usr/local/code
 RUN git clone https://github.com/auto-ndp/faasm-cpp cpp
 WORKDIR /usr/local/code/cpp
+RUN pip3 install -U pip
+RUN pip3 install -U setuptools
+RUN pip3 install -U wheel
 RUN pip3 install -e .
 
 # Python set-up
