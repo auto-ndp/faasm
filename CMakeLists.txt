@@ -117,6 +117,7 @@ elseif(FAABRIC_BUILD_TESTS)
     add_subdirectory(tests/dist)
     add_subdirectory(tests/test)
 endif()
+# Utils are used by faasm tests
 add_subdirectory(tests/utils)
 
 # Install headers

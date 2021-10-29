@@ -31,4 +31,3 @@ add_executable(
 )
 
 target_link_libraries(faabric_dist_test_server PRIVATE faabric_dist_tests_lib)
-

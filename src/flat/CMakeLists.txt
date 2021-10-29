@@ -30,6 +30,5 @@ add_custom_target(
 # Faabric wrapper library
 # ----------------------------------------------
 
-# To get faabric_lib to work here we have to set this include_directory.
 faabric_lib(flat flat.cpp)
 add_dependencies(faabric_common_dependencies faabric_fbs_copied)

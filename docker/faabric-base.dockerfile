@@ -4,6 +4,7 @@ RUN apt-get update
 RUN apt-get install -y software-properties-common gpg wget curl
 RUN wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key|apt-key add -
 RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc | apt-key add -
+RUN add-apt-repository -y -n "deb http://apt.llvm.org/focal/ llvm-toolchain-focal-10 main"
 RUN add-apt-repository -y -n "deb http://apt.llvm.org/focal/ llvm-toolchain-focal-13 main"
 RUN add-apt-repository -y -n "deb https://apt.kitware.com/ubuntu/ focal main"
 RUN add-apt-repository -y -n ppa:ubuntu-toolchain-r/test
@@ -14,25 +15,26 @@ RUN apt install -y \
     autoconf \
     automake \
     build-essential \
-    cgroup-tools \
+    clang-10 \
     clang-13 \
+    clang-format-10 \
     clang-format-13 \
+    clang-tidy-10 \
     clang-tidy-13 \
     clang-tools-13 \
     cmake \
+    g++-11 \
     gdb \
     git \
-    iproute2 \
-    iptables \
     kitware-archive-keyring \
     libboost-filesystem-dev \
     libc++-13-dev \
     libc++abi-13-dev \
-    libcgroup-dev \
     libcurl4-openssl-dev \
+    libhiredis-dev \
     libpython3-dev \
+    libssl-dev \
     libstdc++-11-dev \
-    g++-11 \
     libtool \
     libunwind-13-dev \
     libz-dev \

@@ -16,4 +16,3 @@ target_link_libraries(faabric_tests PRIVATE
 )
 
 add_test(NAME faabric_tests COMMAND "tests/test/faabric_tests")
-

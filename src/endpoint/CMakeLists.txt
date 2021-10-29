@@ -1,11 +1,7 @@
-file(GLOB HEADERS "${FAABRIC_INCLUDE_DIR}/faabric/endpoint/*.h")
 
-set(LIB_FILES
-        Endpoint.cpp
-        FaabricEndpointHandler.cpp
-        ${HEADERS}
-        )
-
-faabric_lib(endpoint "${LIB_FILES}")
+faabric_lib(endpoint
+    Endpoint.cpp
+    FaabricEndpointHandler.cpp
+)
 
 target_link_libraries(endpoint PRIVATE faabric::util)

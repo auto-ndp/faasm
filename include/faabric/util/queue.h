@@ -4,6 +4,7 @@
 #include <faabric/util/locks.h>
 #include <faabric/util/logging.h>
 
+#include <condition_variable>
 #include <queue>
 #include <condition_variable>
 

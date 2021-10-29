@@ -25,4 +25,4 @@ add_custom_target(
 
 faabric_lib(proto ${PB_SRC})
 add_dependencies(faabric_common_dependencies faabric_pbh_copied)
-target_include_directories(faabric_common_dependencies INTERFACE ${CMAKE_CURRENT_BINARY_DIR})
+target_include_directories(proto_deps INTERFACE ${CMAKE_CURRENT_BINARY_DIR})
