@@ -22,6 +22,7 @@ conan_check(VERSION 1.41.0 REQUIRED)
 
 conan_cmake_configure(
     REQUIRES
+        abseil/20210324.2
         boost/1.77.0
         catch2/2.13.7
         cppcodec/0.2
@@ -69,6 +70,7 @@ conan_cmake_install(PATH_OR_REFERENCE .
 
 include(${CMAKE_CURRENT_BINARY_DIR}/conan_paths.cmake)
 
+find_package(absl REQUIRED)
 find_package(Boost 1.77.0 REQUIRED)
 find_package(Catch2 REQUIRED)
 find_package(Flatbuffers REQUIRED)
@@ -161,6 +163,10 @@ target_include_directories(faabric_common_dependencies INTERFACE
     ${FAABRIC_INCLUDE_DIR}
 )
 target_link_libraries(faabric_common_dependencies INTERFACE
+    absl::algorithm_container
+    absl::btree
+    absl::flat_hash_set
+    absl::flat_hash_map
     Boost::Boost
     Boost::filesystem
     Boost::system
