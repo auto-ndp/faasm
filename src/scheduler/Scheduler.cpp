@@ -788,7 +788,7 @@ Scheduler::getRecordedMessagesShared()
     return recordedMessagesShared;
 }
 
-void Scheduler::claimExecutor(faabric::Message& msg)
+std::shared_ptr<Executor> Scheduler::claimExecutor(faabric::Message& msg)
 {
     std::string funcStr = faabric::util::funcToString(msg, false);
 
