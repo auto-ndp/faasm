@@ -11,7 +11,6 @@ RUN add-apt-repository -y -n ppa:ubuntu-toolchain-r/test
 RUN apt-get update
 
 RUN apt install -y \
-    ansible \
     autoconf \
     automake \
     build-essential \
@@ -49,7 +48,6 @@ RUN apt install -y \
     redis-tools \
     sudo \
     unzip \
-    wget \
     zsh
 
 RUN curl -s -L -o /tmp/conan-latest.deb https://github.com/conan-io/conan/releases/latest/download/conan-ubuntu-64.deb && sudo dpkg -i /tmp/conan-latest.deb && rm -f /tmp/conan-latest.deb

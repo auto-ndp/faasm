@@ -266,6 +266,10 @@ class Scheduler
     // ---- Threads ----
     std::unordered_map<uint32_t, std::promise<int32_t>> threadResults;
 
+    std::unordered_map<uint32_t, std::shared_ptr<MessageLocalResult>>
+      localResults;
+    std::mutex localResultsMutex;
+
     // ---- Clients ----
     faabric::scheduler::FunctionCallClient& getFunctionCallClient(
       const std::string& otherHost);
@@ -276,10 +280,6 @@ class Scheduler
     // ---- Host resources and hosts ----
     faabric::HostResources thisHostResources;
     std::atomic<int32_t> thisHostUsedSlots;
-
-    std::unordered_map<uint32_t, std::shared_ptr<MessageLocalResult>>
-      localResults;
-    std::mutex localResultsMutex;
 
     void updateHostResources();
 
