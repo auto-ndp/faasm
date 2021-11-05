@@ -66,14 +66,6 @@ find_package(mimalloc REQUIRED)
 find_package(AWSSDK REQUIRED)
 
 # Tightly-coupled dependencies
-set(FETCHCONTENT_QUIET OFF)
-FetchContent_Declare(wavm_ext
-    GIT_REPOSITORY "https://github.com/auto-ndp/WAVM.git"
-    GIT_TAG "faasm"
-    CMAKE_ARGS "-DDLL_EXPORT= \
-        -DDLL_IMPORT="
-)
-
 FetchContent_Declare(wamr_ext
     GIT_REPOSITORY "https://github.com/faasm/wasm-micro-runtime"
     GIT_TAG "5ac9493230902dd6ffdcbef0eeb6d5cc20fa81df"
@@ -84,10 +76,11 @@ FetchContent_Declare(wamr_ext
 # static constructor errors in LLVM due to double-registration
 set(WAVM_ENABLE_STATIC_LINKING ON CACHE INTERNAL "")
 
-FetchContent_MakeAvailable(wavm_ext wamr_ext)
+FetchContent_MakeAvailable(wamr_ext)
 
 # Allow access to headers nested in other projects
-FetchContent_GetProperties(wavm_ext SOURCE_DIR FAASM_WAVM_SOURCE_DIR)
+set(FAASM_WAVM_SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}/../third-party/wavm)
+add_subdirectory(${FAASM_WAVM_SOURCE_DIR})
 message(STATUS FAASM_WAVM_SOURCE_DIR ${FAASM_WAVM_SOURCE_DIR})
 
 FetchContent_GetProperties(wamr_ext SOURCE_DIR WAMR_ROOT_DIR)
