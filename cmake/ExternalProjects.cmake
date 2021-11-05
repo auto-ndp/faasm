@@ -25,6 +25,7 @@ conan_cmake_configure(
     REQUIRES
         catch2/2.13.7
         aws-sdk-cpp/1.9.100
+        mimalloc/2.0.2
     GENERATORS
         cmake_find_package
         cmake_paths
@@ -53,6 +54,7 @@ conan_cmake_install(PATH_OR_REFERENCE .
 include(${CMAKE_CURRENT_BINARY_DIR}/conan_paths.cmake)
 
 find_package(Catch2 REQUIRED)
+find_package(mimalloc REQUIRED)
 
 # There are some AWS docs on using the cpp sdk as an external project:
 # https://github.com/aws/aws-sdk-cpp/blob/main/Docs/CMake_External_Project.md

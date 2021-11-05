@@ -2,6 +2,7 @@
 #include <faabric/util/environment.h>
 #include <faabric/util/logging.h>
 #include <faabric/util/timing.h>
+#include <mimalloc.h>
 #include <new>
 
 using namespace faabric::util;
@@ -80,24 +81,117 @@ void FaasmConfig::print()
 }
 }
 
-/*
-#ifdef TRACY_ENABLE
-void* operator new(std::size_t count)
+inline void TraceAlloc(void* p, size_t n)
 {
-    if (count == 0) {
-        count++;
-    }
-    void* ptr = malloc(count);
-    if (!ptr) {
-        throw std::bad_alloc{};
-    }
-    TracySecureAlloc(ptr, count);
-    return ptr;
+    TracySecureAlloc(p, n);
 }
-void operator delete(void* ptr) noexcept
+inline void TraceFree(void* p)
 {
-    TracySecureFree(ptr);
-    free(ptr);
+    TracySecureFree(p);
 }
+
+#if 1
+
+void operator delete(void* p) noexcept
+{
+    TraceFree(p);
+    mi_free(p);
+};
+void operator delete[](void* p) noexcept
+{
+    TraceFree(p);
+    mi_free(p);
+};
+
+void* operator new(std::size_t n) noexcept(false)
+{
+    void* p = mi_new(n);
+    TraceAlloc(p, n);
+    return p;
+}
+void* operator new[](std::size_t n) noexcept(false)
+{
+    void* p = mi_new(n);
+    TraceAlloc(p, n);
+    return p;
+}
+
+void* operator new(std::size_t n, const std::nothrow_t& tag) noexcept
+{
+    (void)(tag);
+    void* p = mi_new_nothrow(n);
+    TraceAlloc(p, n);
+    return p;
+}
+void* operator new[](std::size_t n, const std::nothrow_t& tag) noexcept
+{
+    (void)(tag);
+    void* p = mi_new_nothrow(n);
+    TraceAlloc(p, n);
+    return p;
+}
+
+// #if (__cplusplus >= 201402L || _MSC_VER >= 1916)
+void operator delete(void* p, std::size_t n) noexcept
+{
+    TraceFree(p);
+    mi_free_size(p, n);
+};
+void operator delete[](void* p, std::size_t n) noexcept
+{
+    TraceFree(p);
+    mi_free_size(p, n);
+};
+
+// #if (__cplusplus > 201402L || defined(__cpp_aligned_new))
+void operator delete(void* p, std::align_val_t al) noexcept
+{
+    TraceFree(p);
+    mi_free_aligned(p, static_cast<size_t>(al));
+}
+void operator delete[](void* p, std::align_val_t al) noexcept
+{
+    TraceFree(p);
+    mi_free_aligned(p, static_cast<size_t>(al));
+}
+void operator delete(void* p, std::size_t n, std::align_val_t al) noexcept
+{
+    TraceFree(p);
+    mi_free_size_aligned(p, n, static_cast<size_t>(al));
+};
+void operator delete[](void* p, std::size_t n, std::align_val_t al) noexcept
+{
+    TraceFree(p);
+    mi_free_size_aligned(p, n, static_cast<size_t>(al));
+};
+
+void* operator new(std::size_t n, std::align_val_t al) noexcept(false)
+{
+    void* p = mi_new_aligned(n, static_cast<size_t>(al));
+    TraceAlloc(p, n);
+    return p;
+}
+void* operator new[](std::size_t n, std::align_val_t al) noexcept(false)
+{
+    void* p = mi_new_aligned(n, static_cast<size_t>(al));
+    TraceAlloc(p, n);
+    return p;
+}
+void* operator new(std::size_t n,
+                   std::align_val_t al,
+                   const std::nothrow_t&) noexcept
+{
+    void* p = mi_new_aligned_nothrow(n, static_cast<size_t>(al));
+    TraceAlloc(p, n);
+    return p;
+}
+void* operator new[](std::size_t n,
+                     std::align_val_t al,
+                     const std::nothrow_t&) noexcept
+{
+    void* p = mi_new_aligned_nothrow(n, static_cast<size_t>(al));
+    TraceAlloc(p, n);
+    return p;
+}
+
 #endif
-*/
