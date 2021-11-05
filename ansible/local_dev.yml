@@ -5,7 +5,7 @@
   gather_facts: yes
   roles:
     - linux
-    - llvm13
+    - llvm10
     - grpc
     - eigen
     - pistache

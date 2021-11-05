@@ -8,7 +8,7 @@
   roles:
     - linux
     - cmake
-    - llvm13
+    - llvm10
     - grpc
     - code
     - python
