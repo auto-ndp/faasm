@@ -290,9 +290,7 @@ class Scheduler
 
     std::unordered_map<std::string, std::set<std::string>> registeredHosts;
 
-    void claimExecutor(
-      faabric::Message& msg,
-      std::function<void(std::shared_ptr<Executor>)> runOnExecutor);
+    std::shared_ptr<Executor> claimExecutor(faabric::Message& msg);
 
     std::vector<std::string> getUnregisteredHosts(const std::string& funcStr,
                                                   bool noCache = false);

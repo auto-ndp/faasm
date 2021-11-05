@@ -17,9 +17,9 @@
 #include <faabric/util/testing.h>
 #include <faabric/util/timing.h>
 
-#include <sys/syscall.h>
 #include <sys/eventfd.h>
 #include <sys/file.h>
+#include <sys/syscall.h>
 
 #include <chrono>
 #include <unordered_set>
@@ -248,7 +248,10 @@ void Scheduler::notifyExecutorShutdown(Executor* exec,
     }
 
     if (execIdx < 0) {
-        SPDLOG_ERROR("Couldn't find executor with id {}, current executor count: {}", exec->id, thisExecutors.size());
+        SPDLOG_ERROR(
+          "Couldn't find executor with id {}, current executor count: {}",
+          exec->id,
+          thisExecutors.size());
         return;
     }
     // We assume it's been found or something has gone very wrong
@@ -547,10 +550,9 @@ faabric::util::SchedulingDecision Scheduler::callFunctions(
         this->thisHostUsedSlots.fetch_add((int32_t)localMessageIdxs.size(),
                                           std::memory_order_acquire);
 
-        bool executed = false;
         if (isThreads) {
-            // Threads use the existing executor. We assume there's only
-            // one running at a time.
+            // Threads use the existing executor. We assume there's only one
+            // running at a time.
             std::vector<std::shared_ptr<Executor>>& thisExecutors =
               executors[funcStr];
 
@@ -558,12 +560,7 @@ faabric::util::SchedulingDecision Scheduler::callFunctions(
             if (thisExecutors.empty()) {
                 ZoneScopedN("Scheduler::callFunctions claiming new executor");
                 // Create executor if not exists
-                claimExecutor(
-                  firstMsg,
-                  [req, localMessageIdxs](std::shared_ptr<Executor> exec) {
-                      exec->executeTasks(localMessageIdxs, req);
-                  });
-                executed = true;
+                e = claimExecutor(firstMsg);
             } else if (thisExecutors.size() == 1) {
                 // Use existing executor if exists
                 e = thisExecutors.back();
@@ -578,10 +575,7 @@ faabric::util::SchedulingDecision Scheduler::callFunctions(
             assert(e != nullptr);
 
             // Execute the tasks
-            if (!executed) {
-                ZoneScopedN("Scheduler::callFunctions execute tasks");
-                e->executeTasks(localMessageIdxs, req);
-            }
+            e->executeTasks(localMessageIdxs, req);
         } else {
             // Non-threads require one executor per task
             for (auto i : localMessageIdxs) {
@@ -595,11 +589,8 @@ faabric::util::SchedulingDecision Scheduler::callFunctions(
                       { localMsg.id(),
                         std::make_shared<MessageLocalResult>() });
                 }
-                ZoneScopedN("Scheduler::callFunctions claim executor");
-                claimExecutor(firstMsg,
-                              [req, i](std::shared_ptr<Executor> exec) {
-                                  exec->executeTasks({ i }, req);
-                              });
+                std::shared_ptr<Executor> e = claimExecutor(localMsg);
+                e->executeTasks({ i }, req);
             }
         }
     }
@@ -797,9 +788,7 @@ Scheduler::getRecordedMessagesShared()
     return recordedMessagesShared;
 }
 
-void Scheduler::claimExecutor(
-  faabric::Message& msg,
-  std::function<void(std::shared_ptr<Executor>)> runOnExecutor)
+void Scheduler::claimExecutor(faabric::Message& msg)
 {
     std::string funcStr = faabric::util::funcToString(msg, false);
 
@@ -850,14 +839,16 @@ void Scheduler::claimExecutor(
             std::shared_ptr<faabric::scheduler::ExecutorFactory> factory =
               getExecutorFactory();
             auto executor = factory->createExecutor(msg);
-            executor->tryClaim();
             thisExecutors.push_back(std::move(executor));
             claimed = thisExecutors.back();
+
+            // Claim it
+            claimed->tryClaim();
         }
     }
 
     assert(claimed != nullptr);
-    runOnExecutor(claimed);
+    return claimed;
 }
 
 std::string Scheduler::getThisHost()
