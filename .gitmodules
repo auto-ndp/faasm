@@ -7,3 +7,6 @@
 [submodule "clients/cpp"]
 	path = clients/cpp
 	url = https://github.com/auto-ndp/faasm-cpp.git
+[submodule "third-party/wavm"]
+	path = third-party/wavm
+	url = https://github.com/auto-ndp/WAVM.git
