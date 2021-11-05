@@ -266,12 +266,6 @@ class Scheduler
     // ---- Threads ----
     std::unordered_map<uint32_t, std::promise<int32_t>> threadResults;
 
-    std::unordered_map<uint32_t,
-                       std::promise<std::unique_ptr<faabric::Message>>>
-      localResults;
-
-    std::mutex localResultsMutex;
-
     // ---- Clients ----
     faabric::scheduler::FunctionCallClient& getFunctionCallClient(
       const std::string& otherHost);
