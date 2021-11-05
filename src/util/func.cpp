@@ -87,6 +87,9 @@ std::shared_ptr<faabric::Message> messageFactoryShared(
 
     std::string thisHost = faabric::util::getSystemConfig().endpointHost;
     ptr->set_masterhost(thisHost);
+
+    ptr->set_recordexecgraph(false);
+
     return ptr;
 }
 
@@ -101,6 +104,8 @@ faabric::Message messageFactory(const std::string& user,
 
     std::string thisHost = faabric::util::getSystemConfig().endpointHost;
     msg.set_masterhost(thisHost);
+
+    msg.set_recordexecgraph(false);
 
     return msg;
 }

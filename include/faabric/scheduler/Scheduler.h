@@ -5,6 +5,7 @@
 #include <faabric/scheduler/FunctionCallClient.h>
 #include <faabric/scheduler/InMemoryMessageQueue.h>
 #include <faabric/snapshot/SnapshotClient.h>
+#include <faabric/transport/PointToPointBroker.h>
 #include <faabric/util/asio.h>
 #include <faabric/util/config.h>
 #include <faabric/util/func.h>
@@ -253,48 +254,54 @@ class Scheduler
 
     faabric::util::SystemConfig& conf;
 
+    std::shared_mutex mx;
+
+    // ---- Executors ----
     std::vector<std::shared_ptr<Executor>> deadExecutors;
 
     std::unordered_map<std::string, std::vector<std::shared_ptr<Executor>>>
       executors;
     std::unordered_map<std::string, std::atomic_int> suspendedExecutors;
 
-    std::shared_mutex mx;
-
+    // ---- Threads ----
     std::unordered_map<uint32_t, std::promise<int32_t>> threadResults;
 
+    std::unordered_map<uint32_t,
+                       std::promise<std::unique_ptr<faabric::Message>>>
+      localResults;
+
+    std::mutex localResultsMutex;
+
+    // ---- Clients ----
     faabric::scheduler::FunctionCallClient& getFunctionCallClient(
       const std::string& otherHost);
 
     faabric::snapshot::SnapshotClient& getSnapshotClient(
       const std::string& otherHost);
 
+    // ---- Host resources and hosts ----
     faabric::HostResources thisHostResources;
     std::atomic<int32_t> thisHostUsedSlots;
-    std::set<std::string> availableHostsCache;
-    std::unordered_map<std::string, std::set<std::string>> registeredHosts;
 
     std::unordered_map<uint32_t, std::shared_ptr<MessageLocalResult>>
       localResults;
     std::mutex localResultsMutex;
 
-    std::vector<faabric::Message> recordedMessagesAll;
-    std::vector<faabric::Message> recordedMessagesLocal;
-    std::vector<std::pair<std::string, faabric::Message>>
-      recordedMessagesShared;
+    void updateHostResources();
 
-    std::vector<std::string> getUnregisteredHosts(const std::string& funcStr,
-                                                  bool noCache = false);
+    faabric::HostResources getHostResources(const std::string& host);
+
+    // ---- Actual scheduling ----
+    std::set<std::string> availableHostsCache;
+
+    std::unordered_map<std::string, std::set<std::string>> registeredHosts;
 
     void claimExecutor(
       faabric::Message& msg,
       std::function<void(std::shared_ptr<Executor>)> runOnExecutor);
 
-    faabric::HostResources getHostResources(const std::string& host);
-
-    ExecGraphNode getFunctionExecGraphNode(unsigned int msgId);
-
-    void updateHostResources();
+    std::vector<std::string> getUnregisteredHosts(const std::string& funcStr,
+                                                  bool noCache = false);
 
     int scheduleFunctionsOnHost(
       const std::string& host,
@@ -303,6 +310,17 @@ class Scheduler
       int offset,
       faabric::util::SnapshotData* snapshot,
       bool forceAll = false);
+
+    // ---- Accounting and debugging ----
+    std::vector<faabric::Message> recordedMessagesAll;
+    std::vector<faabric::Message> recordedMessagesLocal;
+    std::vector<std::pair<std::string, faabric::Message>>
+      recordedMessagesShared;
+
+    ExecGraphNode getFunctionExecGraphNode(unsigned int msgId);
+
+    // ---- Point-to-point ----
+    faabric::transport::PointToPointBroker& broker;
 };
 
 }
