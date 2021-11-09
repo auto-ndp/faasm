@@ -3,6 +3,7 @@ faasm_private_lib(codegen
 )
 target_include_directories(codegen PRIVATE ${FAASM_INCLUDE_DIR}/codegen)
 target_link_libraries(codegen PUBLIC
+    faasm::common_deps
     faasm::storage
     faasm::wamrmodule
     faasm::wavmmodule

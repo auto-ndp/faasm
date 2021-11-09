@@ -3,6 +3,7 @@ faasm_private_lib(runner_lib
     MicrobenchRunner.cpp
 )
 target_link_libraries(runner_lib PUBLIC
+    faasm::common_deps
     faasm::conf
     faasm::faaslet_lib
     faasm::wavmmodule
@@ -32,6 +33,7 @@ target_include_directories(pool_runner PRIVATE ${FAASM_INCLUDE_DIR}/runner)
 add_library(codegen_common INTERFACE)
 add_library(faasm::codegen_common ALIAS codegen_common)
 target_link_libraries(codegen_common INTERFACE
+    faasm::common_deps
     faasm::codegen
     faasm::runner_lib
 )
