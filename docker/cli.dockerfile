@@ -5,7 +5,7 @@ SHELL ["/bin/bash", "-c"]
 
 # Install various deps
 RUN apt-get update
-RUN apt-get install -y \
+RUN apt-get install --no-install-recommends --no-install-suggests -y \
     clang-tidy-10 \
     clang-tidy-13 \
     libpython3-dev \
