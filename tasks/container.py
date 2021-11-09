@@ -27,7 +27,7 @@ def _do_container_build(name, nocache=False, push=False):
 
     build_cmd = [
         "docker buildx build",
-        "--load",
+        "--push" if push else "",
         "--platform linux/amd64,linux/arm64",
         no_cache_str,
         "-t {}".format(tag_name),
@@ -39,9 +39,6 @@ def _do_container_build(name, nocache=False, push=False):
 
     print(build_cmd)
     run(build_cmd, shell=True, check=True, env={"DOCKER_BUILDKIT": "1"})
-
-    if push:
-        _do_push(name)
 
 
 def _do_push(name):
