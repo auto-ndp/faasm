@@ -60,9 +60,6 @@ if (SGX_FOUND)
     # SGX includes
     include_directories(${SGX_SDK_PATH}/include)
 
-    # Switch off Werror only when in SGX mode
-    set(CMAKE_CXX_FLAGS "-Wall")
-
     # Set up SGX definitions
     add_definitions(-DFAASM_SGX=1)
 
@@ -81,7 +78,6 @@ if (SGX_FOUND)
         add_definitions(-DFAASM_SGX_ATTESTATION=0)
     endif()
 else ()
-    set(CMAKE_CXX_FLAGS "-Wall -Werror")
     add_definitions(-DFAASM_SGX=0)
 endif ()
 
