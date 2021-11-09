@@ -50,7 +50,7 @@ RUN apt install -y \
     unzip \
     zsh
 
-RUN curl -s -L -o /tmp/conan-latest.deb https://github.com/conan-io/conan/releases/latest/download/conan-ubuntu-64.deb && sudo dpkg -i /tmp/conan-latest.deb && rm -f /tmp/conan-latest.deb
+RUN pip install conan
 
 # Tidy up
 RUN apt-get clean autoclean
