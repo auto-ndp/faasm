@@ -154,12 +154,14 @@ message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 include_directories(${LLVM_INCLUDE_DIRS})
 add_definitions(${LLVM_DEFINITIONS})
 
-# Third party deps
-include(cmake/ExternalProjects.cmake)
-
 # See https://github.com/bytecodealliance/wasm-micro-runtime/blob/main/doc/build_wamr.md
 set(WAMR_SHARED_DIR ${WAMR_ROOT_DIR}/core/shared)
 set(WAMR_IWASM_DIR ${WAMR_ROOT_DIR}/core/iwasm)
+set(WAMR_NO_LLVM_IMPORT ON)
+
+# Third party deps
+include(cmake/ExternalProjects.cmake)
+
 if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
     set(WAMR_BUILD_TARGET X86_64)
 elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
@@ -167,7 +169,6 @@ elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
 else()
     message(FATAL_ERROR "Unsupported CPU architecture '${CMAKE_SYSTEM_PROCESSOR}'")
 endif()
-set(WAMR_NO_LLVM_IMPORT ON)
 
 add_library(faasm_common_deps INTERFACE)
 add_library(faasm::common_deps ALIAS faasm_common_deps)
