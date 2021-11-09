@@ -3,7 +3,7 @@ file(GLOB_RECURSE SGX_TEST_FILES sgx test_*.cpp)
 
 # Remove SGX tests if SGX disabled or not found
 if (NOT SGX_FOUND)
-    list(REMOVE_ITEM ${TEST_FILES} ${SGX_TEST_FILES})
+    list(REMOVE_ITEM TEST_FILES ${SGX_TEST_FILES})
 endif()
 
 add_executable(
