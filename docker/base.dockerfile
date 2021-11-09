@@ -2,13 +2,13 @@
 FROM kubasz51/faasm-faabric:0.2.2 as faabric
 
 # Stage to extract Python runtime files
-FROM kubasz51/faasm-cpython:0.1.1 as python
+FROM kubasz51/faasm-cpython:0.1.2 as python
 
 # Import from SGX container
-FROM kubasz51/faasm-sgx:0.6.1 as sgx
+FROM kubasz51/faasm-sgx:0.7.3 as sgx
 
 # Note - we don't often rebuild cpp-root so this dep may be behind
-FROM kubasz51/faasm-cpp-root:0.7.1
+FROM kubasz51/faasm-cpp-root:0.7.3
 ARG FAASM_VERSION
 
 # Flag to say we're in a container
