@@ -71,7 +71,7 @@ def build(ctx, c, nocache=False, push=False):
 
         faasm_ver = get_faasm_version()
 
-        cmd = "docker buildx build --load --platform linux/amd64,linux/arm64 {} {} -t {} --build-arg FAASM_VERSION={} -f {} .".format(
+        cmd = "docker buildx build --platform linux/amd64,linux/arm64 {} {} -t {} --build-arg FAASM_VERSION={} -f {} .".format(
             "--push" if push else "",
             "--no-cache" if nocache else "", tag_name, faasm_ver, dockerfile
         )
