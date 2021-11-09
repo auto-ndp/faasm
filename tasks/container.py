@@ -33,14 +33,15 @@ def _do_container_build(name, nocache=False, push=False):
         "-t {}".format(tag_name),
         "-f {}".format(dockerfile),
         "--build-arg FAABRIC_VERSION={}".format(ver),
+        "."
     ]
-    if push:
-        build_cmd.append("--push")
-    build_cmd.append(".")
     build_cmd = " ".join(build_cmd)
 
     print(build_cmd)
     run(build_cmd, shell=True, check=True, env={"DOCKER_BUILDKIT": "1"})
+
+    if push:
+        _do_push(name)
 
 
 def _do_push(name):
