@@ -1,3 +1,6 @@
+# Stage to copy Conan cache
+FROM kubasz51/faasm-faabric:0.2.2 as faabric
+
 # Stage to extract Python runtime files
 FROM kubasz51/faasm-cpython:0.1.1 as python
 
@@ -10,6 +13,9 @@ ARG FAASM_VERSION
 
 # Flag to say we're in a container
 ENV FAASM_DOCKER="on"
+
+# Copy Conan cache
+COPY --from=faabric /root/.conan /root/.conan
 
 # Copy Python runtime libraries
 COPY --from=python /usr/local/faasm/runtime_root /usr/local/faasm/runtime_root
