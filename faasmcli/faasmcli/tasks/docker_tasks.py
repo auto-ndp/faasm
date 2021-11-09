@@ -71,14 +71,12 @@ def build(ctx, c, nocache=False, push=False):
 
         faasm_ver = get_faasm_version()
 
-        cmd = "docker build {} -t {} --build-arg FAASM_VERSION={} -f {} .".format(
+        cmd = "docker buildx build --platform linux/amd64,linux/arm64 {} {} -t {} --build-arg FAASM_VERSION={} -f {} .".format(
+            "--push" if push else "",
             "--no-cache" if nocache else "", tag_name, faasm_ver, dockerfile
         )
         print(cmd)
         run(cmd, shell=True, check=True, cwd=PROJ_ROOT, env=shell_env)
-
-        if push:
-            _do_push(container, faasm_ver)
 
 
 @task(iterable=["c"])
