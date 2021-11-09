@@ -51,10 +51,4 @@ RUN cmake \
     -DCMAKE_BUILD_TYPE=Release \
     /usr/local/code/faasm
 
-RUN cmake --build . --target tests
-RUN cmake --build . --target func_runner
-RUN cmake --build . --target func_sym
-RUN cmake --build . --target codegen_func
-RUN cmake --build . --target codegen_shared_obj
-RUN cmake --build . --target pool_runner
-RUN cmake --build . --target upload
+RUN cmake --build . --target tests func_runner func_sym codegen_func codegen_shared_obj pool_runner upload
