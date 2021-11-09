@@ -27,6 +27,7 @@ def _do_container_build(name, nocache=False, push=False):
 
     build_cmd = [
         "docker buildx build",
+        "--load",
         "--platform linux/amd64,linux/arm64",
         no_cache_str,
         "-t {}".format(tag_name),
