@@ -8,6 +8,11 @@ include(CMakeParseArguments)
 
 set(SGX_FOUND "NO")
 
+# SGX can only work on x86_64 systems
+if(NOT (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64"))
+    return()
+endif()
+
 if(EXISTS SGX_DIR)
     set(SGX_SDK_PATH ${SGX_DIR})
 elseif(EXISTS SGX_ROOT)
