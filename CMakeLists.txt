@@ -87,7 +87,13 @@ endif ()
 # WAMR configuration
 # ----------------------------------------
 
-add_definitions(-DBUILD_TARGET_X86_64)
+if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+    add_definitions(-DBUILD_TARGET_X86_64)
+elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
+    add_definitions(-DBUILD_TARGET_AARCH64)
+else()
+    message(FATAL_ERROR "Unsupported CPU architecture '${CMAKE_SYSTEM_PROCESSOR}'")
+endif()
 enable_language(ASM)
 add_definitions(-DWAMR_EXECUTION_MODE_INTERP=0)
 
@@ -156,7 +162,13 @@ include(cmake/ExternalProjects.cmake)
 # See https://github.com/bytecodealliance/wasm-micro-runtime/blob/main/doc/build_wamr.md
 set(WAMR_SHARED_DIR ${WAMR_ROOT_DIR}/core/shared)
 set(WAMR_IWASM_DIR ${WAMR_ROOT_DIR}/core/iwasm)
-set(WAMR_BUILD_TARGET X86_64)
+if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+    set(WAMR_BUILD_TARGET X86_64)
+elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
+    set(WAMR_BUILD_TARGET AARCH64)
+else()
+    message(FATAL_ERROR "Unsupported CPU architecture '${CMAKE_SYSTEM_PROCESSOR}'")
+endif()
 set(WAMR_NO_LLVM_IMPORT ON)
 
 add_library(faasm_common_deps INTERFACE)

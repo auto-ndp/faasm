@@ -4,7 +4,13 @@
 
 # Set target platform details
 set(WAMR_BUILD_PLATFORM "linux")
-set(WAMR_BUILD_TARGET X86_64)
+if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+    set(WAMR_BUILD_TARGET X86_64)
+elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
+    set(WAMR_BUILD_TARGET AARCH64)
+else()
+    message(FATAL_ERROR "Unsupported CPU architecture '${CMAKE_SYSTEM_PROCESSOR}'")
+endif()
 set(WAMR_BUILD_SPEC_TEST 0)
 
 # Set AOT mode and JIT for code generation
