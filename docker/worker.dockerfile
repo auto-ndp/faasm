@@ -3,9 +3,6 @@ FROM kubasz51/faasm-base:${FAASM_VERSION}
 
 # Build the worker binary
 WORKDIR /build/faasm
-RUN cmake --build . --target codegen_shared_obj
-RUN cmake --build . --target codegen_func
-RUN cmake --build . --target pool_runner
 
 # Install hoststats
 RUN pip3 install hoststats==0.1.0
