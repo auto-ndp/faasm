@@ -60,11 +60,18 @@ conan_cmake_configure(
 
 conan_cmake_autodetect(FAABRIC_CONAN_SETTINGS)
 
+set(FAABRIC_ARCH_SUFFIX "")
+if(NOT (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64"))
+    set(FAABRIC_ARCH_SUFFIX "-${CMAKE_SYSTEM_PROCESSOR}")
+endif()
+
+set(FAABRIC_CONAN_PROFILE "${CMAKE_CURRENT_LIST_DIR}/../conan-profile${FAABRIC_ARCH_SUFFIX}.txt" CACHE FILEPATH "Faabric conan profile path" FORCE)
+
 conan_cmake_install(PATH_OR_REFERENCE .
                     BUILD outdated
                     REMOTE conancenter
-                    PROFILE_HOST ${CMAKE_CURRENT_LIST_DIR}/../conan-profile.txt
-                    PROFILE_BUILD ${CMAKE_CURRENT_LIST_DIR}/../conan-profile.txt
+                    PROFILE_HOST ${FAABRIC_CONAN_PROFILE}
+                    PROFILE_BUILD ${FAABRIC_CONAN_PROFILE}
                     SETTINGS ${FAABRIC_CONAN_SETTINGS}
 )
 
