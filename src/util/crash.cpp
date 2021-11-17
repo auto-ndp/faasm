@@ -39,7 +39,7 @@ void crashHandler(int sig, siginfo_t *siginfo, void *contextR) noexcept
                          STDERR_FILENO);
     for (int entry = 0; entry < filledStacks; entry++) {
         bool hasSymbol = absl::Symbolize(stackPtrs[entry], symbolName.data(), symbolName.size());
-        fprintf(stderr, "[%2d] %08zx: %s\n", entry, (size_t)(stackPtrs[entry]), hasSymbol ? symbolName.data() : "<unknown symbol>");
+        fprintf(stderr, "[%2d] 0x%016zx: %s\n", entry, (size_t)(stackPtrs[entry]), hasSymbol ? symbolName.data() : "<unknown symbol>");
     }
     if (sig != TEST_SIGNAL) {
         signal(sig, SIG_DFL);
