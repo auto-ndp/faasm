@@ -48,8 +48,6 @@ std::vector<uint8_t> wavmCodegen(std::vector<uint8_t>& bytes,
     }
 
     // Compile the module to object code
-    Runtime::ModuleRef module = Runtime::compileModule(moduleIR);
-    std::vector<uint8_t> objBytes = Runtime::getObjectCode(module);
-    return objBytes;
+    return Runtime::precompileModule(moduleIR, "", "");
 }
 }
