@@ -35,8 +35,8 @@ Executor::Executor(faabric::Message& msg)
   : boundMessage(msg)
   , threadPoolSize(faabric::util::getUsableCores())
   , threadPoolThreads(threadPoolSize)
-  , threadTaskQueues(threadPoolSize)
   , resetDone(false)
+  , threadTaskQueues(threadPoolSize)
 {
     faabric::util::SystemConfig& conf = faabric::util::getSystemConfig();
 
@@ -192,28 +192,57 @@ void Executor::executeTasks(std::vector<int> msgIdxs,
 void Executor::threadPoolThread(int threadPoolIdx)
 {
     SPDLOG_DEBUG("Thread pool thread {}:{} starting up", id, threadPoolIdx);
+    std::string boundName =
+      faabric::util::funcToString(this->boundMessage, false);
     tracy::SetThreadName(
-      ("Executor threadPoolThread: " + this->id + " " +
-       faabric::util::funcToString(this->boundMessage, false))
-        .c_str());
+      ("Executor threadPoolThread: " + this->id + " " + boundName).c_str());
+
+    auto& sch = faabric::scheduler::getScheduler();
+    const auto& conf = faabric::util::getSystemConfig();
+
+    bool failedTasks = false;
+    auto failAllTasks = [&]() {
+        failedTasks = true;
+        while (threadTaskQueues[threadPoolIdx].size() > 0) {
+            ExecutorTask task = threadTaskQueues[threadPoolIdx].dequeue(1);
+            faabric::Message& msg =
+              task.req->mutable_messages()->at(task.messageIndex);
+            msg.set_returnvalue(1);
+            msg.set_outputdata("Exception caught on initialization");
+            bool isThreads =
+              task.req->type() == faabric::BatchExecuteRequest::THREADS;
+            if (isThreads) {
+                sch.setThreadResult(msg, 1);
+            } else {
+                sch.setFunctionResult(msg);
+            }
+        }
+    };
     if (threadPoolIdx == 0) {
         std::unique_lock<std::shared_mutex> _lock(resetMutex);
-        reset(boundMessage);
-        resetDone.store(true);
+        try {
+            reset(boundMessage);
+        } catch (...) {
+            SPDLOG_ERROR("Caught exception when initialising module for {}",
+                         boundName);
+            failAllTasks();
+            resetFailed.store(true, std::memory_order_release);
+        }
+        resetDone.store(true, std::memory_order_release);
         _lock.unlock();
         resetCondvar.notify_all();
     } else {
         std::shared_lock<std::shared_mutex> lock(resetMutex);
         resetCondvar.wait(
           lock, [&]() { return resetDone.load(std::memory_order_acq_rel); });
+        if (resetFailed.load(std::memory_order_acquire)) {
+            failAllTasks();
+        }
     }
-
-    auto& sch = faabric::scheduler::getScheduler();
-    const auto& conf = faabric::util::getSystemConfig();
 
     bool selfShutdown = false;
 
-    for (;;) {
+    while (!failedTasks) {
         SPDLOG_TRACE("Thread starting loop {}:{}", id, threadPoolIdx);
 
         ExecutorTask task;

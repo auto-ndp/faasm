@@ -104,6 +104,7 @@ class Executor
     std::shared_mutex resetMutex;
     std::condition_variable_any resetCondvar;
     std::atomic_bool resetDone;
+    std::atomic_bool resetFailed;
 
     std::vector<faabric::util::Queue<ExecutorTask>> threadTaskQueues;
 
