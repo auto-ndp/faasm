@@ -15,7 +15,7 @@
 
 #define SHARED_OBJ_EXT ".o"
 
-#define HASH_EXT ".md5"
+#define HASH_EXT ".sha256"
 
 #define PYTHON_USER "python"
 #define PYTHON_FUNC "py_func"

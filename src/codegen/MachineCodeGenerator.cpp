@@ -3,7 +3,7 @@
 #include <wamr/WAMRWasmModule.h>
 #include <wavm/WAVMWasmModule.h>
 
-#include <openssl/md5.h>
+#include <openssl/sha.h>
 #include <stdexcept>
 
 #include <faabric/util/bytes.h>
@@ -34,10 +34,10 @@ MachineCodeGenerator::MachineCodeGenerator(storage::FileLoader& loaderIn)
 std::vector<uint8_t> MachineCodeGenerator::hashBytes(
   const std::vector<uint8_t>& bytes)
 {
-    std::vector<uint8_t> result(MD5_DIGEST_LENGTH);
-    MD5(reinterpret_cast<const unsigned char*>(bytes.data()),
-        bytes.size(),
-        result.data());
+    std::vector<uint8_t> result(SHA256_DIGEST_LENGTH);
+    SHA256(reinterpret_cast<const unsigned char*>(bytes.data()),
+           bytes.size(),
+           result.data());
 
     return result;
 }
