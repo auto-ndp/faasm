@@ -1,6 +1,11 @@
 #pragma once
 
 #include <cstdint>
+#include <fcntl.h>
+#include <linux/userfaultfd.h>
+#include <optional>
+#include <sys/ioctl.h>
+#include <sys/syscall.h>
 #include <unistd.h>
 #include <vector>
 
@@ -39,6 +44,85 @@ void resetDirtyTracking();
 
 std::vector<int> getDirtyPageNumbers(const uint8_t* ptr, int nPages);
 
+/*
+struct UserfaultFd
+{
+    int fd = -1;
+    uffdio_api api = {};
 
+    // Only allow moving, not copying - owns the fd
+    inline UserfaultFd() {}
+    inline ~UserfaultFd() { clear(); }
+    UserfaultFd(const UserfaultFd&) = delete;
+    inline UserfaultFd(UserfaultFd&& other)
+    {
+        this->operator=(std::move(other));
+    }
+    UserfaultFd& operator=(const UserfaultFd&) = delete;
+    inline UserfaultFd& operator=(UserfaultFd&& other)
+    {
+        fd = other.fd;
+        api = other.api;
+        other.fd = -1;
+        other.api = {};
+        return *this;
+    }
+
+    // Close fd if present
+    inline void clear()
+    {
+        if (fd >= 0) {
+            close(fd);
+            fd = -1;
+            api = {};
+        }
+    }
+
+    // Release ownership and return the fd
+    std::pair<int, uffdio_api> release();
+
+    void create(int flags = 0, bool sigbus = false);
+
+    // Thread-safe
+    inline void checkFd()
+    {
+        if (fd < 0) {
+            throw std::runtime_error("UFFD fd not initialized");
+        }
+    }
+
+    // Write-protect mode requires at least Linux 5.7 kernel
+    // Thread-safe
+    void register_address_range(size_t startPtr,
+                                size_t length,
+                                bool modeMissing,
+                                bool modeWriteProtect);
+
+    // Thread-safe
+    void unregister_address_range(size_t startPtr, size_t length);
+
+    // Thread-safe
+    std::optional<uffd_msg> readEvent();
+
+    // Thread-safe
+    void writeProtectPages(size_t startPtr,
+                           size_t length,
+                           bool preventWrites = true,
+                           bool dontWake = false);
+
+    // Thread-safe
+    void zeroPages(size_t startPtr, size_t length, bool dontWake = false);
+
+    // Thread-safe
+    void copyPages(size_t targetStartPtr,
+                   size_t length,
+                   size_t sourceStartPtr,
+                   bool writeProtect = false,
+                   bool dontWake = false);
+
+    // Thread-safe
+    void wakePages(size_t startPtr, size_t length);
+};
+*/
 
 }
