@@ -152,8 +152,9 @@ TEST_CASE_METHOD(UploadTestFixture, "Test upload and download", "[upload]")
     {
         // Ensure environment is clean before running
         std::string fileKey = "gamma/delta/function.wasm";
-        std::string objFileKey = "gamma/delta/function.wasm.o";
-        std::string objFileHashKey = "gamma/delta/function.wasm.o.md5";
+        std::string objFileKey = "gamma/delta/function.wasm" SHARED_OBJ_EXT;
+        std::string objFileHashKey =
+          "gamma/delta/function.wasm" SHARED_OBJ_EXT HASH_EXT;
         s3.deleteKey(conf.s3Bucket, fileKey);
         s3.deleteKey(conf.s3Bucket, objFileKey);
         s3.deleteKey(conf.s3Bucket, objFileHashKey);
