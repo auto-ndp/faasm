@@ -39,19 +39,6 @@ void resetDirtyTracking();
 
 std::vector<int> getDirtyPageNumbers(const uint8_t* ptr, int nPages);
 
-// Keeps track of dirty pages across many memory ranges independently
-// Allows only one range per start address, they should not overlap
-namespace dirty_tracker {
-// Makes sure the memory range starting at `start` and ending at
-// `start+byteLength` gets tracked If byteLength == 0, stops tracking that
-// memory range New parts of regions will be marked as dirty
-void trackMemoryRange(uint8_t* start, size_t byteLength);
 
-void markClean(uint8_t* rangeStart, size_t substartOffset, size_t sublength);
-
-// Gets all the dirty subregions (as pairs of (start, byte length)) for a given
-// memory region
-std::vector<std::pair<uint8_t*, size_t>> getDirtySubregions(uint8_t* start);
-}
 
 }
