@@ -1,5 +1,5 @@
 # Stage to copy Conan cache
-FROM kubasz51/faasm-faabric:0.2.2 as faabric
+FROM kubasz51/faasm-faabric:0.3.0 as faabric
 
 # Stage to extract Python runtime files
 FROM kubasz51/faasm-cpython:0.1.2 as python
