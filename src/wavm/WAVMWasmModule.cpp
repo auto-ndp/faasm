@@ -211,8 +211,7 @@ void WAVMWasmModule::clone(const WAVMWasmModule& other,
         } else {
             // Exclude memory if snapshot key provided
             ZoneScopedN("WAVMWasmModule::cloneInto::compartment:noMemory");
-            Runtime::cloneCompartmentInto(
-              *compartment, other.compartment, "", false);
+            Runtime::cloneCompartmentInto(*compartment, other.compartment, "");
         }
 
         // Clone context
