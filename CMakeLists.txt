@@ -19,6 +19,13 @@ option(FAASM_SGX_SIM_MODE "Turn on SGX sim mode" ON)
 option(FAASM_SGX_ATTESTATION "Turn on attestation" OFF)
 option(FAASM_SGX_XRA "Turn on support for XRA" OFF)
 
+# Enable colorized compiler output
+if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+    add_compile_options(-fdiagnostics-color=always)
+elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+    add_compile_options(-fcolor-diagnostics)
+endif()
+
 # Top-level CMake config
 if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
     add_compile_options(-march=skylake -mtune=skylake)
