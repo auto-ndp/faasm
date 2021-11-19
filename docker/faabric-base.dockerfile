@@ -1,31 +1,25 @@
-FROM ubuntu:20.04
+FROM debian:bookworm-20211115
+# Debian "12" testing
 
 RUN apt-get update
+RUN apt-get upgrade
 RUN apt-get install -y software-properties-common gpg wget curl
-RUN wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key|apt-key add -
-RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc | apt-key add -
-RUN add-apt-repository -y -n "deb http://apt.llvm.org/focal/ llvm-toolchain-focal-10 main"
-RUN add-apt-repository -y -n "deb http://apt.llvm.org/focal/ llvm-toolchain-focal-13 main"
-RUN add-apt-repository -y -n "deb https://apt.kitware.com/ubuntu/ focal main"
-RUN add-apt-repository -y -n ppa:ubuntu-toolchain-r/test
-RUN apt-get update
 
-RUN apt install -y \
+RUN apt-get install -y \
     autoconf \
     automake \
     build-essential \
-    clang-10 \
+    clang-11 \
     clang-13 \
-    clang-format-10 \
+    clang-format-11 \
     clang-format-13 \
-    clang-tidy-10 \
+    clang-tidy-11 \
     clang-tidy-13 \
     clang-tools-13 \
     cmake \
     g++-11 \
     gdb \
     git \
-    kitware-archive-keyring \
     libboost-filesystem-dev \
     libc++-13-dev \
     libc++abi-13-dev \
@@ -50,6 +44,7 @@ RUN apt install -y \
     unzip \
     zsh
 
+RUN pip install cmake
 RUN pip install conan
 
 # Tidy up
