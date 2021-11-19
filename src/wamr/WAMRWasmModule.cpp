@@ -82,7 +82,7 @@ void WAMRWasmModule::doBindToFunction(faabric::Message& msg, bool cache)
     // Load the wasm file
     storage::FileLoader& functionLoader = storage::getFileLoader();
     std::vector<uint8_t> wasmBytes =
-      functionLoader.loadFunctionWamrAotFile(msg);
+      functionLoader.loadFunctionWamrAotFile(msg, conf::nativeCodegenTarget());
 
     // Load wasm module
     wasmModule = wasm_runtime_load(

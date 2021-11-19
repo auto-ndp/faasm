@@ -209,7 +209,8 @@ TEST_CASE_METHOD(CodegenTestFixture,
       std::string("/tmp/obj") + std::string(localSharedObjFile) + ".o";
     std::string hashFile = objFile + HASH_EXT;
 
-    loader.uploadSharedObjectObjectFile(localSharedObjFile, sharedObjWasm);
+    loader.uploadSharedObjectObjectFile(
+      localSharedObjFile, conf::nativeCodegenTarget(), sharedObjWasm);
 
     // Flush anything cached locally
     loader.clearLocalCache();
@@ -234,7 +235,8 @@ TEST_CASE_METHOD(CodegenTestFixture,
     REQUIRE(std::filesystem::exists(hashFile));
 
     std::vector<uint8_t> dummyBytes = { 0, 1, 2, 3 };
-    loader.uploadSharedObjectObjectFile(localSharedObjFile, dummyBytes);
+    loader.uploadSharedObjectObjectFile(
+      localSharedObjFile, conf::nativeCodegenTarget(), dummyBytes);
 
     // Rerun codegen and check dummy data not overwritten (i.e. codegen skipped)
     gen.codegenForSharedObject(localSharedObjFile);
@@ -243,7 +245,8 @@ TEST_CASE_METHOD(CodegenTestFixture,
     REQUIRE(objAfterA == dummyBytes);
 
     // Now write the dummy bytes to the hash file and rerun the upload
-    loader.uploadSharedObjectObjectHash(localSharedObjFile, dummyBytes);
+    loader.uploadSharedObjectObjectHash(
+      localSharedObjFile, conf::nativeCodegenTarget(), dummyBytes);
     gen.codegenForSharedObject(localSharedObjFile);
 
     // Check the object file is updated

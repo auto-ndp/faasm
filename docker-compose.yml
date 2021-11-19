@@ -81,6 +81,7 @@ services:
       - /sys/kernel/debug:/sys/kernel/debug
       - /sys/kernel/debug/tracing:/sys/kernel/debug/tracing
     environment:
+      - CODEGEN_TARGETS=x86_64:skylake;aarch64:thunderx2t99
       - CAPTURE_STDOUT=on
       - CGROUP_MODE=off
       - DELTA_SNAPSHOT_ENCODING=pages=64
@@ -122,6 +123,7 @@ services:
       - /sys/kernel/debug:/sys/kernel/debug
       - /sys/kernel/debug/tracing:/sys/kernel/debug/tracing
     environment:
+      - CODEGEN_TARGETS=x86_64:skylake;aarch64:thunderx2t99
       - CAPTURE_STDOUT=off
       - CGROUP_MODE=off
       - DELTA_SNAPSHOT_ENCODING=pages=64

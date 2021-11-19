@@ -10,6 +10,8 @@ struct CodegenTargetSpec {
     std::string cpu;
 };
 
+CodegenTargetSpec nativeCodegenTarget();
+
 class FaasmConfig
 {
   public:

@@ -42,52 +42,84 @@ class FileLoader
     void uploadFunction(faabric::Message& msg);
 
     // ----- Function object files -----
-    std::string getFunctionObjectFile(const faabric::Message& msg);
+    std::string getFunctionObjectFile(
+      const faabric::Message& msg,
+      conf::CodegenTargetSpec target = conf::nativeCodegenTarget());
 
-    std::vector<uint8_t> loadFunctionObjectFile(const faabric::Message& msg);
+    std::vector<uint8_t> loadFunctionObjectFile(
+      const faabric::Message& msg,
+      conf::CodegenTargetSpec target = conf::nativeCodegenTarget());
 
-    std::vector<uint8_t> loadFunctionObjectHash(const faabric::Message& msg);
+    std::vector<uint8_t> loadFunctionObjectHash(
+      const faabric::Message& msg,
+      conf::CodegenTargetSpec target = conf::nativeCodegenTarget());
 
-    void uploadFunctionObjectFile(const faabric::Message& msg,
-                                  const std::vector<uint8_t>& objBytes);
+    void uploadFunctionObjectFile(
+      const faabric::Message& msg,
+      conf::CodegenTargetSpec target,
+      const std::vector<uint8_t>& objBytes);
 
-    void uploadFunctionObjectHash(const faabric::Message& msg,
-                                  const std::vector<uint8_t>& hash);
+    void uploadFunctionObjectHash(
+      const faabric::Message& msg,
+      conf::CodegenTargetSpec target,
+      const std::vector<uint8_t>& hash);
 
     // ----- Function WAMR AoT files -----
-    std::string getFunctionAotFile(const faabric::Message& msg);
+    std::string getFunctionAotFile(
+      const faabric::Message& msg,
+      conf::CodegenTargetSpec target = conf::nativeCodegenTarget());
 
-    std::vector<uint8_t> loadFunctionWamrAotFile(const faabric::Message& msg);
+    std::vector<uint8_t> loadFunctionWamrAotFile(
+      const faabric::Message& msg,
+      conf::CodegenTargetSpec target = conf::nativeCodegenTarget());
 
-    std::vector<uint8_t> loadFunctionWamrAotHash(const faabric::Message& msg);
+    std::vector<uint8_t> loadFunctionWamrAotHash(
+      const faabric::Message& msg,
+      conf::CodegenTargetSpec target = conf::nativeCodegenTarget());
 
-    void uploadFunctionWamrAotFile(const faabric::Message& msg,
-                                   const std::vector<uint8_t>& objBytes);
+    void uploadFunctionWamrAotFile(
+      const faabric::Message& msg,
+      conf::CodegenTargetSpec target,
+      const std::vector<uint8_t>& objBytes);
 
-    void uploadFunctionWamrAotHash(const faabric::Message& msg,
-                                   const std::vector<uint8_t>& hash);
+    void uploadFunctionWamrAotHash(
+      const faabric::Message& msg,
+      conf::CodegenTargetSpec target,
+      const std::vector<uint8_t>& hash);
 
     // ----- Encrypted function wasm -----
     std::string getEncryptedFunctionFile(const faabric::Message& msg);
 
     // ----- Function symbols -----
-    std::string getFunctionSymbolsFile(const faabric::Message& msg);
+    std::string getFunctionSymbolsFile(
+      const faabric::Message& msg,
+      conf::CodegenTargetSpec target = conf::nativeCodegenTarget());
 
     // ----- Shared object wasm -----
     std::vector<uint8_t> loadSharedObjectWasm(const std::string& path);
 
     // ----- Shared object object files -----
-    std::string getSharedObjectObjectFile(const std::string& realPath);
+    std::string getSharedObjectObjectFile(
+      const std::string& realPath,
+      conf::CodegenTargetSpec target = conf::nativeCodegenTarget());
 
-    std::vector<uint8_t> loadSharedObjectObjectFile(const std::string& path);
+    std::vector<uint8_t> loadSharedObjectObjectFile(
+      const std::string& path,
+      conf::CodegenTargetSpec target = conf::nativeCodegenTarget());
 
-    std::vector<uint8_t> loadSharedObjectObjectHash(const std::string& path);
+    std::vector<uint8_t> loadSharedObjectObjectHash(
+      const std::string& path,
+      conf::CodegenTargetSpec target = conf::nativeCodegenTarget());
 
-    void uploadSharedObjectObjectFile(const std::string& path,
-                                      const std::vector<uint8_t>& objBytes);
+    void uploadSharedObjectObjectFile(
+      const std::string& path,
+      conf::CodegenTargetSpec target,
+      const std::vector<uint8_t>& objBytes);
 
-    void uploadSharedObjectObjectHash(const std::string& path,
-                                      const std::vector<uint8_t>& hash);
+    void uploadSharedObjectObjectHash(
+      const std::string& path,
+      conf::CodegenTargetSpec target,
+      const std::vector<uint8_t>& hash);
 
     // ----- Shared files -----
     std::string getSharedFileFile(const std::string& path);

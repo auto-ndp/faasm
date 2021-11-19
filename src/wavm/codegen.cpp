@@ -6,6 +6,7 @@
 #include <WAVM/WASM/WASM.h>
 #include <WAVM/WASTParse/WASTParse.h>
 
+#include <conf/FaasmConfig.h>
 #include <faabric/util/files.h>
 #include <faabric/util/logging.h>
 
@@ -13,6 +14,7 @@ using namespace WAVM;
 
 namespace wasm {
 std::vector<uint8_t> wavmCodegen(std::vector<uint8_t>& bytes,
+                                 conf::CodegenTargetSpec target,
                                  const std::string& fileName)
 {
 
@@ -48,6 +50,6 @@ std::vector<uint8_t> wavmCodegen(std::vector<uint8_t>& bytes,
     }
 
     // Compile the module to object code
-    return Runtime::precompileModule(moduleIR, "", "");
+    return Runtime::precompileModule(moduleIR, target.arch, target.cpu);
 }
 }

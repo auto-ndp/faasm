@@ -1,5 +1,6 @@
 #pragma once
 
+#include <conf/FaasmConfig.h>
 #include <threads/ThreadState.h>
 #include <wasm/WasmExecutionContext.h>
 #include <wasm/WasmModule.h>
@@ -16,6 +17,7 @@ WAVM_DECLARE_INTRINSIC_MODULE(env)
 WAVM_DECLARE_INTRINSIC_MODULE(wasi)
 
 std::vector<uint8_t> wavmCodegen(std::vector<uint8_t>& wasmBytes,
+                                 conf::CodegenTargetSpec target,
                                  const std::string& fileName);
 
 class WAVMWasmModule final

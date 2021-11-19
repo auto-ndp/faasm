@@ -121,7 +121,8 @@ Runtime::ModuleRef IRModuleCache::getCompiledMainModule(const std::string& user,
             storage::FileLoader& functionLoader = storage::getFileLoader();
             faabric::Message msg = faabric::util::messageFactory(user, func);
             std::vector<uint8_t> objectFileBytes =
-              functionLoader.loadFunctionObjectFile(msg);
+              functionLoader.loadFunctionObjectFile(
+                msg, conf::nativeCodegenTarget());
 
             if (!objectFileBytes.empty()) {
                 compiledModuleMap[key] =
@@ -156,7 +157,8 @@ Runtime::ModuleRef IRModuleCache::getCompiledSharedModule(
             std::vector<uint8_t> objectBytes;
             {
                 ZoneScopedN("Load object file");
-                objectBytes = functionLoader.loadSharedObjectObjectFile(path);
+                objectBytes = functionLoader.loadSharedObjectObjectFile(
+                  path, conf::nativeCodegenTarget());
             }
             {
                 ZoneScopedN("Runtime::loadPrecompiledModule");

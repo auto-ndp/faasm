@@ -44,14 +44,15 @@ std::vector<uint8_t> MachineCodeGenerator::hashBytes(
 
 std::vector<uint8_t> MachineCodeGenerator::doCodegen(
   std::vector<uint8_t>& bytes,
+  conf::CodegenTargetSpec target,
   const std::string& fileName,
   bool isSgx)
 {
     if (conf.wasmVm == "wamr") {
-        return wasm::wamrCodegen(bytes, isSgx);
+        return wasm::wamrCodegen(bytes, target, isSgx);
     } else {
         assert(isSgx == false);
-        return wasm::wavmCodegen(bytes, fileName);
+        return wasm::wavmCodegen(bytes, target, fileName);
     }
 }
 
@@ -65,50 +66,53 @@ void MachineCodeGenerator::codegenForFunction(faabric::Message& msg)
         throw std::runtime_error("Loaded empty bytes for " + funcStr);
     }
 
-    // Compare hashes
-    std::vector<uint8_t> newHash = hashBytes(bytes);
-    std::vector<uint8_t> oldHash;
-    if (conf.wasmVm == "wamr") {
-        oldHash = loader.loadFunctionWamrAotHash(msg);
-    } else if (conf.wasmVm == "wavm" && msg.issgx()) {
-        SPDLOG_ERROR("Can't run SGX codegen for WAVM. Only WAMR is supported.");
-        throw std::runtime_error("SGX codegen for WAVM");
-    } else {
-        oldHash = loader.loadFunctionObjectHash(msg);
-    }
-
-    if ((!oldHash.empty()) && newHash == oldHash) {
-        // Even if we skip the code generation step, we want to sync the latest
-        // object file
+    for (const auto& target : conf.codegenTargets) {
+        // Compare hashes
+        std::vector<uint8_t> newHash = hashBytes(bytes);
+        std::vector<uint8_t> oldHash;
         if (conf.wasmVm == "wamr") {
-            UNUSED(loader.loadFunctionWamrAotHash(msg));
+            oldHash = loader.loadFunctionWamrAotHash(msg, target);
+        } else if (conf.wasmVm == "wavm" && msg.issgx()) {
+            SPDLOG_ERROR(
+              "Can't run SGX codegen for WAVM. Only WAMR is supported.");
+            throw std::runtime_error("SGX codegen for WAVM");
         } else {
-            UNUSED(loader.loadFunctionObjectFile(msg));
+            oldHash = loader.loadFunctionObjectHash(msg, target);
         }
-        SPDLOG_DEBUG("Skipping codegen for {}", funcStr);
-        return;
-    } else if (oldHash.empty()) {
-        SPDLOG_DEBUG("No old hash found for {}", funcStr);
-    } else {
-        SPDLOG_DEBUG("Hashes differ for {}", funcStr);
-    }
 
-    // Run the actual codegen
-    std::vector<uint8_t> objBytes;
-    try {
-        objBytes = doCodegen(bytes, funcStr, msg.issgx());
-    } catch (std::runtime_error& ex) {
-        SPDLOG_ERROR("Codegen failed for " + funcStr);
-        throw ex;
-    }
+        if ((!oldHash.empty()) && newHash == oldHash) {
+            // Even if we skip the code generation step, we want to sync the
+            // latest object file
+            if (conf.wasmVm == "wamr") {
+                UNUSED(loader.loadFunctionWamrAotHash(msg, target));
+            } else {
+                UNUSED(loader.loadFunctionObjectFile(msg, target));
+            }
+            SPDLOG_DEBUG("Skipping codegen for {}", funcStr);
+            return;
+        } else if (oldHash.empty()) {
+            SPDLOG_DEBUG("No old hash found for {}", funcStr);
+        } else {
+            SPDLOG_DEBUG("Hashes differ for {}", funcStr);
+        }
 
-    // Upload the file contents and the hash
-    if (conf.wasmVm == "wamr") {
-        loader.uploadFunctionWamrAotFile(msg, objBytes);
-        loader.uploadFunctionWamrAotHash(msg, newHash);
-    } else {
-        loader.uploadFunctionObjectFile(msg, objBytes);
-        loader.uploadFunctionObjectHash(msg, newHash);
+        // Run the actual codegen
+        std::vector<uint8_t> objBytes;
+        try {
+            objBytes = doCodegen(bytes, target, funcStr, msg.issgx());
+        } catch (std::runtime_error& ex) {
+            SPDLOG_ERROR("Codegen failed for " + funcStr);
+            throw ex;
+        }
+
+        // Upload the file contents and the hash
+        if (conf.wasmVm == "wamr") {
+            loader.uploadFunctionWamrAotFile(msg, target, objBytes);
+            loader.uploadFunctionWamrAotHash(msg, target, newHash);
+        } else {
+            loader.uploadFunctionObjectFile(msg, target, objBytes);
+            loader.uploadFunctionObjectHash(msg, target, newHash);
+        }
     }
 }
 
@@ -119,26 +123,29 @@ void MachineCodeGenerator::codegenForSharedObject(const std::string& inputPath)
 
     // Check the hash
     std::vector<uint8_t> newHash = hashBytes(bytes);
-    std::vector<uint8_t> oldHash = loader.loadSharedObjectObjectHash(inputPath);
+    for (const auto& target : conf.codegenTargets) {
+        std::vector<uint8_t> oldHash =
+          loader.loadSharedObjectObjectHash(inputPath, target);
 
-    if ((!oldHash.empty()) && newHash == oldHash) {
-        // Even if we skip the code generation step, we want to sync the latest
-        // shared object object file
-        UNUSED(loader.loadSharedObjectObjectFile(inputPath));
-        SPDLOG_DEBUG("Skipping codegen for {}", inputPath);
-        return;
+        if ((!oldHash.empty()) && newHash == oldHash) {
+            // Even if we skip the code generation step, we want to sync the
+            // latest shared object object file
+            UNUSED(loader.loadSharedObjectObjectFile(inputPath, target));
+            SPDLOG_DEBUG("Skipping codegen for {}", inputPath);
+            return;
+        }
+
+        // Run the actual codegen
+        std::vector<uint8_t> objBytes = doCodegen(bytes, target, inputPath);
+
+        // Do the upload
+        if (conf.wasmVm == "wamr") {
+            throw std::runtime_error(
+              "Codegen for shared objects not supported with WAMR");
+        }
+
+        loader.uploadSharedObjectObjectFile(inputPath, target, objBytes);
+        loader.uploadSharedObjectObjectHash(inputPath, target, newHash);
     }
-
-    // Run the actual codegen
-    std::vector<uint8_t> objBytes = doCodegen(bytes, inputPath);
-
-    // Do the upload
-    if (conf.wasmVm == "wamr") {
-        throw std::runtime_error(
-          "Codegen for shared objects not supported with WAMR");
-    }
-
-    loader.uploadSharedObjectObjectFile(inputPath, objBytes);
-    loader.uploadSharedObjectObjectHash(inputPath, newHash);
 }
 }

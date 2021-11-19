@@ -1,5 +1,6 @@
 #include <absl/strings/str_split.h>
 #include <absl/strings/string_view.h>
+#include <boost/predef.h>
 #include <conf/FaasmConfig.h>
 #include <faabric/util/environment.h>
 #include <faabric/util/logging.h>
@@ -14,6 +15,37 @@ using namespace faabric::util;
 using namespace std::string_view_literals;
 
 namespace conf {
+
+CodegenTargetSpec determineNativeCodegenTarget()
+{
+    CodegenTargetSpec ts;
+    const FaasmConfig& conf = getFaasmConfig();
+#if (BOOST_ARCH_X86_64 == 1)
+    ts.arch = "x86_64";
+    ts.cpu = "skylake";
+#elif (BOOST_ARCH_ARM == 1)
+    ts.arch = "aarch64";
+    ts.cpu = "cortex-a53";
+#else
+#error Unsupported CPU architecture
+#endif
+    const CodegenTargetSpec detectedTs = ts;
+    for (const auto& cts : conf.codegenTargets) {
+        if (cts.arch == ts.arch) {
+            ts.cpu = cts.cpu;
+            break;
+        }
+    }
+    SPDLOG_INFO("Using architecture {}:{}", ts.arch, ts.cpu);
+    return ts;
+}
+
+CodegenTargetSpec nativeCodegenTarget()
+{
+    static CodegenTargetSpec ts = determineNativeCodegenTarget();
+    return ts;
+}
+
 FaasmConfig& getFaasmConfig()
 {
     static FaasmConfig conf;

@@ -17,6 +17,13 @@
 
 namespace storage {
 
+class file_not_found_error : std::runtime_error
+{
+  public:
+    explicit file_not_found_error(const char* msg);
+    explicit file_not_found_error(std::string msg);
+};
+
 void initFaasmS3();
 
 void shutdownFaasmS3();

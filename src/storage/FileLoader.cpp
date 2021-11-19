@@ -10,6 +10,7 @@
 #include <faabric/util/func.h>
 #include <faabric/util/testing.h>
 
+#include <absl/strings/str_cat.h>
 #include <filesystem>
 
 using namespace faabric::util;
@@ -21,11 +22,23 @@ namespace storage {
 // -------------------------------------
 
 #define FUNC_FILENAME "function.wasm"
-#define FUNC_OBJECT_FILENAME "function.wasm.o"
+std::string FUNC_OBJECT_FILENAME(conf::CodegenTargetSpec target)
+{
+    return absl::StrCat(
+      FUNC_FILENAME, ".", target.arch, ".", target.cpu, SHARED_OBJ_EXT);
+}
 #define PYTHON_FUNCTION_FILENAME "function.py"
 #define FUNC_ENCRYPTED_FILENAME "function.wasm.enc"
-#define FUNCTION_SYMBOLS_FILENAME "function.symbols"
-#define WAMR_AOT_FILENAME "function.aot"
+std::string FUNCTION_SYMBOLS_FILENAME(conf::CodegenTargetSpec target)
+{
+    return absl::StrCat(
+      FUNC_FILENAME, ".", target.arch, ".", target.cpu, ".symbols");
+}
+std::string WAMR_AOT_FILENAME(conf::CodegenTargetSpec target)
+{
+    return absl::StrCat(
+      FUNC_FILENAME, ".", target.arch, ".", target.cpu, ".aot");
+}
 #define SGX_WAMR_AOT_FILENAME "function.aot.sgx"
 
 static int removeAllInside(const std::filesystem::path& dir)
@@ -285,42 +298,47 @@ void FileLoader::uploadFunction(faabric::Message& msg)
 // FUNCTION OBJECT FILES
 // -------------------------------------
 
-std::string FileLoader::getFunctionObjectFile(const faabric::Message& msg)
+std::string FileLoader::getFunctionObjectFile(const faabric::Message& msg,
+                                              conf::CodegenTargetSpec target)
 {
     auto path = getDir(conf.objectFileDir, msg, true);
-    path.append(FUNC_OBJECT_FILENAME);
+    path.append(FUNC_OBJECT_FILENAME(target));
     return path.string();
 }
 
 std::vector<uint8_t> FileLoader::loadFunctionObjectFile(
-  const faabric::Message& msg)
+  const faabric::Message& msg,
+  conf::CodegenTargetSpec target)
 {
-    const std::string key = getKey(msg, FUNC_OBJECT_FILENAME);
-    const std::string localCachePath = getFunctionObjectFile(msg);
+    const std::string key = getKey(msg, FUNC_OBJECT_FILENAME(target));
+    const std::string localCachePath = getFunctionObjectFile(msg, target);
     return loadFileBytes(key, localCachePath);
 }
 
 std::vector<uint8_t> FileLoader::loadFunctionObjectHash(
-  const faabric::Message& msg)
+  const faabric::Message& msg,
+  conf::CodegenTargetSpec target)
 {
-    const std::string key = getKey(msg, FUNC_OBJECT_FILENAME);
-    const std::string localCachePath = getFunctionObjectFile(msg);
+    const std::string key = getKey(msg, FUNC_OBJECT_FILENAME(target));
+    const std::string localCachePath = getFunctionObjectFile(msg, target);
     return loadHashFileBytes(key, localCachePath);
 }
 
 void FileLoader::uploadFunctionObjectFile(const faabric::Message& msg,
+                                          conf::CodegenTargetSpec target,
                                           const std::vector<uint8_t>& objBytes)
 {
-    const std::string key = getKey(msg, FUNC_OBJECT_FILENAME);
-    const std::string localCachePath = getFunctionObjectFile(msg);
+    const std::string key = getKey(msg, FUNC_OBJECT_FILENAME(target));
+    const std::string localCachePath = getFunctionObjectFile(msg, target);
     uploadFileBytes(key, localCachePath, objBytes);
 }
 
 void FileLoader::uploadFunctionObjectHash(const faabric::Message& msg,
+                                          conf::CodegenTargetSpec target,
                                           const std::vector<uint8_t>& hash)
 {
-    const std::string key = getKey(msg, FUNC_OBJECT_FILENAME);
-    const std::string localCachePath = getFunctionObjectFile(msg);
+    const std::string key = getKey(msg, FUNC_OBJECT_FILENAME(target));
+    const std::string localCachePath = getFunctionObjectFile(msg, target);
     uploadHashFileBytes(key, localCachePath, hash);
 }
 
@@ -328,56 +346,62 @@ void FileLoader::uploadFunctionObjectHash(const faabric::Message& msg,
 // FUNCTION WAMR AOT FILES
 // -------------------------------------
 
-static const std::string getWamrAotKey(const faabric::Message& msg)
+static const std::string getWamrAotKey(const faabric::Message& msg,
+                                       conf::CodegenTargetSpec target)
 {
     if (msg.issgx()) {
         return getKey(msg, SGX_WAMR_AOT_FILENAME);
     } else {
-        return getKey(msg, WAMR_AOT_FILENAME);
+        return getKey(msg, WAMR_AOT_FILENAME(target));
     }
 }
 
-std::string FileLoader::getFunctionAotFile(const faabric::Message& msg)
+std::string FileLoader::getFunctionAotFile(const faabric::Message& msg,
+                                           conf::CodegenTargetSpec target)
 {
     auto path = getDir(conf.objectFileDir, msg, true);
     if (msg.issgx()) {
         path.append(SGX_WAMR_AOT_FILENAME);
     } else {
-        path.append(WAMR_AOT_FILENAME);
+        path.append(WAMR_AOT_FILENAME(target));
     }
 
     return path.string();
 }
 
 std::vector<uint8_t> FileLoader::loadFunctionWamrAotFile(
-  const faabric::Message& msg)
+  const faabric::Message& msg,
+  conf::CodegenTargetSpec target)
 {
-    const std::string key = getWamrAotKey(msg);
-    const std::string localCachePath = getFunctionAotFile(msg);
+    const std::string key = getWamrAotKey(msg, target);
+    const std::string localCachePath = getFunctionAotFile(msg, target);
     return loadFileBytes(key, localCachePath);
 }
 
 std::vector<uint8_t> FileLoader::loadFunctionWamrAotHash(
-  const faabric::Message& msg)
+  const faabric::Message& msg,
+  conf::CodegenTargetSpec target)
 {
-    const std::string key = getWamrAotKey(msg);
-    const std::string localCachePath = getFunctionAotFile(msg);
+    const std::string key = getWamrAotKey(msg, target);
+    const std::string localCachePath = getFunctionAotFile(msg, target);
     return loadHashFileBytes(key, localCachePath);
 }
 
 void FileLoader::uploadFunctionWamrAotFile(const faabric::Message& msg,
+                                           conf::CodegenTargetSpec target,
                                            const std::vector<uint8_t>& objBytes)
 {
-    const std::string key = getWamrAotKey(msg);
-    const std::string localCachePath = getFunctionAotFile(msg);
+    const std::string key = getWamrAotKey(msg, target);
+    const std::string localCachePath = getFunctionAotFile(msg, target);
     uploadFileBytes(key, localCachePath, objBytes);
 }
 
 void FileLoader::uploadFunctionWamrAotHash(const faabric::Message& msg,
+                                           conf::CodegenTargetSpec target,
                                            const std::vector<uint8_t>& hash)
 {
-    const std::string key = getWamrAotKey(msg);
-    const std::string localCachePath = getFunctionAotFile(msg);
+    const std::string key = getWamrAotKey(msg, target);
+    const std::string localCachePath = getFunctionAotFile(msg, target);
     uploadHashFileBytes(key, localCachePath, hash);
 }
 
@@ -396,10 +420,11 @@ std::string FileLoader::getEncryptedFunctionFile(const faabric::Message& msg)
 // FUNCTION SYMBOLS
 // -------------------------------------
 
-std::string FileLoader::getFunctionSymbolsFile(const faabric::Message& msg)
+std::string FileLoader::getFunctionSymbolsFile(const faabric::Message& msg,
+                                               conf::CodegenTargetSpec target)
 {
     auto path = getDir(conf.functionDir, msg, true);
-    path.append(FUNCTION_SYMBOLS_FILENAME);
+    path.append(FUNCTION_SYMBOLS_FILENAME(target));
     return path.string();
 }
 
@@ -416,7 +441,9 @@ std::vector<uint8_t> FileLoader::loadSharedObjectWasm(const std::string& path)
 // SHARED OBJECT OBJECT FILES
 // -------------------------------------
 
-std::string FileLoader::getSharedObjectObjectFile(const std::string& realPath)
+std::string FileLoader::getSharedObjectObjectFile(
+  const std::string& realPath,
+  conf::CodegenTargetSpec target)
 {
     std::filesystem::directory_entry f(realPath);
     const std::string directory = f.path().parent_path().string();
@@ -435,37 +462,41 @@ std::string FileLoader::getSharedObjectObjectFile(const std::string& realPath)
 
     // Add the filename
     std::string outputFile = objPath.append(fileName).string();
-    outputFile += SHARED_OBJ_EXT;
 
-    return outputFile;
+    return fmt::format(
+      "{}.{}.{}" SHARED_OBJ_EXT, outputFile, target.arch, target.cpu);
 }
 
 std::vector<uint8_t> FileLoader::loadSharedObjectObjectFile(
-  const std::string& path)
+  const std::string& path,
+  conf::CodegenTargetSpec target)
 {
-    const std::string localCachePath = getSharedObjectObjectFile(path);
+    const std::string localCachePath = getSharedObjectObjectFile(path, target);
     return loadFileBytes(path, localCachePath);
 }
 
 std::vector<uint8_t> FileLoader::loadSharedObjectObjectHash(
-  const std::string& path)
+  const std::string& path,
+  conf::CodegenTargetSpec target)
 {
-    const std::string localCachePath = getSharedObjectObjectFile(path);
+    const std::string localCachePath = getSharedObjectObjectFile(path, target);
     return loadHashFileBytes(path, localCachePath);
 }
 
 void FileLoader::uploadSharedObjectObjectFile(
   const std::string& path,
+  conf::CodegenTargetSpec target,
   const std::vector<uint8_t>& objBytes)
 {
-    const std::string localCachePath = getSharedObjectObjectFile(path);
+    const std::string localCachePath = getSharedObjectObjectFile(path, target);
     uploadFileBytes(path, localCachePath, objBytes);
 }
 
 void FileLoader::uploadSharedObjectObjectHash(const std::string& path,
+                                              conf::CodegenTargetSpec target,
                                               const std::vector<uint8_t>& hash)
 {
-    const std::string localCachePath = getSharedObjectObjectFile(path);
+    const std::string localCachePath = getSharedObjectObjectFile(path, target);
     uploadHashFileBytes(path, localCachePath, hash);
 }
 

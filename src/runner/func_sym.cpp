@@ -40,7 +40,8 @@ int main(int argc, char* argv[])
           module.buildDisassemblyMap();
 
         storage::FileLoader& loader = storage::getFileLoader();
-        std::string outPath = loader.getFunctionSymbolsFile(call);
+        std::string outPath =
+          loader.getFunctionSymbolsFile(call, conf::nativeCodegenTarget());
         std::ofstream outfile;
         outfile.open(outPath, std::ios::out);
 

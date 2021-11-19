@@ -12,6 +12,8 @@
 #include <aws/s3/model/ListObjectsRequest.h>
 #include <aws/s3/model/PutObjectRequest.h>
 
+#include <string_view>
+
 using namespace Aws::S3::Model;
 using namespace Aws::Client;
 using namespace Aws::Auth;
@@ -36,24 +38,39 @@ R reqFactory(const std::string& bucket, const std::string& key)
     return req;
 }
 
-#define CHECK_ERRORS(response, bucketName, keyName)                            \
-    {                                                                          \
-        if (!response.IsSuccess()) {                                           \
-            const auto& err = response.GetError();                             \
-            if (std::string(bucketName).empty()) {                             \
-                SPDLOG_ERROR("General S3 error", bucketName);                  \
-            } else if (std::string(keyName).empty()) {                         \
-                SPDLOG_ERROR("S3 error with bucket: {}", bucketName);          \
-            } else {                                                           \
-                SPDLOG_ERROR(                                                  \
-                  "S3 error with bucket/key: {}/{}", bucketName, keyName);     \
-            }                                                                  \
-            SPDLOG_ERROR("S3 error: {}. {}",                                   \
-                         err.GetExceptionName().c_str(),                       \
-                         err.GetMessage().c_str());                            \
-            throw std::runtime_error("S3 error");                              \
-        }                                                                      \
+file_not_found_error::file_not_found_error(const char* msg)
+  : std::runtime_error(msg)
+{}
+file_not_found_error::file_not_found_error(std::string msg)
+  : std::runtime_error(msg)
+{}
+
+void CHECK_ERRORS(const auto& response,
+                  std::string_view bucketName,
+                  std::string_view keyName)
+{
+    if (!response.IsSuccess()) {
+        const auto& err = response.GetError();
+        if (std::string(bucketName).empty()) {
+            SPDLOG_ERROR("General S3 error", bucketName);
+        } else if (std::string(keyName).empty()) {
+            SPDLOG_ERROR("S3 error with bucket: {}", bucketName);
+        } else {
+            SPDLOG_ERROR(
+              "S3 error with bucket/key: {}/{}", bucketName, keyName);
+        }
+        SPDLOG_ERROR("S3 error: {}. {}",
+                     err.GetExceptionName().c_str(),
+                     err.GetMessage().c_str());
+        if (response.GetError().GetErrorType() ==
+            Aws::S3::S3Errors::NO_SUCH_KEY) {
+            throw file_not_found_error(
+              fmt::format("S3 key not found: {}/{}", bucketName, "/", keyName));
+        } else {
+            throw std::runtime_error("S3 error");
+        }
     }
+}
 
 std::shared_ptr<AWSCredentialsProvider> getCredentialsProvider()
 {

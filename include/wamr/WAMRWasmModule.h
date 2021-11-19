@@ -1,5 +1,6 @@
 #pragma once
 
+#include <conf/FaasmConfig.h>
 #include <wasm/WasmModule.h>
 #include <wasm_runtime_common.h>
 
@@ -9,7 +10,9 @@
 
 namespace wasm {
 
-std::vector<uint8_t> wamrCodegen(std::vector<uint8_t>& wasmBytes, bool isSgx);
+std::vector<uint8_t> wamrCodegen(std::vector<uint8_t>& wasmBytes,
+                                 conf::CodegenTargetSpec target,
+                                 bool isSgx);
 
 class WAMRWasmModule final : public WasmModule
 {

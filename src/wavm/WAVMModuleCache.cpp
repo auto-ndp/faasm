@@ -41,7 +41,12 @@ wasm::WAVMWasmModule& WAVMModuleCache::getCachedModule(faabric::Message& msg)
 
             // Instantiate the base module
             wasm::WAVMWasmModule& module = cachedModuleMap[key];
-            module.bindToFunction(msg, false);
+            try {
+                module.bindToFunction(msg, false);
+            } catch (...) {
+                cachedModuleMap.erase(key);
+                throw;
+            }
         }
     }
 

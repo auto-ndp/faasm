@@ -25,6 +25,7 @@ class MachineCodeGenerator
     std::vector<uint8_t> hashBytes(const std::vector<uint8_t>& bytes);
 
     std::vector<uint8_t> doCodegen(std::vector<uint8_t>& bytes,
+                                   conf::CodegenTargetSpec target,
                                    const std::string& fileName,
                                    bool isSgx = false);
 };

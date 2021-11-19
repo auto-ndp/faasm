@@ -1,3 +1,4 @@
+#include <conf/FaasmConfig.h>
 #include <faabric/util/files.h>
 #include <faabric/util/logging.h>
 #include <wamr/WAMRWasmModule.h>
@@ -10,7 +11,9 @@
 #include <wasm_export.h>
 
 namespace wasm {
-std::vector<uint8_t> wamrCodegen(std::vector<uint8_t>& wasmBytes, bool isSgx)
+std::vector<uint8_t> wamrCodegen(std::vector<uint8_t>& wasmBytes,
+                                 conf::CodegenTargetSpec target,
+                                 bool isSgx)
 {
     // Make sure WAMR is initialised
     WAMRWasmModule::initialiseWAMRGlobally();
@@ -40,6 +43,8 @@ std::vector<uint8_t> wamrCodegen(std::vector<uint8_t>& wasmBytes, bool isSgx)
     option.size_level = 3;
     option.output_format = AOT_FORMAT_FILE;
     option.bounds_checks = 2;
+    option.target_arch = target.arch.data();
+    option.target_cpu = target.cpu.data();
 
     if (isSgx) {
         option.size_level = 1;

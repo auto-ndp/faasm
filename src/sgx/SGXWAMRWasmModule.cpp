@@ -57,7 +57,7 @@ void SGXWAMRWasmModule::doBindToFunction(faabric::Message& msg, bool cache)
     storage::FileLoader& functionLoader = storage::getFileLoader();
 
     std::vector<uint8_t> wasmBytes =
-      functionLoader.loadFunctionWamrAotFile(msg);
+      functionLoader.loadFunctionWamrAotFile(msg, conf::nativeCodegenTarget());
 
     // Load the wasm module
     // Note - loading and instantiating happen in the same ecall
