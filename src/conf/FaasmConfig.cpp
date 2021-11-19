@@ -1,11 +1,17 @@
+#include <absl/strings/str_split.h>
+#include <absl/strings/string_view.h>
 #include <conf/FaasmConfig.h>
 #include <faabric/util/environment.h>
 #include <faabric/util/logging.h>
 #include <faabric/util/timing.h>
 #include <mimalloc.h>
+
+#include <algorithm>
 #include <new>
+#include <string_view>
 
 using namespace faabric::util;
+using namespace std::string_view_literals;
 
 namespace conf {
 FaasmConfig& getFaasmConfig()
@@ -31,6 +37,23 @@ void FaasmConfig::initialise()
     captureStdout = getEnvVar("CAPTURE_STDOUT", "off");
 
     wasmVm = getEnvVar("WASM_VM", "wavm");
+    std::string rawCodegenTargets = getEnvVar("CODEGEN_TARGETS", "");
+    codegenTargets.clear();
+    if (!rawCodegenTargets.empty()) {
+        for (std::string_view pairStr :
+             absl::StrSplit(rawCodegenTargets, ';', absl::SkipEmpty())) {
+            auto splitPos = pairStr.find_first_of(':');
+            if (splitPos == std::string_view::npos) {
+                throw std::runtime_error(
+                  "Invalid format for CODEGEN_TARGETS, expected format: "
+                  "arch:cpu;x86_64:skylake;aarch64:cortex-a53;aarch64:"
+                  "thunderx2t99");
+            }
+            codegenTargets.emplace_back((CodegenTargetSpec){
+              .arch = std::string(pairStr.substr(0, splitPos)),
+              .cpu = std::string(pairStr.substr(splitPos + 1)) });
+        }
+    }
     chainedCallTimeout = this->getIntParam("CHAINED_CALL_TIMEOUT", "300000");
 
     std::string faasmLocalDir =
@@ -72,7 +95,13 @@ void FaasmConfig::print()
     SPDLOG_INFO("Chained call timeout: {}", chainedCallTimeout);
     SPDLOG_INFO("Python preload:       {}", pythonPreload);
     SPDLOG_INFO("Wasm VM:              {}", wasmVm);
-
+    if (codegenTargets.empty()) {
+        SPDLOG_INFO("Codegen targets:      Native");
+    } else {
+        for (const auto& cgt : codegenTargets) {
+            SPDLOG_INFO("Codegen target:       {}:{}", cgt.arch, cgt.cpu);
+        }
+    }
     SPDLOG_INFO("--- STORAGE ---");
     SPDLOG_INFO("Function dir:         {}", functionDir);
     SPDLOG_INFO("Object file dir:      {}", objectFileDir);

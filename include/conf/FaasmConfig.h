@@ -1,8 +1,15 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 namespace conf {
+
+struct CodegenTargetSpec {
+    std::string arch;
+    std::string cpu;
+};
+
 class FaasmConfig
 {
   public:
@@ -18,6 +25,9 @@ class FaasmConfig
     int chainedCallTimeout;
 
     std::string wasmVm;
+
+    // arch:cpu;arch:cpu;arch:cpu...
+    std::vector<CodegenTargetSpec> codegenTargets;
 
     std::string functionDir;
     std::string objectFileDir;

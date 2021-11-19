@@ -41,6 +41,7 @@ services:
       - /sys/kernel/debug:/sys/kernel/debug
       - /sys/kernel/debug/tracing:/sys/kernel/debug/tracing
     environment:
+      - CODEGEN_TARGETS=x86_64:skylake;aarch64:thunderx2t99
       - DELTA_SNAPSHOT_ENCODING=pages=64
       - LOG_LEVEL=debug
       - PYTHON_CODEGEN=${PYTHON_CODEGEN:-off}
