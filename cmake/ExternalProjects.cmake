@@ -175,6 +175,7 @@ target_link_libraries(faabric_common_dependencies INTERFACE
     absl::flat_hash_set
     absl::flat_hash_map
     absl::debugging
+    absl::strings
     Boost::Boost
     Boost::filesystem
     Boost::system
