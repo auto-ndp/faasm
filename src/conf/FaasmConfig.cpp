@@ -23,7 +23,7 @@ CodegenTargetSpec determineNativeCodegenTarget()
 #if (BOOST_ARCH_X86_64 == 1)
     ts.arch = "x86_64";
     ts.cpu = "skylake";
-#elif (BOOST_ARCH_ARM == 1)
+#elif (BOOST_ARCH_ARM >= BOOST_VERSION_NUMBER(8,0,0))
     ts.arch = "aarch64";
     ts.cpu = "cortex-a53";
 #else
