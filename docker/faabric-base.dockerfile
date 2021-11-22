@@ -2,7 +2,7 @@ FROM debian:bookworm-20211115
 # Debian "12" testing
 
 RUN apt-get update
-RUN apt-get upgrade
+RUN apt-get upgrade -y
 RUN apt-get install -y software-properties-common gpg wget curl
 
 RUN apt-get install -y \
