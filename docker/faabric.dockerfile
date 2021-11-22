@@ -1,4 +1,4 @@
-FROM kubasz51/faasm-faabric-base:0.1.6
+FROM kubasz51/faasm-faabric-base:0.3.0
 ARG FAABRIC_VERSION
 
 # faabic-base image is not re-built often, so tag may be behind
