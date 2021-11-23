@@ -59,7 +59,7 @@ zmq::socket_t socketFactory(zmq::socket_type socketType,
                             const std::string& address)
 {
     ZoneScopedNS("MessageEndpoint::setUpSocket", 6);
-    ZoneValue(socketPort);
+    ZoneText(address.data(), address.size());
     zmq::socket_t socket;
 
     // Create the socket
