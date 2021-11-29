@@ -4,6 +4,7 @@
 #include <fcntl.h>
 #include <linux/userfaultfd.h>
 #include <optional>
+#include <stdexcept>
 #include <sys/ioctl.h>
 #include <sys/syscall.h>
 #include <unistd.h>
@@ -44,7 +45,6 @@ void resetDirtyTracking();
 
 std::vector<int> getDirtyPageNumbers(const uint8_t* ptr, int nPages);
 
-/*
 struct UserfaultFd
 {
     int fd = -1;
@@ -123,6 +123,5 @@ struct UserfaultFd
     // Thread-safe
     void wakePages(size_t startPtr, size_t length);
 };
-*/
 
 }

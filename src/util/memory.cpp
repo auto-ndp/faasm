@@ -152,7 +152,7 @@ std::vector<int> getDirtyPageNumbers(const uint8_t* ptr, int nPages)
 
     return pageNumbers;
 }
-/*
+
 // UserfaultFd wrapper
 std::pair<int, uffdio_api> UserfaultFd::release()
 {
@@ -337,5 +337,5 @@ retry:
         throw std::runtime_error("Couldn't wake an address range through UFFD");
     }
 }
-*/
+
 }
