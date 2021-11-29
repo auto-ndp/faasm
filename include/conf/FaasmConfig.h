@@ -12,11 +12,17 @@ struct CodegenTargetSpec {
 
 CodegenTargetSpec nativeCodegenTarget();
 
+enum class VirtualMemoryArenaMode {
+    Default,
+    Uffd
+};
+
 class FaasmConfig
 {
   public:
     std::string hostType;
 
+    VirtualMemoryArenaMode vmArenaMode;
     std::string cgroupMode;
     std::string netNsMode;
     int maxNetNs;

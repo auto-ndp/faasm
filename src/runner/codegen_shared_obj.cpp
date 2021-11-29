@@ -8,6 +8,8 @@
 #include <codegen/MachineCodeGenerator.h>
 #include <storage/S3Wrapper.h>
 
+#include "runner_common.h"
+
 using namespace boost::filesystem;
 
 void codegenForDirectory(std::string& inputPath)
@@ -69,6 +71,7 @@ void codegenForDirectory(std::string& inputPath)
 int main(int argc, char* argv[])
 {
     faabric::util::initLogging();
+    runner::commonInit();
     storage::initFaasmS3();
 
     if (argc < 2) {

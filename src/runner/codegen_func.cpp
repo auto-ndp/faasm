@@ -10,6 +10,8 @@
 #include <storage/FileLoader.h>
 #include <storage/S3Wrapper.h>
 
+#include "runner_common.h"
+
 using namespace boost::filesystem;
 
 void codegenForFunc(const std::string& user,
@@ -39,6 +41,7 @@ void codegenForFunc(const std::string& user,
 int main(int argc, char* argv[])
 {
     faabric::util::initLogging();
+    runner::commonInit();
     storage::initFaasmS3();
 
     if (argc == 3) {

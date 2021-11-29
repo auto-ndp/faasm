@@ -11,8 +11,11 @@
 #include <wasm/WasmModule.h>
 #include <wavm/WAVMWasmModule.h>
 
+#include "runner_common.h"
+
 int main(int argc, char* argv[])
 {
+    runner::commonInit();
     storage::initFaasmS3();
     faabric::transport::initGlobalMessageContext();
 

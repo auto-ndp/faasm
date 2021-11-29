@@ -16,6 +16,8 @@ WAVM_DECLARE_INTRINSIC_MODULE(env)
 
 WAVM_DECLARE_INTRINSIC_MODULE(wasi)
 
+void setupWavmHooks();
+
 std::vector<uint8_t> wavmCodegen(std::vector<uint8_t>& wasmBytes,
                                  conf::CodegenTargetSpec target,
                                  const std::string& fileName);

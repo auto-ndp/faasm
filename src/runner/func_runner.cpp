@@ -11,6 +11,8 @@
 #include <faabric/util/logging.h>
 #include <faabric/util/timing.h>
 
+#include "runner_common.h"
+
 int doRunner(int argc, char* argv[])
 {
     faabric::util::initLogging();
@@ -118,6 +120,7 @@ int doRunner(int argc, char* argv[])
 
 int main(int argc, char* argv[])
 {
+    runner::commonInit();
     storage::initFaasmS3();
     faabric::transport::initGlobalMessageContext();
 

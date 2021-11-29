@@ -9,8 +9,11 @@
 #include <faabric/util/config.h>
 #include <faabric/util/logging.h>
 
+#include "runner_common.h"
+
 int main()
 {
+    runner::commonInit();
     storage::initFaasmS3();
     faabric::transport::initGlobalMessageContext();
     faabric::util::initLogging();

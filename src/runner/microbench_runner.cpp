@@ -15,11 +15,14 @@
 
 #include <boost/filesystem.hpp>
 
+#include "runner_common.h"
+
 using namespace faabric::util;
 using namespace runner;
 
 int main(int argc, char* argv[])
 {
+    runner::commonInit();
     storage::initFaasmS3();
     faabric::transport::initGlobalMessageContext();
 

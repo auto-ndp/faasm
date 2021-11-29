@@ -70,6 +70,11 @@ static void instantiateBaseModules()
     PROF_END(BaseWasiModule)
 }
 
+void setupWavmHooks()
+{
+    // TODO
+}
+
 void WAVMWasmModule::clearCaches()
 {
     getIRModuleCache().clear();
