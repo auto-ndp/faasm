@@ -219,3 +219,14 @@ add_subdirectory(src/wavm)
 add_subdirectory(tests/test)
 add_subdirectory(tests/dist)
 add_subdirectory(tests/utils)
+
+add_custom_target(faasm_dev_tools
+    DEPENDS
+        codegen_func
+        codegen_shared_obj
+        func_runner
+        func_sym
+        pool_runner
+        upload
+        tests
+)
