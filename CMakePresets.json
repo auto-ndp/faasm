@@ -1,0 +1,65 @@
+{
+    "version": 3,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 21,
+        "patch": 0
+    },
+    "configurePresets": [
+        {
+            "name": "default",
+            "displayName": "Default Config (Debug)",
+            "description": "Default build using Ninja generator",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/work/debug",
+            "cacheVariables": {
+                "CMAKE_INSTALL_PREFIX": {
+                    "type": "STRING",
+                    "value": "${sourceDir}/work/debuginstall"
+                },
+                "CMAKE_BUILD_TYPE": {
+                    "type": "STRING",
+                    "value": "Debug"
+                },
+                "CMAKE_EXPORT_COMPILE_COMMANDS": {
+                    "type": "BOOL",
+                    "value": true
+                },
+                "BUILD_SHARED_LIBS": {
+                    "type": "BOOL",
+                    "value": false
+                },
+                "CMAKE_CXX_COMPILER": {
+                    "type": "FILEPATH",
+                    "value": "/usr/bin/clang++"
+                },
+                "CMAKE_C_COMPILER": {
+                    "type": "FILEPATH",
+                    "value": "/usr/bin/clang"
+                }
+            },
+            "environment": {},
+            "vendor": {}
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "default",
+            "configurePreset": "default"
+        }
+    ],
+    "testPresets": [
+        {
+            "name": "default",
+            "configurePreset": "default",
+            "output": {
+                "outputOnFailure": true
+            },
+            "execution": {
+                "noTestsAction": "error",
+                "stopOnFailure": true
+            }
+        }
+    ],
+    "vendor": {}
+}
