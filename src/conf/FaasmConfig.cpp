@@ -1,5 +1,4 @@
 #include <absl/strings/str_split.h>
-#include <absl/strings/string_view.h>
 #include <boost/predef.h>
 #include <conf/FaasmConfig.h>
 #include <faabric/util/environment.h>
@@ -31,7 +30,7 @@ CodegenTargetSpec determineNativeCodegenTarget()
 #endif
     const CodegenTargetSpec detectedTs = ts;
     for (const auto& cts : conf.codegenTargets) {
-        if (cts.arch == ts.arch) {
+        if (cts.arch == detectedTs.arch) {
             ts.cpu = cts.cpu;
             break;
         }
@@ -61,6 +60,17 @@ void FaasmConfig::initialise()
 {
     hostType = getEnvVar("HOST_TYPE", "default");
 
+    {
+        auto vmam = getEnvVar("VM_ARENA_MODE", "default");
+        if (vmam.empty() || vmam == "default") {
+            vmArenaMode = VirtualMemoryArenaMode::Default;
+        } else if (vmam == "uffd") {
+            vmArenaMode = VirtualMemoryArenaMode::Uffd;
+        } else {
+            throw std::runtime_error("Invalid VM_ARENA_MODE value");
+        }
+    }
+    vmArenaMode = VirtualMemoryArenaMode::Default;
     cgroupMode = getEnvVar("CGROUP_MODE", "on");
     netNsMode = getEnvVar("NETNS_MODE", "off");
     maxNetNs = this->getIntParam("MAX_NET_NAMESPACES", "100");
@@ -107,7 +117,7 @@ int FaasmConfig::getIntParam(const char* name, const char* defaultValue)
     int value = stoi(faabric::util::getEnvVar(name, defaultValue));
 
     return value;
-};
+}
 
 void FaasmConfig::reset()
 {
@@ -157,12 +167,12 @@ void operator delete(void* p) noexcept
 {
     TraceFree(p);
     mi_free(p);
-};
+}
 void operator delete[](void* p) noexcept
 {
     TraceFree(p);
     mi_free(p);
-};
+}
 
 void* operator new(std::size_t n) noexcept(false)
 {
@@ -197,12 +207,12 @@ void operator delete(void* p, std::size_t n) noexcept
 {
     TraceFree(p);
     mi_free_size(p, n);
-};
+}
 void operator delete[](void* p, std::size_t n) noexcept
 {
     TraceFree(p);
     mi_free_size(p, n);
-};
+}
 
 // #if (__cplusplus > 201402L || defined(__cpp_aligned_new))
 void operator delete(void* p, std::align_val_t al) noexcept
@@ -219,12 +229,12 @@ void operator delete(void* p, std::size_t n, std::align_val_t al) noexcept
 {
     TraceFree(p);
     mi_free_size_aligned(p, n, static_cast<size_t>(al));
-};
+}
 void operator delete[](void* p, std::size_t n, std::align_val_t al) noexcept
 {
     TraceFree(p);
     mi_free_size_aligned(p, n, static_cast<size_t>(al));
-};
+}
 
 void* operator new(std::size_t n, std::align_val_t al) noexcept(false)
 {
