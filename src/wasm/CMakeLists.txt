@@ -1,5 +1,6 @@
 
 faasm_private_lib(wasm
+    UffdMemoryArenaManager.cpp
     WasmEnvironment.cpp
     WasmExecutionContext.cpp
     WasmModule.cpp
