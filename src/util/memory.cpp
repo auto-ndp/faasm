@@ -212,10 +212,10 @@ void UserfaultFd::create(int flags, bool sigbus)
     }
 }
 
-void UserfaultFd::register_address_range(size_t startPtr,
-                                         size_t length,
-                                         bool modeMissing,
-                                         bool modeWriteProtect)
+void UserfaultFd::registerAddressRange(size_t startPtr,
+                                       size_t length,
+                                       bool modeMissing,
+                                       bool modeWriteProtect)
 {
     checkFd();
     uffdio_register r = {};
@@ -241,7 +241,7 @@ void UserfaultFd::register_address_range(size_t startPtr,
     }
 }
 
-void UserfaultFd::unregister_address_range(size_t startPtr, size_t length)
+void UserfaultFd::unregisterAddressRange(size_t startPtr, size_t length)
 {
     checkFd();
     uffdio_range r = {};

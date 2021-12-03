@@ -96,13 +96,13 @@ struct UserfaultFd
 
     // Write-protect mode requires at least Linux 5.7 kernel
     // Thread-safe
-    void register_address_range(size_t startPtr,
-                                size_t length,
-                                bool modeMissing,
-                                bool modeWriteProtect);
+    void registerAddressRange(size_t startPtr,
+                              size_t length,
+                              bool modeMissing,
+                              bool modeWriteProtect);
 
     // Thread-safe
-    void unregister_address_range(size_t startPtr, size_t length);
+    void unregisterAddressRange(size_t startPtr, size_t length);
 
     // Thread-safe
     std::optional<uffd_msg> readEvent();
