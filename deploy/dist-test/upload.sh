@@ -7,6 +7,7 @@ export PROJ_ROOT=${THIS_DIR}/../..
 pushd ${PROJ_ROOT} > /dev/null
 
 export FAASM_BUILD_MOUNT=/build/faasm
+export CONAN_CACHE_MOUNT_SOURCE=$HOME/.conan/
 
 # Make sure upload server is running
 docker-compose \
@@ -24,6 +25,8 @@ docker-compose \
     cpp \
     inv func.user demo \
     func.upload-user demo \
+    func.user mpi \
+    func.upload-user mpi \
     func.user omp \
     func.upload-user omp
 

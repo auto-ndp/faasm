@@ -19,6 +19,7 @@
 #include <faabric/util/snapshot.h>
 #include <faabric/util/timing.h>
 
+#include <conf/FaasmConfig.h>
 #include <storage/SharedFiles.h>
 #include <threads/ThreadState.h>
 #include <wasm/WasmExecutionContext.h>
@@ -191,8 +192,6 @@ void WAVMWasmModule::clone(const WAVMWasmModule& other,
     threadPoolSize = other.threadPoolSize;
     threadStacks = other.threadStacks;
     openMPContexts = std::vector<Runtime::Context*>(threadPoolSize, nullptr);
-
-    mutexes.clear();
 
     // Do not copy over any captured stdout
     stdoutMemFd = 0;
@@ -444,7 +443,6 @@ void WAVMWasmModule::executeWasmFunction(
   WAVM::IR::UntaggedValue& result)
 {
     const IR::FunctionType funcType = Runtime::getFunctionType(func);
-
     Runtime::invokeFunction(ctx, func, funcType, arguments.data(), &result);
 }
 
@@ -1122,6 +1120,10 @@ int32_t WAVMWasmModule::executeOMPThread(int threadPoolIdx,
     SPDLOG_DEBUG("Executing OpenMP thread {} for {}", threadPoolIdx, funcStr);
 
     // Set up function args
+    // NOTE: an OpenMP microtask takes the following arguments:
+    // - The thread ID within its current team
+    // - The number of non-global shared variables it has access to
+    // - A pointer to each of the non-global shared variables
     std::shared_ptr<threads::Level> ompLevel = threads::getCurrentOpenMPLevel();
     int argc = ompLevel->nSharedVarOffsets;
     std::vector<IR::UntaggedValue> invokeArgs = { msg.appidx(), argc };
