@@ -34,6 +34,7 @@ void SystemConfig::initialise()
     // Scheduling
     noScheduler = this->getSystemConfIntParam("NO_SCHEDULER", "0");
     overrideCpuCount = this->getSystemConfIntParam("OVERRIDE_CPU_COUNT", "0");
+    noTopologyHints = getEnvVar("NO_TOPOLOGY_HINTS", "off");
     isStorageNode = this->getSystemConfIntParam("IS_STORAGE_NODE", "0");
 
     // Worker-related timeouts (all in seconds)
@@ -104,6 +105,7 @@ void SystemConfig::print()
     SPDLOG_INFO("--- Scheduling ---");
     SPDLOG_INFO("NO_SCHEDULER               {}", noScheduler);
     SPDLOG_INFO("OVERRIDE_CPU_COUNT         {}", overrideCpuCount);
+    SPDLOG_INFO("NO_TOPOLOGY_HINTS         {}", noTopologyHints);
     SPDLOG_INFO("IS_STORAGE_NODE            {}", isStorageNode);
 
     SPDLOG_INFO("--- Timeouts ---");

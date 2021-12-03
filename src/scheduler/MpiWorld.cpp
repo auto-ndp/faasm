@@ -208,7 +208,10 @@ void MpiWorld::create(faabric::Message& call, int newId, int newSize)
     std::vector<std::string> executedAt;
     if (size > 1) {
         // Send the init messages (note that message i corresponds to rank i+1)
-        faabric::util::SchedulingDecision decision = sch.callFunctions(req);
+        // By default, we use the NEVER_ALONE policy for MPI executions to
+        // minimise cross-host messaging
+        faabric::util::SchedulingDecision decision = sch.callFunctions(
+          req, faabric::util::SchedulingTopologyHint::NEVER_ALONE);
         executedAt = decision.hosts;
     }
     assert(executedAt.size() == size - 1);
@@ -300,7 +303,6 @@ void MpiWorld::initialiseFromMsg(faabric::Message& msg)
     user = msg.user();
     function = msg.function();
     size = msg.mpiworldsize();
-    thisRankMsg = &msg;
 
     // Block until we receive
     faabric::MpiHostsToRanksMessage hostRankMsg = recvMpiHostRankMsg();
@@ -322,6 +324,11 @@ void MpiWorld::initialiseFromMsg(faabric::Message& msg)
 
     // Initialise the memory queues for message reception
     initLocalQueues();
+}
+
+void MpiWorld::setMsgForRank(faabric::Message& msg)
+{
+    thisRankMsg = &msg;
 }
 
 std::string MpiWorld::getHostForRank(int rank)
@@ -586,8 +593,15 @@ void MpiWorld::send(int sendRank,
     if (thisRankMsg != nullptr && thisRankMsg->recordexecgraph()) {
         faabric::util::exec_graph::incrementCounter(
           *thisRankMsg,
-          faabric::util::exec_graph::mpiMsgCountPrefix +
-            std::to_string(recvRank));
+          fmt::format("{}-{}", MPI_MSG_COUNT_PREFIX, std::to_string(recvRank)));
+
+        // Work out the message type breakdown
+        faabric::util::exec_graph::incrementCounter(
+          *thisRankMsg,
+          fmt::format("{}-{}-{}",
+                      MPI_MSGTYPE_COUNT_PREFIX,
+                      std::to_string(messageType),
+                      std::to_string(recvRank)));
     }
 }
 
@@ -955,24 +969,23 @@ void MpiWorld::reduce(int sendRank,
             memcpy(recvBuffer, sendBuffer, bufferSize);
         }
 
-        uint8_t* rankData = new uint8_t[bufferSize];
+        auto rankData = std::make_unique<uint8_t[]>(bufferSize);
         for (int r = 0; r < size; r++) {
             // Work out the data for this rank
-            memset(rankData, 0, bufferSize);
+            memset(rankData.get(), 0, bufferSize);
             if (r != recvRank) {
                 recv(r,
                      recvRank,
-                     rankData,
+                     rankData.get(),
                      datatype,
                      count,
                      nullptr,
                      faabric::MPIMessage::REDUCE);
 
-                op_reduce(operation, datatype, count, rankData, recvBuffer);
+                op_reduce(
+                  operation, datatype, count, rankData.get(), recvBuffer);
             }
         }
-
-        delete[] rankData;
 
     } else {
         // Do the sending
@@ -1141,17 +1154,16 @@ void MpiWorld::scan(int rank,
 
     if (rank > 0) {
         // Receive the current accumulated value
-        auto currentAcc = new uint8_t[bufferSize];
+        auto currentAcc = std::make_unique<uint8_t[]>(bufferSize);
         recv(rank - 1,
              rank,
-             currentAcc,
+             currentAcc.get(),
              datatype,
              count,
              nullptr,
              faabric::MPIMessage::SCAN);
         // Reduce with our own value
-        op_reduce(operation, datatype, count, currentAcc, recvBuffer);
-        delete[] currentAcc;
+        op_reduce(operation, datatype, count, currentAcc.get(), recvBuffer);
     }
 
     // If not the last process, send to the next one

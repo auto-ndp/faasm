@@ -7,8 +7,10 @@
 #include <faabric/util/network.h>
 #include <faabric/util/timing.h>
 
+#include <atomic>
 #include <csignal>
 #include <cstdlib>
+#include <memory>
 
 namespace faabric::transport {
 
@@ -154,10 +156,12 @@ void MessageEndpointServerHandler::start(
                         }
 
                         // Wait on the request latch if necessary
-                        if (server->requestLatch != nullptr) {
+                        auto requestLatch = std::atomic_load_explicit(
+                          &server->requestLatch, std::memory_order_acquire);
+                        if (requestLatch != nullptr) {
                             SPDLOG_TRACE(
                               "Server thread waiting on worker latch");
-                            server->requestLatch->wait();
+                            requestLatch->wait();
                         }
                     }
                 }
@@ -167,10 +171,12 @@ void MessageEndpointServerHandler::start(
 
                 // Just before the thread dies, check if there's something
                 // waiting on the shutdown latch
-                if (server->shutdownLatch != nullptr) {
+                auto shutdownLatch = std::atomic_load_explicit(
+                  &server->shutdownLatch, std::memory_order_acquire);
+                if (shutdownLatch != nullptr) {
                     SPDLOG_TRACE("Server thread {} waiting on shutdown latch",
                                  i);
-                    server->shutdownLatch->wait();
+                    shutdownLatch->wait();
                 }
             });
         }
@@ -273,12 +279,18 @@ void MessageEndpointServer::stop()
                      nThreads,
                      asyncPort);
 
-        shutdownLatch = faabric::util::Latch::create(2);
+        std::atomic_store_explicit(&shutdownLatch,
+                                   faabric::util::Latch::create(2),
+                                   std::memory_order_release);
 
         asyncShutdownSender.send(shutdownHeader.data(), shutdownHeader.size());
 
-        shutdownLatch->wait();
-        shutdownLatch = nullptr;
+        std::atomic_load_explicit(&shutdownLatch, std::memory_order_acquire)
+          ->wait();
+        std::atomic_store_explicit(
+          &shutdownLatch,
+          std::shared_ptr<faabric::util::Latch>(nullptr),
+          std::memory_order_release);
     }
 
     for (int i = 0; i < nThreads; i++) {
@@ -287,13 +299,19 @@ void MessageEndpointServer::stop()
                      nThreads,
                      syncPort);
 
-        shutdownLatch = faabric::util::Latch::create(2);
+        std::atomic_store_explicit(&shutdownLatch,
+                                   faabric::util::Latch::create(2),
+                                   std::memory_order_release);
 
         syncShutdownSender.sendAwaitResponse(shutdownHeader.data(),
                                              shutdownHeader.size());
 
-        shutdownLatch->wait();
-        shutdownLatch = nullptr;
+        std::atomic_load_explicit(&shutdownLatch, std::memory_order_acquire)
+          ->wait();
+        std::atomic_store_explicit(
+          &shutdownLatch,
+          std::shared_ptr<faabric::util::Latch>(nullptr),
+          std::memory_order_release);
     }
 
     // Join the handlers
@@ -310,16 +328,20 @@ void MessageEndpointServer::onWorkerStop()
 
 void MessageEndpointServer::setRequestLatch()
 {
-    requestLatch = faabric::util::Latch::create(2);
+    std::atomic_store_explicit(&requestLatch,
+                               faabric::util::Latch::create(2),
+                               std::memory_order_release);
 }
 
 void MessageEndpointServer::awaitRequestLatch()
 {
     SPDLOG_TRACE("Waiting on worker latch for port {}", asyncPort);
-    requestLatch->wait();
+    std::atomic_load_explicit(&requestLatch, std::memory_order_acquire)->wait();
 
     SPDLOG_TRACE("Finished worker latch for port {}", asyncPort);
-    requestLatch = nullptr;
+    std::atomic_store_explicit(&requestLatch,
+                               std::shared_ptr<faabric::util::Latch>(nullptr),
+                               std::memory_order_release);
 }
 
 int MessageEndpointServer::getNThreads()

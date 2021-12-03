@@ -93,13 +93,12 @@ class Executor
     uint32_t threadPoolSize = 0;
 
   private:
-    std::string lastSnapshot;
-
     std::atomic<bool> claimed = false;
 
     std::mutex threadsMutex;
     std::vector<std::shared_ptr<std::thread>> threadPoolThreads;
     std::vector<std::shared_ptr<std::thread>> deadThreads;
+    std::set<int> availablePoolThreads;
 
     std::shared_mutex resetMutex;
     std::condition_variable_any resetCondvar;
@@ -145,7 +144,13 @@ class Scheduler
 
     faabric::util::SchedulingDecision callFunctions(
       std::shared_ptr<faabric::BatchExecuteRequest> req,
-      bool forceLocal = false,
+      faabric::util::SchedulingTopologyHint =
+        faabric::util::SchedulingTopologyHint::NORMAL,
+      faabric::Message* caller = nullptr);
+
+    faabric::util::SchedulingDecision callFunctions(
+      std::shared_ptr<faabric::BatchExecuteRequest> req,
+      faabric::util::SchedulingDecision& hint,
       faabric::Message* caller = nullptr);
 
     void reset();
@@ -162,7 +167,8 @@ class Scheduler
     int getFunctionRegisteredHostCount(const faabric::Message& msg);
 
     std::set<std::string> getFunctionRegisteredHosts(
-      const faabric::Message& msg);
+      const faabric::Message& msg,
+      bool acquireLock = true);
 
     void broadcastFlush();
 
@@ -269,6 +275,9 @@ class Scheduler
 
     std::unordered_map<uint32_t, std::shared_ptr<MessageLocalResult>>
       localResults;
+
+    std::unordered_map<std::string, std::set<std::string>> pushedSnapshotsMap;
+
     std::mutex localResultsMutex;
 
     // ---- Clients ----
@@ -291,18 +300,20 @@ class Scheduler
 
     std::unordered_map<std::string, std::set<std::string>> registeredHosts;
 
+    faabric::util::SchedulingDecision makeSchedulingDecision(
+      std::shared_ptr<faabric::BatchExecuteRequest> req,
+      faabric::util::SchedulingTopologyHint topologyHint);
+
+    faabric::util::SchedulingDecision doCallFunctions(
+      std::shared_ptr<faabric::BatchExecuteRequest> req,
+      faabric::util::SchedulingDecision& decision,
+      faabric::Message* caller,
+      faabric::util::FullLock& lock);
+
     std::shared_ptr<Executor> claimExecutor(faabric::Message& msg);
 
     std::vector<std::string> getUnregisteredHosts(const std::string& funcStr,
                                                   bool noCache = false);
-
-    int scheduleFunctionsOnHost(
-      const std::string& host,
-      std::shared_ptr<faabric::BatchExecuteRequest> req,
-      faabric::util::SchedulingDecision& decision,
-      int offset,
-      faabric::util::SnapshotData* snapshot,
-      bool forceAll = false);
 
     // ---- Accounting and debugging ----
     std::vector<faabric::Message> recordedMessagesAll;

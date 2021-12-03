@@ -201,8 +201,10 @@ std::string messageToJson(const faabric::Message& msg)
             }
 
             std::string out = ss.str();
+            // As out is a temporary, pass the allocator to Value() to make a
+            // copy
             d.AddMember(
-              "exec_graph_detail", Value(out.c_str(), out.size()).Move(), a);
+              "exec_graph_detail", Value(out.c_str(), out.size(), a).Move(), a);
         }
 
         if (msg.intexecgraphdetails_size() > 0) {
@@ -218,8 +220,10 @@ std::string messageToJson(const faabric::Message& msg)
             }
 
             std::string out = ss.str();
+            // As out is a temporary, pass the allocator to Value() to make a
+            // copy
             d.AddMember("int_exec_graph_detail",
-                        Value(out.c_str(), out.size()).Move(),
+                        Value(out.c_str(), out.size(), a).Move(),
                         a);
         }
     }
