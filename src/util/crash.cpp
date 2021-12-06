@@ -9,9 +9,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string>
-#include <unistd.h>
-#include <sys/signal.h>
 #include <sys/mman.h>
+#include <sys/signal.h>
+#include <unistd.h>
 
 #include <absl/debugging/stacktrace.h>
 #include <absl/debugging/symbolize.h>
@@ -20,36 +20,43 @@ const std::string_view ABORT_MSG = "Caught stack backtrace:\n";
 constexpr int TEST_SIGNAL = 12341234;
 
 // Must be async-signal-safe - don't call allocating functions
-void crashHandler(int sig, siginfo_t *siginfo, void *contextR) noexcept
+void crashHandler(int sig, siginfo_t* siginfo, void* contextR) noexcept
 {
     ucontext_t* context = static_cast<ucontext_t*>(contextR);
     UNUSED(context);
     UNUSED(siginfo);
-    constexpr size_t NUM_STACKS = 32;
-    std::array<void*, NUM_STACKS> stackPtrs;
-    std::array<char, 1024> symbolName;
-    int droppedFrames = 0;
-    size_t filledStacks = absl::GetStackTraceWithContext(stackPtrs.data(), stackPtrs.size(), 0, contextR, &droppedFrames);
     if (sig != TEST_SIGNAL) {
         write(STDERR_FILENO, ABORT_MSG.data(), ABORT_MSG.size());
     }
-
-    backtrace_symbols_fd(stackPtrs.data(),
-                         std::min(filledStacks, stackPtrs.size()),
-                         STDERR_FILENO);
-    for (int entry = 0; entry < filledStacks; entry++) {
-        bool hasSymbol = absl::Symbolize(stackPtrs[entry], symbolName.data(), symbolName.size());
-        fprintf(stderr, "[%2d] 0x%016zx: %s\n", entry, (size_t)(stackPtrs[entry]), hasSymbol ? symbolName.data() : "<unknown symbol>");
-    }
+    faabric::util::printStackTrace();
     if (sig != TEST_SIGNAL) {
         signal(sig, SIG_DFL);
         raise(sig);
         exit(1);
     }
-    return;
 }
 
 namespace faabric::util {
+
+void printStackTrace(void* contextR)
+{
+    constexpr size_t NUM_STACKS = 32;
+    std::array<void*, NUM_STACKS> stackPtrs;
+    std::array<char, 1024> symbolName;
+    int droppedFrames = 0;
+    size_t filledStacks = absl::GetStackTraceWithContext(
+      stackPtrs.data(), stackPtrs.size(), 0, contextR, &droppedFrames);
+
+    for (int entry = 0; entry < filledStacks; entry++) {
+        bool hasSymbol = absl::Symbolize(
+          stackPtrs[entry], symbolName.data(), symbolName.size());
+        fprintf(stderr,
+                "[%2d] 0x%016zx: %s\n",
+                entry,
+                (size_t)(stackPtrs[entry]),
+                hasSymbol ? symbolName.data() : "<unknown symbol>");
+    }
+}
 
 void setUpCrashHandler()
 {
@@ -62,15 +69,21 @@ void setUpCrashHandler()
     crashHandler(TEST_SIGNAL, &dummy_siginfo, nullptr);
     SPDLOG_INFO("Installing crash handler");
     constexpr size_t sigstack_size = 16384;
-    void* sigstack = mmap(nullptr, sigstack_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+    void* sigstack = mmap(nullptr,
+                          sigstack_size,
+                          PROT_READ | PROT_WRITE,
+                          MAP_ANONYMOUS | MAP_PRIVATE,
+                          -1,
+                          0);
     if (sigstack == MAP_FAILED || sigstack == nullptr) {
-        throw std::runtime_error("Couldn't allocate memory for signal alternate stack");
+        throw std::runtime_error(
+          "Couldn't allocate memory for signal alternate stack");
     }
     stack_t sigstk = {};
     sigstk.ss_flags = 0;
     sigstk.ss_size = sigstack_size;
     sigstk.ss_sp = sigstack;
-    if(sigaltstack(&sigstk, nullptr) < 0) {
+    if (sigaltstack(&sigstk, nullptr) < 0) {
         throw std::runtime_error("Couldn't install signal alternate stack");
     }
 
