@@ -11,6 +11,12 @@
 
 #include <absl/container/btree_set.h>
 
+#include <fcntl.h>
+#include <signal.h>
+#include <sys/ioctl.h>
+#include <sys/syscall.h>
+#include <unistd.h>
+
 namespace uffd {
 
 struct UffdMemoryRange
@@ -98,6 +104,9 @@ class UffdMemoryArenaManager final
 
     // Remove and free a UFFD-backed range completely
     void freeRange(std::byte* start);
+
+    // The signal handler
+    friend void sigbusHandler(int code, siginfo_t* siginfo, void* contextR);
 
   private:
     std::shared_mutex mx;

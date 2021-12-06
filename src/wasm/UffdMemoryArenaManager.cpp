@@ -1,5 +1,6 @@
 #include "UffdMemoryArenaManager.h"
 
+#include <faabric/util/crash.h>
 #include <faabric/util/files.h>
 #include <faabric/util/timing.h>
 
@@ -71,10 +72,57 @@ UffdMemoryArenaManager& UffdMemoryArenaManager::instance()
     return umam;
 }
 
+void sigbusHandler(int code, siginfo_t* siginfo, void* contextR)
+{
+    constexpr size_t FAULT_PAGE_SIZE = 4096;
+    if (code != SIGBUS) [[unlikely]] {
+        std::terminate();
+    }
+    std::byte* faultAddr = (std::byte*)siginfo->si_addr;
+    std::byte* faultPage =
+      (std::byte*)((size_t)faultAddr & ~(FAULT_PAGE_SIZE - 1));
+    UffdMemoryArenaManager& umam = UffdMemoryArenaManager::instance();
+    faabric::util::SharedLock lock{ umam.mx };
+    auto range = umam.ranges.find(faultAddr);
+    if (range == umam.ranges.end()) [[unlikely]] {
+        lock.unlock();
+        SPDLOG_CRITICAL("SIGBUS invalid access of memory at pointer {}",
+                        (void*)(faultAddr));
+        faabric::util::printStackTrace(contextR);
+        ::exit(1);
+    }
+    if (!range->pointerInValidRange(faultAddr)) [[unlikely]] {
+        lock.unlock();
+        SPDLOG_ERROR("UFFD out of bounds access of memory at pointer {}",
+                     (void*)(faultAddr));
+        faabric::util::printStackTrace(contextR);
+        ::pthread_kill(::pthread_self(), SIGSEGV);
+        return;
+    }
+    size_t offset = faultPage - range->mapStart;
+    auto initSource = range->initSource;
+    lock.unlock();
+    if (offset < initSource.size()) {
+        umam.uffd.copyPages(size_t(faultPage),
+                            FAULT_PAGE_SIZE,
+                            size_t(initSource.data() + offset));
+    } else {
+        umam.uffd.zeroPages(size_t(faultPage), FAULT_PAGE_SIZE);
+    }
+}
+
 UffdMemoryArenaManager::UffdMemoryArenaManager()
 {
     faabric::util::FullLock lock{ mx };
     uffd.create(O_CLOEXEC, true);
+    struct sigaction action;
+    action.sa_flags = SA_RESTART | SA_SIGINFO;
+    action.sa_handler = nullptr;
+    action.sa_sigaction = &sigbusHandler;
+    sigemptyset(&action.sa_mask);
+    checkErrno(sigaction(SIGBUS, &action, nullptr),
+               "Couldn't register UFFD SIGBUS handler");
+    SPDLOG_INFO("Registered UFFD SIGBUS handler");
 }
 
 std::byte* UffdMemoryArenaManager::allocateRange(size_t pages,
