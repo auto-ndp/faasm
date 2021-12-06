@@ -20,17 +20,17 @@ option(FAASM_SGX_ATTESTATION "Turn on attestation" OFF)
 option(FAASM_SGX_XRA "Turn on support for XRA" OFF)
 
 # Enable colorized compiler output
-if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     add_compile_options(-fdiagnostics-color=always)
-elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
     add_compile_options(-fcolor-diagnostics)
-endif()
+endif ()
 
 # Top-level CMake config
-if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+if (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
     add_compile_options(-march=skylake -mtune=skylake)
-endif()
-set(CMAKE_CXX_FLAGS "-Wall")
+endif ()
+set(CMAKE_CXX_FLAGS "-fwrapv -Wall -Wthread-safety -Werror=thread-safety")
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -70,20 +70,20 @@ if (SGX_FOUND)
     # Set up SGX definitions
     add_definitions(-DFAASM_SGX=1)
 
-    if(FAASM_SGX_SIM_MODE)
+    if (FAASM_SGX_SIM_MODE)
         add_definitions(-DSGX_SIM_MODE=1)
         set(Protobuf_USE_STATIC_LIBS 0)
-    else()
-	    add_definitions(-DSGX_SIM_MODE=0)
+    else ()
+        add_definitions(-DSGX_SIM_MODE=0)
         # Must link protobuf statically because SGX LE probably uses an older version
         set(Protobuf_USE_STATIC_LIBS 1)
-    endif()
+    endif ()
 
-    if(FAASM_SGX_ATTESTATION)
+    if (FAASM_SGX_ATTESTATION)
         add_definitions(-DFAASM_SGX_ATTESTATION=1)
-    else()
+    else ()
         add_definitions(-DFAASM_SGX_ATTESTATION=0)
-    endif()
+    endif ()
 else ()
     add_definitions(-DFAASM_SGX=0)
 endif ()
@@ -92,13 +92,13 @@ endif ()
 # WAMR configuration
 # ----------------------------------------
 
-if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+if (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
     add_definitions(-DBUILD_TARGET_X86_64)
-elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
+elseif (CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
     add_definitions(-DBUILD_TARGET_AARCH64)
-else()
+else ()
     message(FATAL_ERROR "Unsupported CPU architecture '${CMAKE_SYSTEM_PROCESSOR}'")
-endif()
+endif ()
 enable_language(ASM)
 add_definitions(-DWAMR_EXECUTION_MODE_INTERP=0)
 
@@ -161,13 +161,13 @@ message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 include_directories(${LLVM_INCLUDE_DIRS})
 add_definitions(${LLVM_DEFINITIONS})
 
-if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+if (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
     set(WAMR_BUILD_TARGET X86_64)
-elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
+elseif (CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
     set(WAMR_BUILD_TARGET AARCH64)
-else()
+else ()
     message(FATAL_ERROR "Unsupported CPU architecture '${CMAKE_SYSTEM_PROCESSOR}'")
-endif()
+endif ()
 set(WAMR_NO_LLVM_IMPORT ON)
 
 # Third party deps
@@ -180,19 +180,19 @@ set(WAMR_IWASM_DIR ${WAMR_ROOT_DIR}/core/iwasm)
 add_library(faasm_common_deps INTERFACE)
 add_library(faasm::common_deps ALIAS faasm_common_deps)
 target_link_libraries(faasm_common_deps INTERFACE
-    faabric::faabric
-    mimalloc::mimalloc
-)
+        faabric::faabric
+        mimalloc::mimalloc
+        )
 target_include_directories(faasm_common_deps INTERFACE
-    # WAMR includes
-    ${WAMR_SHARED_DIR}/include
-    ${WAMR_SHARED_DIR}/utils
-    ${WAMR_IWASM_DIR}/include
-    ${WAMR_IWASM_DIR}/common
-    # Faasm
-    ${FAASM_INCLUDE_DIR}
-    ${FAASM_PYTHON_LIB_DIR}
-)
+        # WAMR includes
+        ${WAMR_SHARED_DIR}/include
+        ${WAMR_SHARED_DIR}/utils
+        ${WAMR_IWASM_DIR}/include
+        ${WAMR_IWASM_DIR}/common
+        # Faasm
+        ${FAASM_INCLUDE_DIR}
+        ${FAASM_PYTHON_LIB_DIR}
+        )
 
 # Faasm SGX support
 if (SGX_FOUND)
@@ -221,7 +221,7 @@ add_subdirectory(tests/dist)
 add_subdirectory(tests/utils)
 
 add_custom_target(faasm_dev_tools
-    DEPENDS
+        DEPENDS
         codegen_func
         codegen_shared_obj
         func_runner
@@ -229,4 +229,4 @@ add_custom_target(faasm_dev_tools
         pool_runner
         upload
         tests
-)
+        )
