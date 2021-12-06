@@ -1,5 +1,6 @@
 #include "UffdMemoryArenaManager.h"
 
+#include <faabric/util/files.h>
 #include <faabric/util/timing.h>
 
 #include <stdexcept>
@@ -7,21 +8,15 @@
 
 namespace uffd {
 
-void check_errno(int ec, const char* msg)
-{
-    if (ec < 0) {
-        perror(msg);
-        throw std::system_error(errno, std::generic_category(), msg);
-    }
-}
+using faabric::util::checkErrno;
 
 UffdMemoryRange::~UffdMemoryRange() noexcept
 {
     if (this->mapStart != nullptr && this->mapBytes > 0) {
         ZoneScopedN("UffdMemoryRange::munmap");
         TracyFreeNS(this->mapStart, 6, "UFFD-Virtual");
-        check_errno(munmap(mapStart, mapBytes),
-                    "Warning: error unmapping UffdMemoryRange");
+        checkErrno(munmap(mapStart, mapBytes),
+                   "Warning: error unmapping UffdMemoryRange");
         this->mapStart = nullptr;
         this->mapBytes = 0;
         this->validBytes = 0;
@@ -51,18 +46,18 @@ UffdMemoryRange::UffdMemoryRange(size_t pages, size_t alignmentLog2)
 
     const size_t numHeadPaddingBytes = alignedAddress - address;
     if (numHeadPaddingBytes > 0) {
-        check_errno(munmap(unalignedBaseAddress, numHeadPaddingBytes),
-                    "Can't munmap unaligned uffd memory range");
+        checkErrno(munmap(unalignedBaseAddress, numHeadPaddingBytes),
+                   "Can't munmap unaligned uffd memory range");
     }
 
     const size_t numTailPaddingBytes =
       alignmentBytes - (alignedAddress - address);
     if (numTailPaddingBytes > 0) {
-        check_errno(munmap(alignedPtr + numBytes, numTailPaddingBytes),
-                    "Can't munmap unaligned uffd memory range");
+        checkErrno(munmap(alignedPtr + numBytes, numTailPaddingBytes),
+                   "Can't munmap unaligned uffd memory range");
     }
 
-    check_errno(madvise(alignedPtr, numBytes, MADV_HUGEPAGE), "MADV_HUGEPAGE");
+    checkErrno(madvise(alignedPtr, numBytes, MADV_HUGEPAGE), "MADV_HUGEPAGE");
     TracyAllocNS(alignedPtr, numBytes, 6, "UFFD-Virtual");
 
     this->mapStart = alignedPtr;
@@ -116,6 +111,25 @@ void UffdMemoryArenaManager::validateAndResizeRange(std::byte* oldEnd,
     resizeRangeImpl(range, newPages);
 }
 
+void UffdMemoryArenaManager::discardAndResizeRange(std::byte* rangePtr,
+                                                   size_t newPages)
+{
+    faabric::util::SharedLock lock{ mx };
+    auto range = this->ranges.find(rangePtr);
+    if (range == this->ranges.end()) {
+        throw std::runtime_error("Invalid pointer for UFFD range resize");
+    }
+    const size_t oldEndBytes =
+      range->validBytes.load(std::memory_order_acquire);
+    const size_t newBytes = 4096 * newPages;
+    if (!range->pointerInRange(range->mapStart + newBytes)) {
+        throw std::runtime_error("New UFFD range end out of allocated range");
+    }
+    range->validBytes.store(newBytes, std::memory_order_release);
+    checkErrno(madvise((void*)(range->mapStart), oldEndBytes, MADV_DONTNEED),
+               "MADV_DONTNEED");
+}
+
 void UffdMemoryArenaManager::discardRange(std::byte* start)
 {
     faabric::util::SharedLock lock{ mx };
@@ -123,10 +137,10 @@ void UffdMemoryArenaManager::discardRange(std::byte* start)
     if (range == this->ranges.end()) {
         throw std::runtime_error("Invalid pointer for UFFD range discard");
     }
-    check_errno(madvise((void*)(range->mapStart),
-                        range->validBytes.load(std::memory_order_acquire),
-                        MADV_DONTNEED),
-                "MADV_DONTNEED");
+    checkErrno(madvise((void*)(range->mapStart),
+                       range->validBytes.load(std::memory_order_acquire),
+                       MADV_DONTNEED),
+               "MADV_DONTNEED");
 }
 
 void UffdMemoryArenaManager::freeRange(std::byte* start)
@@ -154,10 +168,10 @@ void UffdMemoryArenaManager::resizeRangeImpl(
     }
     range->validBytes.store(newValidBytes, std::memory_order_release);
     if (newValidBytes < oldValidBytes) {
-        check_errno(madvise((void*)(range->mapStart + newValidBytes),
-                            oldValidBytes - newValidBytes,
-                            MADV_DONTNEED),
-                    "MADV_DONTNEED");
+        checkErrno(madvise((void*)(range->mapStart + newValidBytes),
+                           oldValidBytes - newValidBytes,
+                           MADV_DONTNEED),
+                   "MADV_DONTNEED");
     }
 }
 

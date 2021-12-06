@@ -10,6 +10,7 @@
 #include <faabric/util/config.h>
 #include <faabric/util/delta.h>
 #include <faabric/util/environment.h>
+#include <faabric/util/files.h>
 #include <faabric/util/func.h>
 #include <faabric/util/gids.h>
 #include <faabric/util/locks.h>
@@ -18,6 +19,7 @@
 #include <faabric/util/snapshot.h>
 #include <faabric/util/timing.h>
 
+#include "UffdMemoryArenaManager.h"
 #include <boost/filesystem.hpp>
 #include <sstream>
 #include <sys/mman.h>
@@ -183,6 +185,8 @@ void WasmModule::restore(const std::string& snapshotKey)
     faabric::snapshot::SnapshotRegistry& reg =
       faabric::snapshot::getSnapshotRegistry();
 
+    const auto& config = conf::getFaasmConfig();
+
     // Expand memory if necessary
     faabric::util::SnapshotData data = reg.getSnapshot(snapshotKey);
     uint32_t memSize = getCurrentBrk();
@@ -204,7 +208,39 @@ void WasmModule::restore(const std::string& snapshotKey)
     // Map the snapshot into memory
     ZoneValue(data.size);
     uint8_t* memoryBase = getMemoryBase();
-    reg.mapSnapshot(snapshotKey, memoryBase);
+    switch (config.vmArenaMode) {
+        case conf::VirtualMemoryArenaMode::Default: {
+            reg.mapSnapshot(snapshotKey, memoryBase);
+            break;
+        }
+        case conf::VirtualMemoryArenaMode::Uffd: {
+            auto snapshot = reg.getSnapshot(snapshotKey);
+            if (snapshot.fd <= 0) {
+                SPDLOG_ERROR("Attempting to map non-restorable snapshot");
+                throw std::runtime_error("Mapping non-restorable snapshot");
+            }
+            auto& umam = uffd::UffdMemoryArenaManager::instance();
+            umam.discardAndResizeRange((std::byte*)memoryBase, snapshot.size);
+            int fd = snapshot.fd;
+            using faabric::util::checkErrno;
+            checkErrno(::lseek(fd, 0, SEEK_SET), "snapshot fd seek");
+            size_t curPos = 0;
+            while (curPos < snapshot.size) {
+                ssize_t bytes =
+                  ::read(fd, memoryBase + curPos, snapshot.size - curPos);
+                if (bytes < 0) {
+                    if (errno == EINTR) {
+                        continue;
+                    } else {
+                        checkErrno(bytes, "snapshot fd read");
+                    }
+                } else {
+                    curPos += bytes;
+                }
+            }
+            break;
+        }
+    }
 }
 
 void WasmModule::zygoteDeltaRestore(const std::vector<uint8_t>& zygoteDelta)
@@ -603,10 +639,14 @@ uint32_t WasmModule::createMemoryGuardRegion(uint32_t wasmOffset)
     // NOTE: we want to protect these regions from _writes_, but we don't
     // want to stop them being read, otherwise snapshotting will fail.
     // Therefore we make them read-only
-    int res = mprotect(nativePtr, regionSize, PROT_READ);
-    if (res != 0) {
-        SPDLOG_ERROR("Failed to create memory guard: {}", std::strerror(errno));
-        throw std::runtime_error("Failed to create memory guard");
+    if (conf::getFaasmConfig().vmArenaMode ==
+        conf::VirtualMemoryArenaMode::Default) {
+        int res = mprotect(nativePtr, regionSize, PROT_READ);
+        if (res != 0) {
+            SPDLOG_ERROR("Failed to create memory guard: {}",
+                         std::strerror(errno));
+            throw std::runtime_error("Failed to create memory guard");
+        }
     }
 
     SPDLOG_TRACE(

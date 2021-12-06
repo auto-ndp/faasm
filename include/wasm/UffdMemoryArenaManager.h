@@ -90,6 +90,8 @@ class UffdMemoryArenaManager final
 
     void validateAndResizeRange(std::byte* oldEnd, std::byte* newEnd);
 
+    void discardAndResizeRange(std::byte* rangePtr, size_t newPages);
+
     // Free all range memory, and set it to be valid with the underlying
     // snapshot
     void discardRange(std::byte* start);
