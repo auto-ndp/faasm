@@ -5,14 +5,14 @@ option(FAABRIC_WASM_BUILD "Build Faabric wasm library" OFF)
 option(FAABRIC_BUILD_TESTS "Build Faabric tests" ON)
 
 # Enable colorized compiler output
-if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     add_compile_options(-fdiagnostics-color=always)
-elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
     add_compile_options(-fcolor-diagnostics)
-endif()
+endif ()
 
 # Top-level CMake config
-set(CMAKE_CXX_FLAGS "-Wall")
+set(CMAKE_CXX_FLAGS "-fwrapv -Wall -Wthread-safety -Werror=thread-safety")
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -35,7 +35,7 @@ elseif (FAABRIC_USE_SANITISER STREQUAL "Memory")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=memory")
 elseif (NOT ((FAABRIC_USE_SANITISER STREQUAL "None") OR (NOT FAABRIC_USE_SANITISER)))
     message(FATAL_ERROR "Invalid FAABRIC_USE_SANITISER setting: ${FAABRIC_USE_SANITISER}")
-endif()
+endif ()
 
 # Global include dir
 set(FAABRIC_INCLUDE_DIR ${CMAKE_CURRENT_LIST_DIR}/include)
@@ -65,11 +65,11 @@ function(faabric_lib lib_name)
     target_link_libraries(${lib_name} PUBLIC ${lib_name}_deps)
     add_library(faabric::${lib_name} ALIAS ${lib_name})
 
-    if(BUILD_SHARED_LIBS)
+    if (BUILD_SHARED_LIBS)
         target_link_options(${lib_name} PRIVATE "-fuse-ld=lld")
         set_property(TARGET ${lib_name} PROPERTY POSITION_INDEPENDENT_CODE ON)
         set_property(TARGET ${lib_name}_obj PROPERTY POSITION_INDEPENDENT_CODE ON)
-    endif()
+    endif ()
 
     # Ensure library generates readable stack traces
     target_compile_options(${lib_name} PUBLIC -fno-omit-frame-pointer)
@@ -91,60 +91,60 @@ add_subdirectory(src/util)
 
 # Wrapper library - note we want to include all the _object_ targets in this
 # library to ensure it's all bundled in together
-if(BUILD_SHARED_LIBS)
+if (BUILD_SHARED_LIBS)
     set(FAABRIC_LIB_TYPE SHARED)
-else()
+else ()
     set(FAABRIC_LIB_TYPE STATIC)
-endif()
+endif ()
 
 add_library(faabric
-    ${FAABRIC_LIB_TYPE}
-    faabric.cpp
-    $<TARGET_OBJECTS:endpoint_obj>
-    $<TARGET_OBJECTS:flat_obj>
-    $<TARGET_OBJECTS:proto_obj>
-    $<TARGET_OBJECTS:redis_obj>
-    $<TARGET_OBJECTS:runner_obj>
-    $<TARGET_OBJECTS:scheduler_obj>
-    $<TARGET_OBJECTS:snapshot_obj>
-    $<TARGET_OBJECTS:state_obj>
-    $<TARGET_OBJECTS:transport_obj>
-    $<TARGET_OBJECTS:util_obj>
-)
+        ${FAABRIC_LIB_TYPE}
+        faabric.cpp
+        $<TARGET_OBJECTS:endpoint_obj>
+        $<TARGET_OBJECTS:flat_obj>
+        $<TARGET_OBJECTS:proto_obj>
+        $<TARGET_OBJECTS:redis_obj>
+        $<TARGET_OBJECTS:runner_obj>
+        $<TARGET_OBJECTS:scheduler_obj>
+        $<TARGET_OBJECTS:snapshot_obj>
+        $<TARGET_OBJECTS:state_obj>
+        $<TARGET_OBJECTS:transport_obj>
+        $<TARGET_OBJECTS:util_obj>
+        )
 add_library(faabric::faabric ALIAS faabric)
 
-if(BUILD_SHARED_LIBS)
+if (BUILD_SHARED_LIBS)
     target_link_options(faabric PRIVATE "-fuse-ld=lld")
-endif()
+endif ()
 
 target_link_libraries(faabric PUBLIC
-    faabric::faabricmpi
-    faabric::common_dependencies
-)
+        faabric::faabricmpi
+        faabric::common_dependencies
+        )
 
 target_include_directories(faabric PUBLIC
-    ${FAABRIC_INCLUDE_DIR}
-    ${CMAKE_INSTALL_PREFIX}/include
-)
+        ${FAABRIC_INCLUDE_DIR}
+        ${CMAKE_INSTALL_PREFIX}/include
+        )
 
 # Ensure faabric generates readable stack traces
 target_compile_options(faabric PUBLIC -fno-omit-frame-pointer)
 target_link_options(faabric PUBLIC -Wl,--export-dynamic)
 
 # Tests - only include in static builds _and_ when requested
-if(BUILD_SHARED_LIBS)
+if (BUILD_SHARED_LIBS)
     message(STATUS "Skipping test build with shared libs")
-elseif(FAABRIC_BUILD_TESTS)
+elseif (FAABRIC_BUILD_TESTS)
     add_subdirectory(tests/dist)
     add_subdirectory(tests/test)
-endif()
+endif ()
 # Utils are used by faasm tests
 add_subdirectory(tests/utils)
 
 # Install headers
 install(
-    DIRECTORY ${FAABRIC_INCLUDE_DIR}/faabric
-    DESTINATION include
+        DIRECTORY ${FAABRIC_INCLUDE_DIR}/faabric
+        DESTINATION include
 )
 
 install(TARGETS faabric)
