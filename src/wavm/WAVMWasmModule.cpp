@@ -22,6 +22,7 @@
 #include <conf/FaasmConfig.h>
 #include <storage/SharedFiles.h>
 #include <threads/ThreadState.h>
+#include <wasm/UffdMemoryArenaManager.h>
 #include <wasm/WasmExecutionContext.h>
 #include <wasm/WasmModule.h>
 #include <wavm/IRModuleCache.h>
@@ -71,9 +72,99 @@ static void instantiateBaseModules()
     PROF_END(BaseWasiModule)
 }
 
+struct WavmUffdHooks : public Platform::MemoryOverrideHook
+{
+    WavmUffdHooks() = default;
+    WavmUffdHooks(const WavmUffdHooks&) = delete;
+    WavmUffdHooks& operator=(const WavmUffdHooks&) = delete;
+
+    U8* allocateVirtualPages(Uptr numPages) override
+    {
+        auto& umam = uffd::UffdMemoryArenaManager::instance();
+        return (U8*)umam.allocateRange(numPages);
+    }
+
+    U8* allocateAlignedVirtualPages(Uptr numPages,
+                                    Uptr alignmentLog2,
+                                    U8*& outUnalignedBaseAddress) override
+    {
+        auto& umam = uffd::UffdMemoryArenaManager::instance();
+        std::byte* ptr = umam.allocateRange(numPages, alignmentLog2);
+        outUnalignedBaseAddress = (U8*)ptr;
+        return (U8*)ptr;
+    }
+
+    bool commitVirtualPages(U8* baseVirtualAddress,
+                            Uptr numPages,
+                            Platform::MemoryAccess access) override
+    {
+        auto& umam = uffd::UffdMemoryArenaManager::instance();
+        umam.validateAndResizeRange((std::byte*)baseVirtualAddress,
+                                    (std::byte*)baseVirtualAddress +
+                                      numPages * 4096);
+        return true;
+    }
+
+    bool setVirtualPageAccess(U8* baseVirtualAddress,
+                              Uptr numPages,
+                              Platform::MemoryAccess access) override
+    {
+        // Fall back to mprotect - this is only used for LLVM module mappings
+        int prot_flags = 0;
+        switch (access) {
+            case Platform::MemoryAccess::none:
+                break;
+            case Platform::MemoryAccess::readOnly:
+                prot_flags = PROT_READ;
+                break;
+            case Platform::MemoryAccess::readWrite:
+                prot_flags = PROT_READ | PROT_WRITE;
+                break;
+            case Platform::MemoryAccess::readExecute:
+                prot_flags = PROT_READ | PROT_EXEC;
+                break;
+            case Platform::MemoryAccess::readWriteExecute:
+                prot_flags = PROT_READ | PROT_WRITE | PROT_EXEC;
+                break;
+        }
+        if (mprotect(baseVirtualAddress, numPages * 4096, prot_flags) < 0) {
+            perror("mprotect failure");
+            throw std::runtime_error("Mprotect call failed");
+        }
+        return true;
+    }
+
+    void decommitVirtualPages(U8* baseVirtualAddress, Uptr numPages) override
+    {
+        auto& umam = uffd::UffdMemoryArenaManager::instance();
+        umam.validateAndResizeRange((std::byte*)baseVirtualAddress,
+                                    (std::byte*)baseVirtualAddress -
+                                      numPages * 4096);
+    }
+
+    void freeVirtualPages(U8* baseVirtualAddress, Uptr numPages) override
+    {
+        auto& umam = uffd::UffdMemoryArenaManager::instance();
+        umam.freeRange((std::byte*)baseVirtualAddress);
+    }
+
+    void freeAlignedVirtualPages(U8* unalignedBaseAddress,
+                                 Uptr _numPages,
+                                 Uptr _alignmentLog2) override
+    {
+        auto& umam = uffd::UffdMemoryArenaManager::instance();
+        umam.freeRange((std::byte*)unalignedBaseAddress);
+    }
+};
+
 void setupWavmHooks()
 {
-    // TODO
+    const auto& config = conf::getFaasmConfig();
+    if (config.vmArenaMode == conf::VirtualMemoryArenaMode::Uffd) {
+        // init UFFD
+        uffd::UffdMemoryArenaManager::instance();
+        Platform::installMemoryOverrideHook(std::make_unique<WavmUffdHooks>());
+    }
 }
 
 void WAVMWasmModule::clearCaches()

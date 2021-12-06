@@ -4,6 +4,7 @@
 #include <compare>
 #include <cstddef>
 #include <cstdint>
+#include <span>
 
 #include <faabric/util/locks.h>
 #include <faabric/util/memory.h>
@@ -17,6 +18,7 @@ struct UffdMemoryRange
     std::byte* mapStart = nullptr;
     size_t mapBytes = 0;
     std::atomic<size_t> validBytes = 0;
+    std::span<std::byte> initSource;
 
     UffdMemoryRange() = delete;
     ~UffdMemoryRange() noexcept;
@@ -86,6 +88,13 @@ class UffdMemoryArenaManager final
     // beginning of it.
     std::byte* allocateRange(size_t pages, size_t alignmentLog2 = 0);
 
+    void validateAndResizeRange(std::byte* oldEnd, std::byte* newEnd);
+
+    // Free all range memory, and set it to be valid with the underlying
+    // snapshot
+    void discardRange(std::byte* start);
+
+    // Remove and free a UFFD-backed range completely
     void freeRange(std::byte* start);
 
   private:
