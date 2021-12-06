@@ -7,12 +7,22 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <stdexcept>
 
+#include <stdio.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
 namespace faabric::util {
+void checkErrno(int ec, const char* msg)
+{
+    if (ec < 0) {
+        perror(msg);
+        throw std::system_error(errno, std::generic_category(), msg);
+    }
+}
+
 std::string readFileToString(const std::string& path)
 {
     std::ifstream stream(path);

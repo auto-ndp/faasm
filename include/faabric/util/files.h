@@ -5,6 +5,8 @@
 #include <vector>
 
 namespace faabric::util {
+void checkErrno(int ec, const char* msg);
+
 std::string readFileToString(const std::string& path);
 
 std::vector<uint8_t> readFileToBytes(const std::string& path);
