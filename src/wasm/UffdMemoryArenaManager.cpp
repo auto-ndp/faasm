@@ -150,9 +150,18 @@ void UffdMemoryArenaManager::validateAndResizeRange(std::byte* oldEnd,
     const std::byte* actualOldEnd =
       range->mapStart + range->validBytes.load(std::memory_order_acquire);
     if (actualOldEnd != oldEnd) {
-        throw std::runtime_error("Mismatched UFFD range resize end pointers");
+        // throw std::runtime_error("Mismatched UFFD range resize end
+        // pointers");
+        auto [minEnd, maxEnd] = std::minmax(oldEnd, newEnd);
+        madvise(minEnd, (maxEnd - minEnd), MADV_DONTNEED);
+        return;
     }
-    if (!range->pointerInRange(newEnd)) {
+    if (!range->pointerInRange(newEnd) &&
+        (newEnd != range->mapStart + range->mapBytes)) {
+        SPDLOG_ERROR(
+          "New UFFD range end out of allocated range: {:08x} > {:08x}",
+          (size_t)newEnd,
+          (size_t)range->mapStart + range->mapBytes);
         throw std::runtime_error("New UFFD range end out of allocated range");
     }
     const size_t newPages = (newEnd - range->mapStart) / 4096;
@@ -170,12 +179,20 @@ void UffdMemoryArenaManager::discardAndResizeRange(std::byte* rangePtr,
     const size_t oldEndBytes =
       range->validBytes.load(std::memory_order_acquire);
     const size_t newBytes = 4096 * newPages;
-    if (!range->pointerInRange(range->mapStart + newBytes)) {
+    if (!range->pointerInRange(range->mapStart + newBytes) &&
+        (newBytes != range->mapBytes)) {
         throw std::runtime_error("New UFFD range end out of allocated range");
+        SPDLOG_ERROR(
+          "New UFFD range end out of allocated range: {:08x} > {:08x}",
+          (size_t)newBytes,
+          range->mapBytes);
     }
     range->validBytes.store(newBytes, std::memory_order_release);
-    checkErrno(madvise((void*)(range->mapStart), oldEndBytes, MADV_DONTNEED),
-               "MADV_DONTNEED");
+    if (oldEndBytes > 0) {
+        checkErrno(
+          madvise((void*)(range->mapStart), oldEndBytes, MADV_DONTNEED),
+          "MADV_DONTNEED");
+    }
 }
 
 void UffdMemoryArenaManager::discardRange(std::byte* start)
