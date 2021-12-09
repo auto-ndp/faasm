@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstdio>
+#include <string_view>
 
 #include <WAVM/IR/IR.h>
 #include <WAVM/Inline/FloatComponents.h>
@@ -27,7 +28,7 @@ using namespace WAVM;
 
 namespace wasm {
 
-faabric::Message ndpStorageBuiltinCall(std::string functionName,
+faabric::Message ndpStorageBuiltinCall(const std::string& functionName,
                                        const std::vector<uint8_t>& inputData)
 {
     ZoneScopedNS("ndp_objects::ndpStorageBuiltinCall", 6);
@@ -150,8 +151,7 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
         std::copy_n(outputData, copyLen, outDataPtr);
         *outDataLen = copyLen;
         outPtr = oldPagesEnd;
-        module_->snapshotExcludedPtrLens.push_back(
-          std::make_pair(oldPagesEnd, copyLen));
+        module_->snapshotExcludedPtrLens.emplace_back(oldPagesEnd, copyLen);
     }
 
     return outPtr;

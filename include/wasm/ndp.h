@@ -64,7 +64,6 @@ struct BuiltinNdpPutArgs
         offset += keySize;
         out.value.assign(bytes.begin() + offset,
                          bytes.begin() + offset + valueSize);
-        offset += valueSize;
         return out;
     }
 };
@@ -96,7 +95,6 @@ struct BuiltinNdpGetArgs
           faabric::util::readBytesOf(bytes, readOffset, &out.uptoBytes);
         out.key.assign(bytes.begin() + readOffset,
                        bytes.begin() + readOffset + keySize);
-        readOffset += keySize;
         return out;
     }
 };
