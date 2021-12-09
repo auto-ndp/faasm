@@ -11,9 +11,16 @@
 
 #include "runner_common.h"
 
+#include <sys/prctl.h>
+
 int main()
 {
     runner::commonInit();
+    if (faabric::util::getSystemConfig().isStorageNode) {
+        prctl(PR_SET_NAME, "pool_runner[S]");
+    } else {
+        prctl(PR_SET_NAME, "pool_runner[C]");
+    }
     storage::initFaasmS3();
     faabric::transport::initGlobalMessageContext();
     faabric::util::initLogging();
