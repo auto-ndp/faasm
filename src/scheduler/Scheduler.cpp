@@ -442,11 +442,11 @@ faabric::util::SchedulingDecision Scheduler::makeSchedulingDecision(
         if (remainder > 0) {
             std::vector<std::string> unregisteredHosts;
             if (hostKindDifferent) {
-                unregisteredHosts = getUnregisteredHosts(funcStr);
-            } else {
                 for (auto&& h : getAvailableHostsForFunction(firstMsg)) {
                     unregisteredHosts.push_back(std::move(h));
                 }
+            } else {
+                unregisteredHosts = getUnregisteredHosts(funcStr);
             }
 
             for (const auto& h : unregisteredHosts) {
@@ -737,6 +737,11 @@ faabric::util::SchedulingDecision Scheduler::doCallFunctions(
                 auto* newMsg = hostRequest->add_messages();
                 *newMsg = req->messages().at(msgIdx);
                 newMsg->set_executeslocally(false);
+                if (!newMsg->directresulthost().empty()) {
+                    faabric::util::UniqueLock resultsLock(localResultsMutex);
+                    localResults.insert(
+                      { newMsg->id(), std::make_shared<MessageLocalResult>() });
+                }
             }
 
             // Dispatch the calls
