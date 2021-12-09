@@ -91,8 +91,7 @@ struct BuiltinNdpGetArgs
         uint64_t keySize{};
         size_t readOffset = 0;
         readOffset = faabric::util::readBytesOf(bytes, readOffset, &keySize);
-        readOffset =
-          faabric::util::readBytesOf(bytes, readOffset, &out.offset);
+        readOffset = faabric::util::readBytesOf(bytes, readOffset, &out.offset);
         readOffset =
           faabric::util::readBytesOf(bytes, readOffset, &out.uptoBytes);
         out.key.assign(bytes.begin() + readOffset,

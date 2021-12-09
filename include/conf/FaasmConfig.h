@@ -21,14 +21,16 @@
 
 namespace conf {
 
-struct CodegenTargetSpec {
+struct CodegenTargetSpec
+{
     std::string arch;
     std::string cpu;
 };
 
 CodegenTargetSpec nativeCodegenTarget();
 
-enum class VirtualMemoryArenaMode {
+enum class VirtualMemoryArenaMode
+{
     Default,
     Uffd
 };

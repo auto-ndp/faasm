@@ -142,7 +142,8 @@ class WasmModule
 
     std::vector<std::pair<uint32_t, uint32_t>> snapshotExcludedPtrLens;
 
-    std::vector<uint8_t> deltaSnapshot(const faabric::util::SnapshotData& oldMemory);
+    std::vector<uint8_t> deltaSnapshot(
+      const faabric::util::SnapshotData& oldMemory);
 
     void deltaRestore(const std::vector<uint8_t>& delta);
     // ----- Threading -----

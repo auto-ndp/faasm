@@ -22,7 +22,7 @@ CodegenTargetSpec determineNativeCodegenTarget()
 #if (BOOST_ARCH_X86_64 == 1)
     ts.arch = "x86_64";
     ts.cpu = "skylake";
-#elif (BOOST_ARCH_ARM >= BOOST_VERSION_NUMBER(8,0,0))
+#elif (BOOST_ARCH_ARM >= BOOST_VERSION_NUMBER(8, 0, 0))
     ts.arch = "aarch64";
     ts.cpu = "cortex-a53";
 #else
@@ -127,6 +127,9 @@ void FaasmConfig::reset()
 void FaasmConfig::print()
 {
     SPDLOG_INFO("--- HOST ---");
+    SPDLOG_INFO("VM arena mode:        {}",
+                vmArenaMode == VirtualMemoryArenaMode::Default ? "Default"
+                                                               : "UFFD");
     SPDLOG_INFO("Cgroup mode:          {}", cgroupMode);
     SPDLOG_INFO("Host type:            {}", hostType);
     SPDLOG_INFO("Network ns mode:      {}", netNsMode);
