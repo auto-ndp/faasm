@@ -5,7 +5,6 @@
 
 #include <optional>
 #include <thread>
-#include <optional>
 #include <zmq.hpp>
 
 // Defined in libzmq/include/zmq.h

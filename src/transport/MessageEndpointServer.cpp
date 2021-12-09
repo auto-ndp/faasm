@@ -144,7 +144,8 @@ void MessageEndpointServerHandler::start(
                             size_t respSize = resp->ByteSizeLong();
 
                             msgBuffer.resize(respSize);
-                            if (!resp->SerializeToArray(msgBuffer.data(), msgBuffer.size())) {
+                            if (!resp->SerializeToArray(msgBuffer.data(),
+                                                        msgBuffer.size())) {
                                 throw std::runtime_error(
                                   "Error serialising message");
                             }
@@ -152,7 +153,8 @@ void MessageEndpointServerHandler::start(
                             // Return the response
                             static_cast<SyncRecvMessageEndpoint*>(
                               endpoint.get())
-                              ->sendResponse(msgBuffer.data(), msgBuffer.size());
+                              ->sendResponse(msgBuffer.data(),
+                                             msgBuffer.size());
                         }
 
                         // Wait on the request latch if necessary

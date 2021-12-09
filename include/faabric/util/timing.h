@@ -1,8 +1,8 @@
 #pragma once
 
+#include <Tracy.hpp>
 #include <faabric/util/clock.h>
 #include <string>
-#include <Tracy.hpp>
 
 #ifdef TRACE_ALL
 #define PROF_BEGIN faabric::util::startGlobalTimer();

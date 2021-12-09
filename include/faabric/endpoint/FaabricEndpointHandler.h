@@ -18,7 +18,7 @@ class FaabricEndpointHandler final
                          faabric::Message&& msg);
 
     void onFunctionResult(HttpRequestContext&& ctx,
-                         faabric::util::BeastHttpResponse&& partialResponse,
-                         faabric::Message& msg);
+                          faabric::util::BeastHttpResponse&& partialResponse,
+                          faabric::Message& msg);
 };
 }
