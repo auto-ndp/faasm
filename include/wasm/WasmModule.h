@@ -165,8 +165,6 @@ class WasmModule
   protected:
     void storeZygoteSnapshot();
 
-    std::atomic<uint32_t> currentBrk = 0;
-
     std::string boundUser;
     std::string boundFunction;
     bool _isBound = false;

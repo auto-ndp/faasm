@@ -509,7 +509,7 @@ uint32_t WasmModule::mapSharedStateMemory(
 
 uint32_t WasmModule::getCurrentBrk()
 {
-    return currentBrk.load(std::memory_order_acquire);
+    return getMemorySizeBytes();
 }
 
 int32_t WasmModule::executeTask(
@@ -759,7 +759,7 @@ void WasmModule::setUpOpenMPMergeRegions(
         uint32_t intValue = faabric::util::unalignedRead<uint32_t>(
           reinterpret_cast<std::byte*>(wasmPointerToNative(regionStart)));
         uint32_t stacksTop = threadStacks.back();
-        uint32_t memMax = currentBrk.load(std::memory_order_acquire);
+        uint32_t memMax = getMemorySizeBytes();
         if (intValue > stacksTop && intValue < memMax) {
             SPDLOG_TRACE("Shared var points to {}, could be pointer ({}-{})",
                          intValue,

@@ -1,5 +1,6 @@
 #include "syscalls.h"
 
+#include <absl/debugging/symbolize.h>
 #include <algorithm>
 #include <boost/filesystem.hpp>
 #include <functional>
@@ -303,9 +304,6 @@ void WAVMWasmModule::clone(const WAVMWasmModule& other,
     boundUser = other.boundUser;
     boundFunction = other.boundFunction;
     preExecuteMemoryData = other.preExecuteMemoryData;
-
-    currentBrk.store(other.currentBrk.load(std::memory_order_acquire),
-                     std::memory_order_release);
 
     filesystem = other.filesystem;
 
@@ -635,9 +633,6 @@ void WAVMWasmModule::doBindToFunctionInternal(faabric::Message& msg,
 
     // Prepare the filesystem
     filesystem.prepareFilesystem();
-
-    // We have to set the current brk before executing any code
-    currentBrk.store(getMemorySizeBytes(), std::memory_order_release);
 
     // Allocate a pool of OpenMP contexts
     openMPContexts = std::vector<Runtime::Context*>(threadPoolSize, nullptr);
@@ -1143,6 +1138,19 @@ int32_t WAVMWasmModule::executeFunction(faabric::Message& msg)
           [&returnValue](Runtime::Exception* ex) {
               SPDLOG_ERROR("Runtime exception: {}",
                            Runtime::describeException(ex).c_str());
+              SPDLOG_ERROR("ABSL callstack symbolization:");
+              const auto& csFrames = ex->callStack.frames;
+              std::array<char, 1024> symbolName{};
+              for (size_t i = 0; i < csFrames.size(); ++i) {
+                  bool hasSymbol = absl::Symbolize((void*)csFrames[i].ip,
+                                                   symbolName.data(),
+                                                   symbolName.size());
+                  SPDLOG_ERROR("[{:2d}] {:#016x}: {}",
+                               i,
+                               (size_t)(csFrames[i].ip),
+                               hasSymbol ? symbolName.data()
+                                         : "<unknown symbol>");
+              }
               Runtime::destroyException(ex);
               returnValue = 1;
           });
@@ -1313,36 +1321,22 @@ U32 WAVMWasmModule::growMemory(U32 nBytes)
 
     // Check if we just need the size
     if (nBytes == 0) {
-        return currentBrk.load(std::memory_order_acquire);
+        return getMemorySizeBytes();
     }
 
     faabric::util::FullLock lock(moduleMemoryMutex);
 
     // Check if we can reclaim
     size_t oldBytes = getMemorySizeBytes();
-    uint32_t oldBrk = currentBrk.load(std::memory_order_acquire);
-    uint32_t newBrk = oldBrk + nBytes;
+    uint32_t newBytes = oldBytes + nBytes;
 
-    if (!isWasmPageAligned(newBrk)) {
+    if (!isWasmPageAligned(newBytes)) {
         SPDLOG_ERROR("Growing memory by {} is not wasm page aligned", nBytes);
         throw std::runtime_error("Non-wasm-page-aligned memory growth");
     }
 
-    // If we can reclaim old memory, just bump the break
-    if (newBrk <= oldBytes) {
-        SPDLOG_TRACE(
-          "MEM - Growing memory using already provisioned {} + {} <= {}",
-          oldBrk,
-          nBytes,
-          oldBytes);
-
-        currentBrk.store(newBrk, std::memory_order_release);
-
-        return oldBrk;
-    }
-
     Uptr oldPages = Runtime::getMemoryNumPages(defaultMemory);
-    Uptr newPages = getNumberOfWasmPagesForBytes(newBrk);
+    Uptr newPages = getNumberOfWasmPagesForBytes(newBytes);
 
     if (newPages > maxPages) {
         SPDLOG_ERROR("mmap would exceed max of {} pages (requested {})",
@@ -1395,7 +1389,6 @@ U32 WAVMWasmModule::growMemory(U32 nBytes)
 
     // Set current break to top of the new memory
     size_t newMemSize = getMemorySizeBytes();
-    currentBrk.store(newMemSize, std::memory_order_release);
 
     if (newMemBase != oldBytes) {
         SPDLOG_ERROR("Expected base of new region ({}) to be end of memory "
@@ -1406,11 +1399,11 @@ U32 WAVMWasmModule::growMemory(U32 nBytes)
         throw std::runtime_error("Memory growth discrepancy");
     }
 
-    if (newMemSize != newBrk) {
+    if (newMemSize != newBytes) {
         SPDLOG_ERROR(
           "Expected new brk ({}) to be old memory plus new bytes ({})",
           newMemSize,
-          newBrk);
+          newBytes);
         throw std::runtime_error("Memory growth discrepancy");
     }
 
@@ -1427,7 +1420,7 @@ uint32_t WAVMWasmModule::shrinkMemory(U32 nBytes)
 
     faabric::util::FullLock lock(moduleMemoryMutex);
 
-    U32 oldBrk = currentBrk.load(std::memory_order_acquire);
+    U32 oldBrk = getMemorySizeBytes();
 
     if (nBytes > oldBrk) {
         SPDLOG_ERROR(
@@ -1467,7 +1460,6 @@ uint32_t WAVMWasmModule::shrinkMemory(U32 nBytes)
     }
 
     SPDLOG_TRACE("MEM - shrinking memory {} -> {}", oldBrk, newBrk);
-    currentBrk.store(newBrk, std::memory_order_release);
 
     return oldBrk;
 }
@@ -1496,7 +1488,7 @@ void WAVMWasmModule::unmapMemory(U32 offset, U32 nBytes)
         throw std::runtime_error("munmapping outside memory max");
     }
 
-    if (unmapTop == currentBrk.load(std::memory_order_acquire)) {
+    if (unmapTop == getMemorySizeBytes()) {
         SPDLOG_TRACE("MEM - munmapping top of memory by {}", pageAligned);
         shrinkMemory(pageAligned);
     } else {
