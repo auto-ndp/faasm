@@ -70,7 +70,6 @@ void FaasmConfig::initialise()
             throw std::runtime_error("Invalid VM_ARENA_MODE value");
         }
     }
-    vmArenaMode = VirtualMemoryArenaMode::Default;
     cgroupMode = getEnvVar("CGROUP_MODE", "on");
     netNsMode = getEnvVar("NETNS_MODE", "off");
     maxNetNs = this->getIntParam("MAX_NET_NAMESPACES", "100");
