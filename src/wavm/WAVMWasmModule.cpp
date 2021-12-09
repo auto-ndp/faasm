@@ -191,7 +191,38 @@ void WAVMWasmModule::reset(faabric::Message& msg,
     auto [cachedModule, cacheLock] =
       wasm::getWAVMModuleCache().getCachedModule(msg);
 
-    clone(cachedModule, snapshotKey);
+    const auto refGlobals = cachedModule.getGlobals();
+    cacheLock.unlock();
+    SPDLOG_DEBUG("Scanning {} globals", refGlobals.size());
+    for (size_t i = 0; i < refGlobals.size(); i++) {
+        this->updateGlobal(i, refGlobals[i]);
+    }
+
+    auto zygSnap = getZygoteSnapshot();
+    if (!zygSnap) {
+        clone(cachedModule, snapshotKey);
+        storeZygoteSnapshot();
+        zygSnap = getZygoteSnapshot();
+        if (!zygSnap) {
+            throw std::runtime_error("Zygote snapshot cannot be created");
+        }
+    }
+    size_t memSize = getCurrentBrk();
+    if (zygSnap->size() > memSize) {
+        size_t bytesRequired = zygSnap->size() - memSize;
+        SPDLOG_DEBUG("Growing memory by {} bytes to fit zygote", bytesRequired);
+        this->growMemory(bytesRequired);
+    } else if (zygSnap->size() < memSize) {
+        size_t shrinkBy = memSize - zygSnap->size();
+        SPDLOG_DEBUG("Shrinking memory by {} bytes to fit zygote", shrinkBy);
+        this->shrinkMemory(shrinkBy);
+    }
+    uint8_t* memoryBase = getMemoryBase();
+    {
+        ZoneNamedN(_zoneMemcpy, "snapshot memcpy", true);
+        zygSnap->get(memoryBase);
+        SPDLOG_DEBUG("Copied {} snapshot bytes", zygSnap->size());
+    }
 }
 
 Runtime::Instance* WAVMWasmModule::getEnvModule()
@@ -1016,6 +1047,11 @@ uint32_t WAVMWasmModule::addFunctionToTable(Runtime::Object* exportedFunc) const
 int32_t WAVMWasmModule::executeFunction(faabric::Message& msg)
 {
     ZoneScopedNS("WAVMWasmModule::executeFunction", 5);
+    ZoneText(boundFunction.c_str(), boundFunction.size());
+    if (msg.forbidndp()) {
+        constexpr static std::string_view nondp_text = "[!ndp]";
+        ZoneText(nondp_text.data(), nondp_text.size());
+    }
     faabric::util::SharedLock lock(resetMx);
     if (!_isBound) {
         throw std::runtime_error("Module must be bound before executing");
@@ -1305,9 +1341,8 @@ U32 WAVMWasmModule::growMemory(U32 nBytes)
         return oldBrk;
     }
 
-    size_t newBytes = oldBytes + nBytes;
     Uptr oldPages = Runtime::getMemoryNumPages(defaultMemory);
-    Uptr newPages = getNumberOfWasmPagesForBytes(newBytes);
+    Uptr newPages = getNumberOfWasmPagesForBytes(newBrk);
 
     if (newPages > maxPages) {
         SPDLOG_ERROR("mmap would exceed max of {} pages (requested {})",
@@ -1371,11 +1406,11 @@ U32 WAVMWasmModule::growMemory(U32 nBytes)
         throw std::runtime_error("Memory growth discrepancy");
     }
 
-    if (newMemSize != newBytes) {
+    if (newMemSize != newBrk) {
         SPDLOG_ERROR(
           "Expected new brk ({}) to be old memory plus new bytes ({})",
           newMemSize,
-          newBytes);
+          newBrk);
         throw std::runtime_error("Memory growth discrepancy");
     }
 
@@ -1402,6 +1437,34 @@ uint32_t WAVMWasmModule::shrinkMemory(U32 nBytes)
 
     // Note - we don't actually free the memory, we just change the brk
     U32 newBrk = oldBrk - nBytes;
+    const size_t pageChange =
+      (getMemorySizeBytes() - newBrk) / WASM_BYTES_PER_PAGE;
+
+    Runtime::GrowResult result =
+      Runtime::shrinkMemory(defaultMemory, pageChange, nullptr);
+
+    if (result != Runtime::GrowResult::success) {
+        if (result == Runtime::GrowResult::outOfMemory) {
+            SPDLOG_ERROR("Committing new pages failed (errno={} ({})) "
+                         "(shrinking by {})",
+                         errno,
+                         strerror(errno),
+                         pageChange);
+            throw std::runtime_error("Unable to commit virtual pages");
+        }
+        if (result == Runtime::GrowResult::outOfMaxSize) {
+            SPDLOG_ERROR("No memory for mapping (shrinking by {})", pageChange);
+            throw std::runtime_error("Run out of memory to map");
+        }
+        if (result == Runtime::GrowResult::outOfQuota) {
+            SPDLOG_ERROR("Memory resource quota exceeded (shrinking by {})",
+                         pageChange);
+            throw std::runtime_error("Memory resource quota exceeded");
+        }
+        SPDLOG_ERROR("Unknown memory mapping error (shrinking by {})",
+                     pageChange);
+        throw std::runtime_error("Unknown memory mapping error");
+    }
 
     SPDLOG_TRACE("MEM - shrinking memory {} -> {}", oldBrk, newBrk);
     currentBrk.store(newBrk, std::memory_order_release);

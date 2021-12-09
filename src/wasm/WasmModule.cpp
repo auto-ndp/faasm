@@ -247,31 +247,6 @@ void WasmModule::zygoteDeltaRestore(const std::vector<uint8_t>& zygoteDelta)
 {
     ZoneScopedNS("WasmModule::zygoteDeltaRestore", 6);
     PROF_START(wasmZygoteDeltaRestore)
-    faabric::state::State& state = faabric::state::getGlobalState();
-    const auto zKey = "$" + this->getBoundFunction();
-    size_t zygSnapSize = state.getStateSize(this->getBoundUser(), zKey);
-    if (zygSnapSize == 0) {
-        SPDLOG_ERROR("Couldn't find zygote snapshot for restore {}/{}",
-                     this->getBoundUser(),
-                     zKey);
-        throw std::runtime_error("Missing zygote snapshot");
-    }
-    size_t memSize = getCurrentBrk();
-    if (zygSnapSize > memSize) {
-        SPDLOG_DEBUG("Growing memory to fit zygote");
-        size_t bytesRequired = zygSnapSize - memSize;
-        this->growMemory(bytesRequired);
-    } else {
-        SPDLOG_DEBUG("Shrinking memory to fit zygote");
-        size_t shrinkBy = memSize - zygSnapSize;
-        this->shrinkMemory(shrinkBy);
-    }
-    uint8_t* memoryBase = getMemoryBase();
-    auto kv = state.getKV(this->getBoundUser(), zKey, zygSnapSize);
-    {
-        ZoneScopedN("kv->get");
-        kv->get(memoryBase);
-    }
     {
         ZoneScopedN("deltaRestore(zygoteDelta)");
         this->deltaRestore(zygoteDelta);
@@ -287,7 +262,7 @@ std::shared_ptr<faabric::state::StateKeyValue> WasmModule::getZygoteSnapshot()
     if (zygSnapSize == 0) {
         SPDLOG_ERROR(
           "Couldn't find zygote snapshot {}/{}", this->getBoundUser(), zKey);
-        throw std::runtime_error("Couldn't find zygote snapshot " + zKey);
+        return nullptr;
     }
     SPDLOG_DEBUG("Found zygote snapshot {} of size {}", zKey, zygSnapSize);
     ZoneValue(zygSnapSize);
