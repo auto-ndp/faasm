@@ -1,6 +1,9 @@
 #pragma once
 
 #include <conf/FaasmConfig.h>
+#include <faabric/util/bytes.h>
+#include <faabric/util/locks.h>
+
 #include <threads/ThreadState.h>
 #include <wasm/WasmExecutionContext.h>
 #include <wasm/WasmModule.h>
@@ -21,6 +24,24 @@ void setupWavmHooks();
 std::vector<uint8_t> wavmCodegen(std::vector<uint8_t>& wasmBytes,
                                  conf::CodegenTargetSpec target,
                                  const std::string& fileName);
+
+template<class T>
+T unalignedWavmRead(WAVM::Runtime::Memory* memory, WAVM::Uptr offset)
+{
+    const std::byte* bytes =
+      WAVM::Runtime::memoryArrayPtr<std::byte>(memory, offset, sizeof(T));
+    return faabric::util::unalignedRead<T>(bytes);
+}
+
+template<class T>
+void unalignedWavmWrite(const T& value,
+                        WAVM::Runtime::Memory* memory,
+                        WAVM::Uptr offset)
+{
+    std::byte* bytes =
+      WAVM::Runtime::memoryArrayPtr<std::byte>(memory, offset, sizeof(T));
+    faabric::util::unalignedWrite<T>(value, bytes);
+}
 
 class WAVMWasmModule final
   : public WasmModule
@@ -159,6 +180,7 @@ class WAVMWasmModule final
     void updateGlobal(size_t idx, int32_t value);
 
   private:
+    std::shared_mutex resetMx;
     WAVM::Runtime::GCPointer<WAVM::Runtime::Instance> envModule;
     WAVM::Runtime::GCPointer<WAVM::Runtime::Instance> wasiModule;
     WAVM::Runtime::GCPointer<WAVM::Runtime::Instance> moduleInstance;
@@ -218,7 +240,8 @@ class WAVMWasmModule final
 class WAVMModuleCache
 {
   public:
-    wasm::WAVMWasmModule& getCachedModule(faabric::Message& msg);
+    std::pair<wasm::WAVMWasmModule&, faabric::util::SharedLock> getCachedModule(
+      faabric::Message& msg);
 
     void initialiseCachedModule(faabric::Message& msg);
 

@@ -181,13 +181,14 @@ void WAVMWasmModule::reset(faabric::Message& msg,
     if (!_isBound) {
         return;
     }
+    faabric::util::FullLock moduleLock(resetMx);
 
     assert(msg.user() == boundUser);
     assert(msg.function() == boundFunction);
 
     std::string funcStr = faabric::util::funcToString(msg, true);
     SPDLOG_DEBUG("Resetting after {} (snap key {})", funcStr, snapshotKey);
-    wasm::WAVMWasmModule& cachedModule =
+    auto [cachedModule, cacheLock] =
       wasm::getWAVMModuleCache().getCachedModule(msg);
 
     clone(cachedModule, snapshotKey);
@@ -272,7 +273,8 @@ void WAVMWasmModule::clone(const WAVMWasmModule& other,
     boundFunction = other.boundFunction;
     preExecuteMemoryData = other.preExecuteMemoryData;
 
-    currentBrk = other.currentBrk;
+    currentBrk.store(other.currentBrk.load(std::memory_order_acquire),
+                     std::memory_order_release);
 
     filesystem = other.filesystem;
 
@@ -579,7 +581,8 @@ void WAVMWasmModule::doBindToFunctionInternal(faabric::Message& msg,
      */
     if (useCache) {
         wasm::WAVMModuleCache& cache = getWAVMModuleCache();
-        clone(cache.getCachedModule(msg), "");
+        auto [cached, lock] = cache.getCachedModule(msg);
+        clone(cached, "");
         return;
     }
 
@@ -603,7 +606,7 @@ void WAVMWasmModule::doBindToFunctionInternal(faabric::Message& msg,
     filesystem.prepareFilesystem();
 
     // We have to set the current brk before executing any code
-    currentBrk = getMemorySizeBytes();
+    currentBrk.store(getMemorySizeBytes(), std::memory_order_release);
 
     // Allocate a pool of OpenMP contexts
     openMPContexts = std::vector<Runtime::Context*>(threadPoolSize, nullptr);
@@ -1013,6 +1016,7 @@ uint32_t WAVMWasmModule::addFunctionToTable(Runtime::Object* exportedFunc) const
 int32_t WAVMWasmModule::executeFunction(faabric::Message& msg)
 {
     ZoneScopedNS("WAVMWasmModule::executeFunction", 5);
+    faabric::util::SharedLock lock(resetMx);
     if (!_isBound) {
         throw std::runtime_error("Module must be bound before executing");
     }
@@ -1176,6 +1180,7 @@ int32_t WAVMWasmModule::executePthread(int threadPoolIdx,
                                        uint32_t stackTop,
                                        faabric::Message& msg)
 {
+    faabric::util::SharedLock lock(resetMx);
     std::string funcStr = faabric::util::funcToString(msg, false);
 
     SPDLOG_DEBUG(
@@ -1205,6 +1210,7 @@ int32_t WAVMWasmModule::executeOMPThread(int threadPoolIdx,
                                          uint32_t stackTop,
                                          faabric::Message& msg)
 {
+    faabric::util::SharedLock lock(resetMx);
     Runtime::Function* funcInstance = getFunctionFromPtr(msg.funcptr());
 
     std::string funcStr = faabric::util::funcToString(msg, false);
@@ -1271,16 +1277,15 @@ U32 WAVMWasmModule::growMemory(U32 nBytes)
 
     // Check if we just need the size
     if (nBytes == 0) {
-        faabric::util::SharedLock lock(moduleMemoryMutex);
-        return currentBrk;
+        return currentBrk.load(std::memory_order_acquire);
     }
 
     faabric::util::FullLock lock(moduleMemoryMutex);
 
     // Check if we can reclaim
     size_t oldBytes = getMemorySizeBytes();
-    uint32_t oldBrk = currentBrk;
-    uint32_t newBrk = currentBrk + nBytes;
+    uint32_t oldBrk = currentBrk.load(std::memory_order_acquire);
+    uint32_t newBrk = oldBrk + nBytes;
 
     if (!isWasmPageAligned(newBrk)) {
         SPDLOG_ERROR("Growing memory by {} is not wasm page aligned", nBytes);
@@ -1295,7 +1300,7 @@ U32 WAVMWasmModule::growMemory(U32 nBytes)
           nBytes,
           oldBytes);
 
-        currentBrk = newBrk;
+        currentBrk.store(newBrk, std::memory_order_release);
 
         return oldBrk;
     }
@@ -1354,7 +1359,8 @@ U32 WAVMWasmModule::growMemory(U32 nBytes)
     auto newMemBase = (U32)(newMemPageBase * WASM_BYTES_PER_PAGE);
 
     // Set current break to top of the new memory
-    currentBrk = getMemorySizeBytes();
+    size_t newMemSize = getMemorySizeBytes();
+    currentBrk.store(newMemSize, std::memory_order_release);
 
     if (newMemBase != oldBytes) {
         SPDLOG_ERROR("Expected base of new region ({}) to be end of memory "
@@ -1365,10 +1371,10 @@ U32 WAVMWasmModule::growMemory(U32 nBytes)
         throw std::runtime_error("Memory growth discrepancy");
     }
 
-    if (currentBrk != newBytes) {
+    if (newMemSize != newBytes) {
         SPDLOG_ERROR(
           "Expected new brk ({}) to be old memory plus new bytes ({})",
-          currentBrk,
+          newMemSize,
           newBytes);
         throw std::runtime_error("Memory growth discrepancy");
     }
@@ -1386,18 +1392,19 @@ uint32_t WAVMWasmModule::shrinkMemory(U32 nBytes)
 
     faabric::util::FullLock lock(moduleMemoryMutex);
 
-    if (nBytes > currentBrk) {
+    U32 oldBrk = currentBrk.load(std::memory_order_acquire);
+
+    if (nBytes > oldBrk) {
         SPDLOG_ERROR(
-          "Shrinking by more than current brk ({} > {})", nBytes, currentBrk);
+          "Shrinking by more than current brk ({} > {})", nBytes, oldBrk);
         throw std::runtime_error("Shrinking by more than current brk");
     }
 
     // Note - we don't actually free the memory, we just change the brk
-    U32 oldBrk = currentBrk;
-    U32 newBrk = currentBrk - nBytes;
+    U32 newBrk = oldBrk - nBytes;
 
     SPDLOG_TRACE("MEM - shrinking memory {} -> {}", oldBrk, newBrk);
-    currentBrk = newBrk;
+    currentBrk.store(newBrk, std::memory_order_release);
 
     return oldBrk;
 }
@@ -1426,7 +1433,7 @@ void WAVMWasmModule::unmapMemory(U32 offset, U32 nBytes)
         throw std::runtime_error("munmapping outside memory max");
     }
 
-    if (unmapTop == currentBrk) {
+    if (unmapTop == currentBrk.load(std::memory_order_acquire)) {
         SPDLOG_TRACE("MEM - munmapping top of memory by {}", pageAligned);
         shrinkMemory(pageAligned);
     } else {
@@ -1755,6 +1762,13 @@ Runtime::Context* WAVMWasmModule::createThreadContext(
           "({})",
           stackGlobal.u32);
         throw std::runtime_error("Unexpected mutable global format");
+    }
+
+    if ((stackTop & 15) != 0) {
+        SPDLOG_CRITICAL("Thread stack top {} is not 16 byte aligned, violating "
+                        "ABI requirements.",
+                        stackTop);
+        throw std::runtime_error("Thread stack top not 16 byte aligned");
     }
 
     ctx->runtimeData->mutableGlobals[0] = stackTop;

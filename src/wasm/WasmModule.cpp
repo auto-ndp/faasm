@@ -188,16 +188,16 @@ void WasmModule::restore(const std::string& snapshotKey)
     const auto& config = conf::getFaasmConfig();
 
     // Expand memory if necessary
-    faabric::util::SnapshotData data = reg.getSnapshot(snapshotKey);
+    auto data = reg.getSnapshot(snapshotKey);
     uint32_t memSize = getCurrentBrk();
 
-    if (data.size > memSize) {
-        size_t bytesRequired = data.size - memSize;
+    if (data->size > memSize) {
+        size_t bytesRequired = data->size - memSize;
         SPDLOG_DEBUG("Growing memory by {} bytes to restore snapshot",
                      bytesRequired);
         this->growMemory(bytesRequired);
-    } else if (data.size < memSize) {
-        size_t shrinkBy = memSize - data.size;
+    } else if (data->size < memSize) {
+        size_t shrinkBy = memSize - data->size;
         SPDLOG_DEBUG("Shrinking memory by {} bytes to restore snapshot",
                      shrinkBy);
         this->shrinkMemory(shrinkBy);
@@ -424,9 +424,8 @@ std::string WasmModule::getCapturedStdout()
     lseek(memFd, 0, SEEK_SET);
 
     // Read in and return
-    char* buf = new char[stdoutSize];
-    read(memFd, buf, stdoutSize);
-    std::string stdoutString(buf, stdoutSize);
+    std::string stdoutString(stdoutSize, '\0');
+    read(memFd, stdoutString.data(), stdoutSize);
     SPDLOG_DEBUG("Read stdout length {}:\n{}", stdoutSize, stdoutString);
 
     return stdoutString;
@@ -535,8 +534,7 @@ uint32_t WasmModule::mapSharedStateMemory(
 
 uint32_t WasmModule::getCurrentBrk()
 {
-    faabric::util::SharedLock lock(moduleMemoryMutex);
-    return currentBrk;
+    return currentBrk.load(std::memory_order_acquire);
 }
 
 int32_t WasmModule::executeTask(
@@ -751,8 +749,8 @@ void WasmModule::setUpOpenMPMergeRegions(
     }
 
     // Create ordered list of offsets
-    std::vector<uint32_t> sortedOffsets(ompLevel->sharedVarOffsets,
-                                        ompLevel->sharedVarOffsets +
+    std::vector<uint32_t> sortedOffsets(ompLevel->sharedVarOffsets.get(),
+                                        ompLevel->sharedVarOffsets.get() +
                                           ompLevel->nSharedVarOffsets);
 
     std::sort(sortedOffsets.begin(), sortedOffsets.end());
@@ -760,7 +758,7 @@ void WasmModule::setUpOpenMPMergeRegions(
     // Get the snapshot
     faabric::snapshot::SnapshotRegistry& reg =
       faabric::snapshot::getSnapshotRegistry();
-    faabric::util::SnapshotData& snap = reg.getSnapshot(snapshotKey);
+    auto snap = reg.getSnapshot(snapshotKey);
 
     // Set up merge regions for these shared variables. Note that any
     // that are later discovered to be reduce results will get
@@ -783,19 +781,20 @@ void WasmModule::setUpOpenMPMergeRegions(
 
         // Check if the var points to a wasm address. If so, it may be a
         // pointer to a pointer, so we should add a merge region
-        uint32_t intValue = *(uint32_t*)wasmPointerToNative(regionStart);
+        uint32_t intValue = faabric::util::unalignedRead<uint32_t>(
+          reinterpret_cast<std::byte*>(wasmPointerToNative(regionStart)));
         uint32_t stacksTop = threadStacks.back();
-        if (intValue > stacksTop && intValue < currentBrk) {
+        uint32_t memMax = currentBrk.load(std::memory_order_acquire);
+        if (intValue > stacksTop && intValue < memMax) {
             SPDLOG_TRACE("Shared var points to {}, could be pointer ({}-{})",
                          intValue,
                          stacksTop,
-                         currentBrk);
+                         memMax);
 
-            uint32_t memMax = currentBrk;
             uint32_t derefPointerEnd =
               std::min<uint32_t>(intValue + DEFAULT_MERGE_REGION_SIZE, memMax);
 
-            snap.addMergeRegion(
+            snap->addMergeRegion(
               intValue,
               derefPointerEnd - intValue,
               faabric::util::SnapshotDataType::Raw,
@@ -814,11 +813,11 @@ void WasmModule::setUpOpenMPMergeRegions(
                      regionEnd);
 
         size_t size = regionEnd - regionStart;
-        snap.addMergeRegion(regionStart,
-                            size,
-                            faabric::util::SnapshotDataType::Raw,
-                            faabric::util::SnapshotMergeOperation::Overwrite,
-                            true);
+        snap->addMergeRegion(regionStart,
+                             size,
+                             faabric::util::SnapshotDataType::Raw,
+                             faabric::util::SnapshotMergeOperation::Overwrite,
+                             true);
     }
 }
 
@@ -839,7 +838,7 @@ void WasmModule::setUpPthreadMergeRegions(
     // more fine-grained would be better (if possible).
 
     std::string snapshotKey = msg.snapshotkey();
-    faabric::util::SnapshotData& snapData =
+    auto snapData =
       faabric::snapshot::getSnapshotRegistry().getSnapshot(snapshotKey);
 
     uint32_t threadStackRegionStart =
@@ -856,17 +855,17 @@ void WasmModule::setUpPthreadMergeRegions(
                  threadStackRegionStart,
                  threadStackRegionEnd);
 
-    snapData.addMergeRegion(STACK_SIZE,
-                            wasmStackRegionSize,
-                            faabric::util::SnapshotDataType::Raw,
-                            faabric::util::SnapshotMergeOperation::Overwrite,
-                            true);
+    snapData->addMergeRegion(STACK_SIZE,
+                             wasmStackRegionSize,
+                             faabric::util::SnapshotDataType::Raw,
+                             faabric::util::SnapshotMergeOperation::Overwrite,
+                             true);
 
-    snapData.addMergeRegion(threadStackRegionEnd,
-                            0,
-                            faabric::util::SnapshotDataType::Raw,
-                            faabric::util::SnapshotMergeOperation::Overwrite,
-                            true);
+    snapData->addMergeRegion(threadStackRegionEnd,
+                             0,
+                             faabric::util::SnapshotDataType::Raw,
+                             faabric::util::SnapshotMergeOperation::Overwrite,
+                             true);
 }
 
 void WasmModule::addThreadStack()
@@ -880,12 +879,14 @@ void WasmModule::addThreadStack()
 
     // Note that wasm stacks grow downwards, so we have to store the stack
     // top, which is the offset one below the guard region above the stack
-    uint32_t stackTop = memBase + GUARD_REGION_SIZE + THREAD_STACK_SIZE - 1;
+    // Subtract 16 to make sure the stack is 16-aligned as required by the C
+    // ABI
+    uint32_t stackTop = memBase + GUARD_REGION_SIZE + THREAD_STACK_SIZE - 16;
     threadStacks.push_back(stackTop);
 
     // Add guard regions
     createMemoryGuardRegion(memBase);
-    createMemoryGuardRegion(stackTop + 1);
+    createMemoryGuardRegion(stackTop + 16);
 }
 
 std::vector<uint32_t> WasmModule::getThreadStacks()
