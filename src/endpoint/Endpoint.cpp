@@ -228,7 +228,9 @@ struct SchedulerMonitoringTask
 void Endpoint::start(bool awaitSignal)
 {
     SPDLOG_INFO("Starting HTTP endpoint on {}, {} threads", port, threadCount);
-    tracy::SetThreadName("EndpointSignalAwaiter");
+    if (getpid() != gettid()) {
+        tracy::SetThreadName("EndpointSignalAwaiter");
+    }
 
     this->state = std::make_unique<detail::EndpointState>(this->threadCount);
 

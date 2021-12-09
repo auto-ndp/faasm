@@ -18,7 +18,7 @@ void FaabricEndpointHandler::onRequest(
   HttpRequestContext&& ctx,
   faabric::util::BeastHttpRequest&& request)
 {
-    if (!registered_with_tracy) {
+    if (!registered_with_tracy && (getpid() != gettid())) {
         registered_with_tracy = true;
         tracy::SetThreadName("Pistache HTTP thread");
     }
@@ -159,7 +159,6 @@ void FaabricEndpointHandler::onFunctionResult(
   faabric::Message& result)
 {
     ZoneScopedNS("Respond to HTTP function", 4);
-    faabric::util::SystemConfig& conf = faabric::util::getSystemConfig();
     beast::http::status statusCode =
       (result.returnvalue() == 0) ? beast::http::status::ok
                                   : beast::http::status::internal_server_error;
