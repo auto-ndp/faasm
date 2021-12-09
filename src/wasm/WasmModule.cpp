@@ -206,7 +206,7 @@ void WasmModule::restore(const std::string& snapshotKey)
     }
 
     // Map the snapshot into memory
-    ZoneValue(data.size);
+    ZoneValue(data->size);
     uint8_t* memoryBase = getMemoryBase();
     switch (config.vmArenaMode) {
         case conf::VirtualMemoryArenaMode::Default: {
@@ -215,19 +215,19 @@ void WasmModule::restore(const std::string& snapshotKey)
         }
         case conf::VirtualMemoryArenaMode::Uffd: {
             auto snapshot = reg.getSnapshot(snapshotKey);
-            if (snapshot.fd <= 0) {
+            if (snapshot->fd <= 0) {
                 SPDLOG_ERROR("Attempting to map non-restorable snapshot");
                 throw std::runtime_error("Mapping non-restorable snapshot");
             }
             auto& umam = uffd::UffdMemoryArenaManager::instance();
-            umam.discardAndResizeRange((std::byte*)memoryBase, snapshot.size);
-            int fd = snapshot.fd;
+            umam.discardAndResizeRange((std::byte*)memoryBase, snapshot->size);
+            int fd = snapshot->fd;
             using faabric::util::checkErrno;
             checkErrno(::lseek(fd, 0, SEEK_SET), "snapshot fd seek");
             size_t curPos = 0;
-            while (curPos < snapshot.size) {
+            while (curPos < snapshot->size) {
                 ssize_t bytes =
-                  ::read(fd, memoryBase + curPos, snapshot.size - curPos);
+                  ::read(fd, memoryBase + curPos, snapshot->size - curPos);
                 if (bytes < 0) {
                     if (errno == EINTR) {
                         continue;
