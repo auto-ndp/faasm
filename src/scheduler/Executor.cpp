@@ -24,9 +24,9 @@ ExecutorTask::ExecutorTask(int messageIndexIn,
                            std::shared_ptr<std::atomic<int>> batchCounterIn,
                            bool needsSnapshotPushIn,
                            bool skipResetIn)
-  : messageIndex(messageIndexIn)
-  , req(reqIn)
-  , batchCounter(batchCounterIn)
+  : req(std::move(reqIn))
+  , batchCounter(std::move(batchCounterIn))
+  , messageIndex(messageIndexIn)
   , needsSnapshotPush(needsSnapshotPushIn)
   , skipReset(skipResetIn)
 {}
@@ -53,8 +53,6 @@ Executor::Executor(faabric::Message& msg)
         availablePoolThreads.insert(i);
     }
 }
-
-Executor::~Executor() {}
 
 void Executor::finish()
 {
@@ -352,9 +350,9 @@ void Executor::threadPoolThread(int threadPoolIdx)
         if (!skippedExec && isLastInBatch && task.needsSnapshotPush) {
             ZoneScopedN("Task snapshot diff push");
             // Get diffs between original snapshot and after execution
-            faabric::util::SnapshotData snapshotPostExecution = snapshot();
+            auto snapshotPostExecution = snapshot();
 
-            faabric::util::SnapshotData snapshotPreExecution =
+            auto snapshotPreExecution =
               faabric::snapshot::getSnapshotRegistry().getSnapshot(
                 msg.snapshotkey());
 
@@ -362,8 +360,8 @@ void Executor::threadPoolThread(int threadPoolIdx)
                          msg.snapshotkey());
 
             std::vector<faabric::util::SnapshotDiff> diffs =
-              snapshotPreExecution.getChangeDiffs(snapshotPostExecution.data,
-                                                  snapshotPostExecution.size);
+              snapshotPreExecution->getChangeDiffs(snapshotPostExecution.data,
+                                                   snapshotPostExecution.size);
 
             sch.pushSnapshotDiffs(msg, diffs);
 

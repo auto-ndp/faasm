@@ -345,7 +345,7 @@ std::map<std::string, std::string> getStringStringMapFromJson(
       std::string(valuePtr, valuePtr + it->value.GetStringLength()));
     std::string keyVal;
     while (std::getline(ss, keyVal, ',')) {
-        auto pos = keyVal.find(":");
+        auto pos = keyVal.find(':');
         std::string key = keyVal.substr(0, pos);
         map[key] = keyVal.erase(0, pos + sizeof(char));
     }
@@ -368,7 +368,7 @@ std::map<std::string, int> getStringIntMapFromJson(Document& doc,
       std::string(valuePtr, valuePtr + it->value.GetStringLength()));
     std::string keyVal;
     while (std::getline(ss, keyVal, ',')) {
-        auto pos = keyVal.find(":");
+        auto pos = keyVal.find(':');
         std::string key = keyVal.substr(0, pos);
         int val = std::stoi(keyVal.erase(0, pos + sizeof(char)));
         map[key] = val;
