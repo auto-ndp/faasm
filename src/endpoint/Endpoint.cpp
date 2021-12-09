@@ -259,9 +259,7 @@ void Endpoint::start(bool awaitSignal)
         try {
             ioc.run();
         } catch (std::exception& ex) {
-            SPDLOG_CRITICAL("Asio runner caught exception of type {}: {}",
-                            typeid(ex).name(),
-                            ex.what());
+            SPDLOG_CRITICAL("Asio runner caught exception: {}", ex.what());
             throw;
         }
     };
