@@ -3,6 +3,8 @@
 #include <faabric/util/config.h>
 #include <faabric/util/exception.h>
 
+#include <absl/container/flat_hash_map.h>
+#include <chrono>
 #include <hiredis/hiredis.h>
 #include <memory>
 #include <mutex>
@@ -137,7 +139,9 @@ class Redis
 
     std::string srandmember(const std::string& key);
 
-    std::set<std::string> smembers(const std::string& key);
+    std::set<std::string> smembers(
+      const std::string& key,
+      std::chrono::milliseconds cacheFor = std::chrono::milliseconds(0));
 
     std::set<std::string> sdiff(const std::string& keyA,
                                 const std::string& keyB);
@@ -216,6 +220,12 @@ class Redis
     const RedisInstance& instance;
 
     UniqueRedisReply dequeueBase(const std::string& queueName, int timeout);
+
+    std::mutex smembersCacheMx;
+    absl::flat_hash_map<
+      std::string,
+      std::pair<std::chrono::steady_clock::time_point, std::set<std::string>>>
+      smembersCache;
 };
 
 class RedisNoResponseException : public faabric::util::FaabricException

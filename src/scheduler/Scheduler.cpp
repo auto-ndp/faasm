@@ -96,11 +96,13 @@ Scheduler::Scheduler()
     }
 }
 
+constexpr std::chrono::milliseconds HOST_CACHE_TIME(10000);
+
 std::set<std::string> Scheduler::getAvailableHosts()
 {
     ZoneScopedN("Scheduler::getAvailableHosts");
     redis::Redis& redis = redis::Redis::getQueue();
-    return redis.smembers(getGlobalSetName());
+    return redis.smembers(getGlobalSetName(), HOST_CACHE_TIME);
 }
 
 std::set<std::string> Scheduler::getAvailableHostsForFunction(
@@ -108,7 +110,7 @@ std::set<std::string> Scheduler::getAvailableHostsForFunction(
 {
     ZoneScopedN("Scheduler::getAvailableHostsForFunction");
     redis::Redis& redis = redis::Redis::getQueue();
-    return redis.smembers(getGlobalSetNameForFunction(msg));
+    return redis.smembers(getGlobalSetNameForFunction(msg), HOST_CACHE_TIME);
 }
 
 void Scheduler::addHostToGlobalSet(const std::string& host)
@@ -414,9 +416,12 @@ faabric::util::SchedulingDecision Scheduler::makeSchedulingDecision(
 
             for (const auto& h : thisRegisteredHosts) {
                 // Work out resources on this host
-                faabric::HostResources r = getHostResources(h);
-                int available = r.slots() - r.usedslots();
-                int nOnThisHost = std::min(available, remainder);
+                int nOnThisHost = remainder;
+                if (registeredHosts.size() > 1) {
+                    faabric::HostResources r = getHostResources(h);
+                    int available = r.slots() - r.usedslots();
+                    nOnThisHost = std::min(available, remainder);
+                }
 
                 // Under the NEVER_ALONE topology hint, we never choose a
                 // host unless we can schedule at least two requests in it.
@@ -458,9 +463,12 @@ faabric::util::SchedulingDecision Scheduler::makeSchedulingDecision(
                 lastHost = h;
 
                 // Work out resources on this host
-                faabric::HostResources r = getHostResources(h);
-                int available = r.slots() - r.usedslots();
-                int nOnThisHost = std::min(available, remainder);
+                int nOnThisHost = remainder;
+                if (unregisteredHosts.size() > 1) {
+                    faabric::HostResources r = getHostResources(h);
+                    int available = r.slots() - r.usedslots();
+                    nOnThisHost = std::min(available, remainder);
+                }
 
                 if (topologyHint ==
                       faabric::util::SchedulingTopologyHint::NEVER_ALONE &&
@@ -952,8 +960,9 @@ void Scheduler::broadcastFlush()
     faabric::util::FullLock lock(mx);
     // Get all hosts
     redis::Redis& redis = redis::Redis::getQueue();
-    std::set<std::string> allHosts = redis.smembers(AVAILABLE_HOST_SET);
-    allHosts.merge(redis.smembers(AVAILABLE_STORAGE_HOST_SET));
+    std::set<std::string> allHosts =
+      redis.smembers(AVAILABLE_HOST_SET, HOST_CACHE_TIME);
+    allHosts.merge(redis.smembers(AVAILABLE_STORAGE_HOST_SET, HOST_CACHE_TIME));
 
     // Remove this host from the set
     allHosts.erase(thisHost);

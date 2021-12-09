@@ -4,6 +4,7 @@
 #include <faabric/util/bytes.h>
 #include <faabric/util/config.h>
 #include <faabric/util/gids.h>
+#include <faabric/util/locks.h>
 #include <faabric/util/logging.h>
 #include <faabric/util/network.h>
 #include <faabric/util/random.h>
@@ -404,11 +405,36 @@ std::set<std::string> extractStringSetFromReply(const redisReply& reply)
     return retValue;
 }
 
-std::set<std::string> Redis::smembers(const std::string& key)
+std::set<std::string> Redis::smembers(const std::string& key,
+                                      std::chrono::milliseconds cacheFor)
 {
     ZoneScopedNS("Redis::smembers", 6);
+    faabric::util::UniqueLock cacheLock;
+    using CacheIterator = decltype(smembersCache)::iterator;
+    CacheIterator cacheIt;
+    std::chrono::steady_clock::time_point now;
+    if (cacheFor > decltype(cacheFor)::zero()) {
+        cacheLock = faabric::util::UniqueLock(smembersCacheMx);
+        now = std::chrono::steady_clock::now();
+        cacheIt = smembersCache.find(key);
+        if (cacheIt != smembersCache.end()) {
+            auto tCached = cacheIt->second.first;
+            if (now < tCached + cacheFor) {
+                ZoneText("Cached", 6);
+                return cacheIt->second.second;
+            }
+        } else {
+            cacheIt = smembersCache.emplace_hint(
+              cacheIt, key, std::make_pair(now, std::set<std::string>()));
+        }
+    }
+    ZoneText("Redis", 5);
     auto reply = safeRedisCommand(context, "SMEMBERS %s", key.c_str());
     std::set<std::string> result = extractStringSetFromReply(*reply);
+    if (cacheLock) {
+        cacheIt->second.first = std::chrono::steady_clock::now();
+        cacheIt->second.second = result;
+    }
 
     return result;
 }
