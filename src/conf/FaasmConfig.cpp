@@ -154,13 +154,19 @@ void FaasmConfig::print()
 }
 }
 
+#define USE_TRACY_ALLOC_TRACING 0
+
 inline void TraceAlloc(void* p, size_t n)
 {
+#if USE_TRACY_ALLOC_TRACING
     TracySecureAlloc(p, n);
+#endif
 }
 inline void TraceFree(void* p)
 {
+#if USE_TRACY_ALLOC_TRACING
     TracySecureFree(p);
+#endif
 }
 
 #if 1
