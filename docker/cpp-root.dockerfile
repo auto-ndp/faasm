@@ -24,4 +24,4 @@ RUN apt-get install -y \
 RUN apt-get -y clean autoclean
 RUN apt-get -y autoremove
 
-CMD /bin/bash
+CMD ["/bin/bash"]
