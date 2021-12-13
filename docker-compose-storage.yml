@@ -22,7 +22,7 @@ services:
     volumes:
       - ./dev/minio/data:/data/minio
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
       interval: 5s
       timeout: 3s
       retries: 3
@@ -53,7 +53,7 @@ services:
       - "saturno-fast:192.168.3.20"
       - "kone-fast:192.168.3.30"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8002/ping"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8002/ping" ]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -102,7 +102,8 @@ services:
       - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
       - ENDPOINT_HOST=${STORAGE_NODE}
       - ENDPOINT_NUM_THREADS=4
-      - OVERRIDE_CPU_COUNT=12
+      - OVERRIDE_CPU_COUNT=${OVERRIDE_CPU_COUNT:-12}
+      - VM_ARENA_MODE=${VM_ARENA_MODE:-}
     extra_hosts:
       - "luna-fast:192.168.3.10"
       - "saturno-fast:192.168.3.20"

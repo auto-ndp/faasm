@@ -17,7 +17,7 @@ services:
     volumes:
       - ./dev/minio/data:/data/minio
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
       interval: 5s
       timeout: 3s
       retries: 3
@@ -49,7 +49,7 @@ services:
       - REDIS_STATE_HOST=redis-state
       - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8002/ping"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8002/ping" ]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -96,6 +96,7 @@ services:
       - ENDPOINT_HOST=worker
       - ENDPOINT_NUM_THREADS=1
       - OVERRIDE_CPU_COUNT=8
+      - VM_ARENA_MODE=${VM_ARENA_MODE:-}
 
   worker-storage:
     image: kubasz51/faasm-worker:${FAASM_VERSION}
@@ -140,6 +141,7 @@ services:
       - ENDPOINT_HOST=worker-storage
       - ENDPOINT_NUM_THREADS=1
       - OVERRIDE_CPU_COUNT=8
+      - VM_ARENA_MODE=${VM_ARENA_MODE:-}
 
   # Load balancer for local cluster
   nginx:

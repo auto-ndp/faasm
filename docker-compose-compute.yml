@@ -20,7 +20,7 @@ services:
         hard: 1073741824
     ports:
       - "8080:8080"
-#      - "5000:5000"
+      #      - "5000:5000"
       - "8003-8010:8003-8010"
       - "8086:8086"
     privileged: true
@@ -49,7 +49,8 @@ services:
       - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
       - ENDPOINT_HOST=${COMPUTE_NODE}
       - ENDPOINT_NUM_THREADS=4
-      - OVERRIDE_CPU_COUNT=26
+      - OVERRIDE_CPU_COUNT=${OVERRIDE_CPU_COUNT:-26}
+      - VM_ARENA_MODE=${VM_ARENA_MODE:-}
     extra_hosts:
       - "luna-fast:192.168.3.10"
       - "saturno-fast:192.168.3.20"
