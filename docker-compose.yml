@@ -1,4 +1,4 @@
-version: "3"
+version: "3.8"
 
 services:
   redis-state:
@@ -24,6 +24,7 @@ services:
 
   upload:
     image: kubasz51/faasm-upload:${FAASM_VERSION}
+    init: true
     ports:
       - "8002:8002"
     expose:
@@ -57,6 +58,7 @@ services:
   # Distributed worker, used for executing as a local cluster
   worker:
     image: kubasz51/faasm-worker:${FAASM_VERSION}
+    init: true
     security_opt:
       - seccomp:unconfined
     # Allows for tracy thread&ctx switch tracking to work better
@@ -81,6 +83,7 @@ services:
       - /sys/kernel/debug:/sys/kernel/debug
       - /sys/kernel/debug/tracing:/sys/kernel/debug/tracing
     environment:
+      - TINI_SUBREAPER=1
       - CODEGEN_TARGETS=x86_64:skylake;aarch64:thunderx2t99
       - CAPTURE_STDOUT=on
       - CGROUP_MODE=off
@@ -100,6 +103,7 @@ services:
 
   worker-storage:
     image: kubasz51/faasm-worker:${FAASM_VERSION}
+    init: true
     security_opt:
       - seccomp:unconfined
     # Allows for tracy thread&ctx switch tracking to work better
@@ -124,6 +128,7 @@ services:
       - /sys/kernel/debug:/sys/kernel/debug
       - /sys/kernel/debug/tracing:/sys/kernel/debug/tracing
     environment:
+      - TINI_SUBREAPER=1
       - CODEGEN_TARGETS=x86_64:skylake;aarch64:thunderx2t99
       - CAPTURE_STDOUT=off
       - CGROUP_MODE=off
@@ -157,6 +162,7 @@ services:
   # C/C++ functions
   cpp:
     image: ${CPP_CLI_IMAGE}
+    init: true
     working_dir: /code/cpp
     stdin_open: true
     tty: true
@@ -167,6 +173,7 @@ services:
   # Python functions
   python:
     image: ${PYTHON_CLI_IMAGE}
+    init: true
     working_dir: /code/python
     stdin_open: true
     tty: true
@@ -177,6 +184,7 @@ services:
   # Faasm dev
   faasm-cli:
     image: ${FAASM_CLI_IMAGE}
+    init: true
     working_dir: /usr/local/code/faasm
     stdin_open: true
     tty: true
@@ -201,6 +209,7 @@ services:
   # Distributed tests server
   dist-test-server:
     image: ${FAASM_CLI_IMAGE}
+    init: true
     working_dir: /build/faasm
     depends_on:
       - redis-queue

@@ -1,4 +1,4 @@
-version: "3"
+version: "3.8"
 
 services:
   # Compute
@@ -10,6 +10,7 @@ services:
   # Compute
   worker:
     image: kubasz51/faasm-worker:${FAASM_VERSION}
+    init: true
     security_opt:
       - seccomp:unconfined
     # Allows for tracy thread&ctx switch tracking to work better
@@ -34,6 +35,7 @@ services:
       - /sys/kernel/debug:/sys/kernel/debug
       - /sys/kernel/debug/tracing:/sys/kernel/debug/tracing
     environment:
+      - TINI_SUBREAPER=1
       - CODEGEN_TARGETS=x86_64:skylake;aarch64:thunderx2t99
       - CAPTURE_STDOUT=off
       - CGROUP_MODE=off
@@ -69,6 +71,7 @@ services:
   # Both
   cpp:
     image: ${CPP_CLI_IMAGE}
+    init: true
     working_dir: /code/cpp
     stdin_open: true
     tty: true
@@ -88,6 +91,7 @@ services:
   # Both
   python:
     image: ${PYTHON_CLI_IMAGE}
+    init: true
     working_dir: /code/python
     stdin_open: true
     tty: true
@@ -109,6 +113,7 @@ services:
   # Both
   faasm-cli:
     image: ${FAASM_CLI_IMAGE}
+    init: true
     working_dir: /usr/local/code/faasm
     stdin_open: true
     tty: true
