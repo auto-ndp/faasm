@@ -174,7 +174,11 @@ class Scheduler
 
     void flushLocally();
 
-    void setFunctionResult(faabric::Message& msg);
+    void setFunctionResult(std::unique_ptr<faabric::Message> msg);
+
+    inline void setFunctionResult(const faabric::Message& msg) {
+        setFunctionResult(std::make_unique<faabric::Message>(msg));
+    }
 
     faabric::Message getFunctionResult(unsigned int messageId,
                                        int timeoutMs,

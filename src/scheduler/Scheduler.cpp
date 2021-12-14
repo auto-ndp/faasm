@@ -995,19 +995,19 @@ void Scheduler::flushLocally()
     getExecutorFactory()->flushHost();
 }
 
-void Scheduler::setFunctionResult(faabric::Message& msg)
+void Scheduler::setFunctionResult(std::unique_ptr<faabric::Message> msg)
 {
     ZoneScopedNS("Scheduler::setFunctionResult", 5);
-    ZoneValue(msg.ByteSizeLong());
+    ZoneValue(msg->ByteSizeLong());
 
     const auto& myHostname = faabric::util::getSystemConfig().endpointHost;
 
-    const auto& directResultHost = msg.directresulthost();
+    const auto& directResultHost = msg->directresulthost();
     if (directResultHost == myHostname) {
         faabric::util::UniqueLock resultsLock(localResultsMutex);
-        auto it = localResults.find(msg.id());
+        auto it = localResults.find(msg->id());
         if (it != localResults.end()) {
-            it->second->set_value(std::make_unique<faabric::Message>(msg));
+            it->second->set_value(std::move(msg));
         } else {
             throw std::runtime_error(
               "Got direct result, but promise is registered");
@@ -1016,10 +1016,10 @@ void Scheduler::setFunctionResult(faabric::Message& msg)
     }
 
     // Record which host did the execution
-    msg.set_executedhost(myHostname);
+    msg->set_executedhost(myHostname);
 
     // Set finish timestamp
-    msg.set_finishtimestamp(faabric::util::getGlobalClock().epochMillis());
+    msg->set_finishtimestamp(faabric::util::getGlobalClock().epochMillis());
 
     if (!directResultHost.empty()) {
         ZoneScopedN("Direct result send");
@@ -1028,37 +1028,32 @@ void Scheduler::setFunctionResult(faabric::Message& msg)
         lock.unlock();
         {
             ZoneScopedN("Socket send");
-            fc.sendDirectResult(msg);
+            fc.sendDirectResult(*msg);
         }
         return;
     }
 
-    if (msg.executeslocally()) {
+    if (msg->executeslocally()) {
         ZoneScopedN("Local results publish");
         faabric::util::UniqueLock resultsLock(localResultsMutex);
 
-        auto it = localResults.find(msg.id());
+        auto it = localResults.find(msg->id());
         if (it != localResults.end()) {
-            it->second->set_value(std::make_unique<faabric::Message>(msg));
+            it->second->set_value(std::move(msg));
         }
 
-        // Sync messages can't have their results read twice, so skip
-        // redis
-        if (!msg.isasync()) {
-            return;
-        }
         return;
     }
 
-    std::string key = msg.resultkey();
+    std::string key = msg->resultkey();
     if (key.empty()) {
         throw std::runtime_error("Result key empty. Cannot publish result");
     }
 
     // Write the successful result to the result queue
-    std::vector<uint8_t> inputData = faabric::util::messageToBytes(msg);
+    std::vector<uint8_t> inputData = faabric::util::messageToBytes(*msg);
     redis::Redis& redis = redis::Redis::getQueue();
-    redis.publishSchedulerResult(key, msg.statuskey(), inputData);
+    redis.publishSchedulerResult(key, msg->statuskey(), inputData);
 }
 
 void Scheduler::registerThread(uint32_t msgId)
