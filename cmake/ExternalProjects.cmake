@@ -130,7 +130,7 @@ add_library(zstd::libzstd_static ALIAS libzstd_static)
 # Tracy (not in Conan)
 FetchContent_Declare(tracy_ext
     GIT_REPOSITORY "https://github.com/wolfpld/tracy.git"
-    GIT_TAG "ac331d034359d42fca68c54d761fb52190be6807"
+    GIT_TAG "a13b04669839e45a2ed5ed33abac787b71eb0414"
 )
 FetchContent_GetProperties(tracy_ext)
 if(NOT tracy_ext_POPULATED)
