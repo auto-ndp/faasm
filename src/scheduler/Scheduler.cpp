@@ -479,7 +479,7 @@ faabric::util::SchedulingDecision Scheduler::makeSchedulingDecision(
                 }
 
                 // Register the host if it's exected a function
-                if (nOnThisHost > 0) {
+                if (nOnThisHost > 0 && !hostKindDifferent) {
                     registeredHosts[funcStr].insert(h);
                 }
 
@@ -523,7 +523,10 @@ faabric::util::SchedulingDecision Scheduler::makeSchedulingDecision(
     }
 
     // Sanity check
-    assert(hosts.size() == nMessages);
+    if (hosts.size() == nMessages) {
+        throw std::logic_error(
+          "Scheduler logic generated wrong number of hosts");
+    }
 
     // Set up decision
     SchedulingDecision decision(firstMsg.appid(), firstMsg.groupid());
