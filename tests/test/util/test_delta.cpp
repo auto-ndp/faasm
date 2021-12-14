@@ -119,8 +119,7 @@ TEST_CASE("Test delta calculate and apply", "[util][delta]")
     for (const auto& cfg : settingsVariants) {
         SECTION(cfg.toString())
         {
-            auto delta = serializeDelta(
-              cfg, oldMem.data(), oldMem.size(), newMem.data(), newMem.size());
+            auto delta = serializeDelta(cfg, oldMem, newMem);
             REQUIRE(delta.size() > 2);
             std::vector<uint8_t> appliedMem(oldMem);
             REQUIRE(std::equal(oldMem.cbegin(),

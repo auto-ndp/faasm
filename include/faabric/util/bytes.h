@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -49,7 +50,7 @@ void appendBytesOf(std::vector<uint8_t>& container, T value)
 }
 
 template<class T>
-size_t readBytesOf(const std::vector<uint8_t>& container,
+size_t readBytesOf(std::span<const uint8_t> container,
                    size_t offset,
                    T* outValue)
 {

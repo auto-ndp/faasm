@@ -2,9 +2,9 @@
 
 #include <cstdint>
 #include <functional>
+#include <span>
 #include <string>
 #include <utility>
-#include <vector>
 
 namespace faabric::util {
 
@@ -24,7 +24,6 @@ struct DeltaSettings
 };
 
 inline constexpr uint8_t DELTA_PROTOCOL_VERSION = 1;
-inline constexpr int DELTA_ZSTD_COMPRESS_LEVEL = 1;
 
 enum DeltaCommand : uint8_t
 {
@@ -43,13 +42,11 @@ enum DeltaCommand : uint8_t
 
 std::vector<uint8_t> serializeDelta(
   const DeltaSettings& cfg,
-  const uint8_t* oldDataStart,
-  size_t oldDataLen,
-  const uint8_t* newDataStart,
-  size_t newDataLen,
-  const std::vector<std::pair<uint32_t, uint32_t>>* excludedPtrLens = nullptr);
+  std::span<const uint8_t> oldData,
+  std::span<const uint8_t> newData,
+  std::span<const std::pair<uint32_t, uint32_t>> excludedPtrLens = {});
 
-void applyDelta(const std::vector<uint8_t>& delta,
+void applyDelta(std::span<const uint8_t> delta,
                 std::function<void(uint32_t)> setDataSize,
                 std::function<uint8_t*()> getDataPointer);
 
