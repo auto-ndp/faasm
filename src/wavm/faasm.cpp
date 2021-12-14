@@ -414,6 +414,10 @@ I32 _readInputImpl(I32 bufferPtr, I32 bufferLen)
     faabric::Message* call = getExecutingCall();
     const auto& inputBytes = call->inputdata();
 
+    if (bufferLen == 0) {
+        return inputBytes.size();
+    }
+
     // If nothing, return nothing
     if (inputBytes.empty()) {
         return 0;
