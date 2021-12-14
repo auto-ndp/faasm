@@ -42,10 +42,6 @@ int safeCopyToBuffer(const std::vector<uint8_t>& dataIn,
 {
     int dataSize = (int)dataIn.size();
 
-    if (bufferLen <= 0) {
-        return dataSize;
-    }
-
     return safeCopyToBuffer(dataIn.data(), dataIn.size(), buffer, bufferLen);
 }
 
@@ -56,6 +52,10 @@ int safeCopyToBuffer(const uint8_t* dataIn,
 {
     if (dataLen == 0) {
         return 0;
+    }
+
+    if (bufferLen <= 0) {
+        return dataLen;
     }
 
     // Truncate date being copied into a short buffer
