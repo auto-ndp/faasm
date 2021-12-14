@@ -1079,27 +1079,45 @@ int32_t WAVMWasmModule::executeFunction(faabric::Message& msg)
         funcInstance = getFunctionFromPtr(funcPtr);
         funcType = Runtime::getFunctionType(funcInstance);
         Uptr nParams = funcType.params().size();
+        const auto& extraArgs = msg.extraarguments();
 
-        switch (nParams) {
-            case (0): {
-                break;
+        if (!extraArgs.empty()) {
+            if (nParams != extraArgs.size()) {
+                SPDLOG_ERROR("Mismatched argument count: WASM expects {}, got "
+                             "{} in request",
+                             nParams,
+                             extraArgs.size());
+                throw std::runtime_error(
+                  "Unexpected function pointer arg count");
             }
-            case (1): {
-                // NOTE - when we've got a function pointer that takes a
-                // single argument we assume the args, we assume it's a
-                // chained thread invocation.
-                if (msg.inputdata().empty()) {
-                    invokeArgs = { 0 };
-                } else {
-                    int intArg = std::stoi(msg.inputdata());
-                    invokeArgs = { intArg };
+            invokeArgs.reserve(nParams);
+            for (I32 param : extraArgs) {
+                invokeArgs.push_back(param);
+            }
+        } else {
+            switch (nParams) {
+                case (0): {
+                    break;
                 }
-                break;
-            }
-            default: {
-                SPDLOG_ERROR("Unexpected function pointer type with {} params",
-                             nParams);
-                throw std::runtime_error("Unexpected function pointer args");
+                case (1): {
+                    // NOTE - when we've got a function pointer that takes a
+                    // single argument we assume the args, we assume it's a
+                    // chained thread invocation.
+                    if (msg.inputdata().empty()) {
+                        invokeArgs = { 0 };
+                    } else {
+                        int intArg = std::stoi(msg.inputdata());
+                        invokeArgs = { intArg };
+                    }
+                    break;
+                }
+                default: {
+                    SPDLOG_ERROR(
+                      "Unexpected function pointer type with {} params",
+                      nParams);
+                    throw std::runtime_error(
+                      "Unexpected function pointer args");
+                }
             }
         }
     } else {

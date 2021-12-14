@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstdio>
+#include <span>
 #include <string_view>
 
 #include <WAVM/IR/IR.h>
@@ -157,7 +158,9 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
     return outPtr;
 }
 
-I32 storageCallAndAwaitImpl(I32 wasmFuncPtr, I32 pyFuncNamePtr)
+I32 storageCallAndAwaitImpl(I32 wasmFuncPtr,
+                            I32 pyFuncNamePtr,
+                            std::span<I32> extraArgs)
 {
     ZoneScopedNS("ndp_objects::storageCallAndAwait", 6);
     const faabric::util::SystemConfig& config =
@@ -173,18 +176,35 @@ I32 storageCallAndAwaitImpl(I32 wasmFuncPtr, I32 pyFuncNamePtr)
     WAVMWasmModule* thisModule = static_cast<WAVMWasmModule*>(
       getCurrentWasmExecutionContext()->executingModule);
 
+    // Validate function signature
+    if (!isPython) {
+        auto* funcInstance = thisModule->getFunctionFromPtr(wasmFuncPtr);
+        auto funcType = Runtime::getFunctionType(funcInstance);
+        if (funcType.results().size() != 1 ||
+            funcType.params().size() != extraArgs.size()) {
+            throw std::invalid_argument(
+              "Wrong function signature for storageCallAndAwait");
+        }
+        for (const auto& param : funcType.params()) {
+            if (param != IR::ValueType::i32) {
+                throw std::invalid_argument("Function argument not i32");
+            }
+        }
+    }
+
     if (config.isStorageNode || call->forbidndp()) {
         ZoneScopedN("call locally");
         if (isPython) {
             return -0x12345678;
         }
-        auto funcInstance = thisModule->getFunctionFromPtr(wasmFuncPtr);
+        auto* funcInstance = thisModule->getFunctionFromPtr(wasmFuncPtr);
         auto funcType = Runtime::getFunctionType(funcInstance);
-        if (funcType.results().size() != 1 || funcType.params().size() != 0) {
-            throw std::invalid_argument(
-              "Wrong function signature for storageCallAndAwait");
+        std::vector<IR::UntaggedValue> funcArgs;
+        funcArgs.reserve(extraArgs.size() + 1);
+        for (I32 param : extraArgs) {
+            funcArgs.push_back(param);
         }
-        std::vector<IR::UntaggedValue> funcArgs = { 0 };
+        funcArgs.push_back(0);
         IR::UntaggedValue result;
         Runtime::invokeFunction(thisModule->executionContext,
                                 funcInstance,
@@ -194,7 +214,7 @@ I32 storageCallAndAwaitImpl(I32 wasmFuncPtr, I32 pyFuncNamePtr)
         return result.i32;
     } else {
         auto zygoteSnapshotKV = thisModule->getZygoteSnapshot();
-        auto zygoteSnapshot = zygoteSnapshotKV->get();
+        auto* zygoteSnapshot = zygoteSnapshotKV->get();
         faabric::util::SnapshotData zygoteSnap;
         zygoteSnap.fd = -1;
         zygoteSnap.data = zygoteSnapshot;
@@ -210,6 +230,7 @@ I32 storageCallAndAwaitImpl(I32 wasmFuncPtr, I32 pyFuncNamePtr)
                                      call->inputdata(),
                                      wasmFuncPtr,
                                      pyFuncName.c_str(),
+                                     extraArgs,
                                      wasmGlobals);
         faabric::Message ndpResult = awaitChainedCallMessage(ndpCallId);
 
@@ -252,7 +273,30 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
                                __faasmndp_storageCallAndAwait,
                                I32 wasmFuncPtr)
 {
-    return storageCallAndAwaitImpl(wasmFuncPtr, 0);
+    return storageCallAndAwaitImpl(wasmFuncPtr, 0, {});
+}
+
+WAVM_DEFINE_INTRINSIC_FUNCTION(env,
+                               "__faasmndp_storageCallAndAwait1",
+                               I32,
+                               __faasmndp_storageCallAndAwait1,
+                               I32 wasmFuncPtr,
+                               I32 arg1)
+{
+    std::array args{ arg1 };
+    return storageCallAndAwaitImpl(wasmFuncPtr, 0, args);
+}
+
+WAVM_DEFINE_INTRINSIC_FUNCTION(env,
+                               "__faasmndp_storageCallAndAwait2",
+                               I32,
+                               __faasmndp_storageCallAndAwait2,
+                               I32 wasmFuncPtr,
+                               I32 arg1,
+                               I32 arg2)
+{
+    std::array args{ arg1, arg2 };
+    return storageCallAndAwaitImpl(wasmFuncPtr, 0, args);
 }
 
 WAVM_DEFINE_INTRINSIC_FUNCTION(env,
@@ -261,7 +305,7 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
                                __faasmndp_storageCallAndAwait_py,
                                I32 namePtr)
 {
-    return storageCallAndAwaitImpl(0, namePtr);
+    return storageCallAndAwaitImpl(0, namePtr, {});
 }
 
 void ndpLink() {}

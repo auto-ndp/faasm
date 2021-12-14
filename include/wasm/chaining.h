@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <faabric/proto/faabric.pb.h>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -25,6 +26,7 @@ int chainNdpCall(const std::string& zygoteDelta,
                  const std::string& inputData,
                  int funcPtr,
                  const char* pyFuncName,
-                 const std::vector<int32_t>& wasmGlobals);
+                 std::span<const int32_t> extraArgs,
+                 std::span<const int32_t> wasmGlobals);
 
 }

@@ -182,7 +182,8 @@ int chainNdpCall(const std::string& zygoteDelta,
                  const std::string& inputData,
                  int funcPtr,
                  const char* pyFuncName,
-                 const std::vector<int32_t>& wasmGlobals)
+                 std::span<const int32_t> extraArgs,
+                 std::span<const int32_t> wasmGlobals)
 {
     const auto& fcfg = faabric::util::getSystemConfig();
     faabric::scheduler::Scheduler& sch = faabric::scheduler::getScheduler();
@@ -202,8 +203,8 @@ int chainNdpCall(const std::string& zygoteDelta,
     call.set_inputdata(inputData);
     call.set_isstorage(true);
     call.set_isoutputmemorydelta(true);
-    call.mutable_wasmglobals()->Assign(wasmGlobals.cbegin(),
-                                       wasmGlobals.cend());
+    call.mutable_wasmglobals()->Assign(wasmGlobals.begin(), wasmGlobals.end());
+    call.mutable_extraarguments()->Assign(extraArgs.begin(), extraArgs.end());
     call.set_cmdline(originalCall->cmdline());
     call.set_directresulthost(fcfg.endpointHost);
 
