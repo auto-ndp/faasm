@@ -297,7 +297,7 @@ void WasmModule::storeZygoteSnapshot()
 }
 
 std::vector<uint8_t> WasmModule::deltaSnapshot(
-  const faabric::util::SnapshotData& oldMemory)
+  const std::span<const uint8_t> oldMemory)
 {
     ZoneScopedNS("WasmModule::deltaSnapshot", 6);
     auto newMemData = getMemoryBase();
@@ -309,8 +309,8 @@ std::vector<uint8_t> WasmModule::deltaSnapshot(
         ZoneValue(newMemSize);
         ZoneValue(this->snapshotExcludedPtrLens.size());
         return faabric::util::serializeDelta(dcfg,
-                                             oldMemory.data,
-                                             oldMemory.size,
+                                             oldMemory.data(),
+                                             oldMemory.size(),
                                              newMemData,
                                              newMemSize,
                                              &this->snapshotExcludedPtrLens);

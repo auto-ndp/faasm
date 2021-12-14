@@ -214,13 +214,10 @@ I32 storageCallAndAwaitImpl(I32 wasmFuncPtr,
         return result.i32;
     } else {
         auto zygoteSnapshotKV = thisModule->getZygoteSnapshot();
-        auto* zygoteSnapshot = zygoteSnapshotKV->get();
-        faabric::util::SnapshotData zygoteSnap;
-        zygoteSnap.fd = -1;
-        zygoteSnap.data = zygoteSnapshot;
-        zygoteSnap.size = zygoteSnapshotKV->size();
-        auto zygoteDelta =
-          faabric::util::bytesToString(thisModule->deltaSnapshot(zygoteSnap));
+        const std::span<const uint8_t> zygoteSnapshot{
+            zygoteSnapshotKV->get(), zygoteSnapshotKV->size()
+        };
+        auto zygoteDelta = thisModule->deltaSnapshot(zygoteSnapshot);
 
         SPDLOG_INFO("{} - NDP sending snapshot of {} bytes",
                     call->id(),

@@ -22,8 +22,8 @@ int makeChainedCall(const std::string& functionName,
 
 faabric::Message awaitChainedCallMessage(unsigned int messageId);
 
-int chainNdpCall(const std::string& zygoteDelta,
-                 const std::string& inputData,
+int chainNdpCall(std::span<const uint8_t> zygoteDelta,
+                 std::span<const char> inputData,
                  int funcPtr,
                  const char* pyFuncName,
                  std::span<const int32_t> extraArgs,

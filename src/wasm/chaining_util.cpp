@@ -178,8 +178,8 @@ faabric::Message awaitChainedCallMessage(unsigned int messageId)
     return result;
 }
 
-int chainNdpCall(const std::string& zygoteDelta,
-                 const std::string& inputData,
+int chainNdpCall(std::span<const uint8_t> zygoteDelta,
+                 std::span<const char> inputData,
                  int funcPtr,
                  const char* pyFuncName,
                  std::span<const int32_t> extraArgs,
@@ -196,11 +196,12 @@ int chainNdpCall(const std::string& zygoteDelta,
 
     // Snapshot details
     call.set_snapshotkey("");
-    call.set_zygotedelta(zygoteDelta);
+    call.mutable_zygotedelta()->assign(
+      reinterpret_cast<const char*>(zygoteDelta.data()), zygoteDelta.size());
 
     // Function pointer and args
     call.set_funcptr(funcPtr);
-    call.set_inputdata(inputData);
+    call.mutable_inputdata()->assign(inputData.data(), inputData.size());
     call.set_isstorage(true);
     call.set_isoutputmemorydelta(true);
     call.mutable_wasmglobals()->Assign(wasmGlobals.begin(), wasmGlobals.end());

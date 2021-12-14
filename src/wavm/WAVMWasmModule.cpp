@@ -1184,11 +1184,7 @@ int32_t WAVMWasmModule::executeFunction(faabric::Message& msg)
     if (returnValue == 0 && msg.isoutputmemorydelta()) {
         ZoneScopedN(
           "WAVMWasmModule::executeFunction calculate output memory delta");
-        faabric::util::SnapshotData oldDataSnap;
-        oldDataSnap.size = this->preExecuteMemoryData.size();
-        oldDataSnap.data = this->preExecuteMemoryData.data();
-        oldDataSnap.fd = -1;
-        auto delta = this->deltaSnapshot(oldDataSnap);
+        auto delta = this->deltaSnapshot(this->preExecuteMemoryData);
         this->preExecuteMemoryData.clear();
         msg.set_outputdata(delta.data(), delta.size());
 
