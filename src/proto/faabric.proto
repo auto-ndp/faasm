@@ -171,6 +171,7 @@ message Message {
     string directResultHost = 93;
     repeated int32 wasmGlobals = 94;
     optional bool forbidNdp = 95;
+    repeated int32 extraArguments = 96;
 }
 
 message DirectResultTransmission {
