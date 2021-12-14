@@ -523,7 +523,11 @@ faabric::util::SchedulingDecision Scheduler::makeSchedulingDecision(
     }
 
     // Sanity check
-    if (hosts.size() == nMessages) {
+    if (hosts.size() != nMessages) {
+        SPDLOG_CRITICAL(
+          "Scheduler logic generated wrong number of hosts ({} != {})",
+          hosts.size(),
+          nMessages);
         throw std::logic_error(
           "Scheduler logic generated wrong number of hosts");
     }
