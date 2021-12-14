@@ -126,6 +126,11 @@ class WasmModule
 
     virtual uint8_t* getMemoryBase();
 
+    inline std::span<uint8_t> getMemorySpan()
+    {
+        return std::span(getMemoryBase(), getMemorySizeBytes());
+    }
+
     // ----- Snapshot/ restore -----
     faabric::util::SnapshotData getSnapshotData();
 
@@ -137,16 +142,15 @@ class WasmModule
 
     void restore(const std::string& snapshotKey);
 
-    void zygoteDeltaRestore(const std::vector<uint8_t>& zygoteDelta);
+    void zygoteDeltaRestore(std::span<const uint8_t> zygoteDelta);
 
     std::shared_ptr<faabric::state::StateKeyValue> getZygoteSnapshot();
 
     std::vector<std::pair<uint32_t, uint32_t>> snapshotExcludedPtrLens;
 
-    std::vector<uint8_t> deltaSnapshot(
-      const std::span<const uint8_t> oldMemory);
+    std::vector<uint8_t> deltaSnapshot(std::span<const uint8_t> oldMemory);
 
-    void deltaRestore(const std::vector<uint8_t>& delta);
+    void deltaRestore(std::span<const uint8_t> delta);
     // ----- Threading -----
     void queuePthreadCall(threads::PthreadCall call);
 

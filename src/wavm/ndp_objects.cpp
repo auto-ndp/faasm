@@ -7,6 +7,7 @@
 #include <faabric/util/delta.h>
 #include <faabric/util/files.h>
 #include <faabric/util/logging.h>
+#include <faabric/util/macros.h>
 #include <faabric/util/snapshot.h>
 #include <faabric/util/timing.h>
 #include <wasm/WasmExecutionContext.h>
@@ -256,8 +257,9 @@ I32 storageCallAndAwaitImpl(I32 wasmFuncPtr,
         // faabric::util::writeBytesToFile(
         //   "/usr/local/faasm/debug_shared_store/debug_delta.bin",
         //   faabric::util::stringToBytes(ndpResult.outputdata()));
-        std::vector<uint8_t> memoryDelta =
-          faabric::util::stringToBytes(ndpResult.outputdata());
+        std::span<const uint8_t> memoryDelta =
+          std::span(BYTES_CONST(ndpResult.outputdata().data()),
+                    ndpResult.outputdata().size());
         thisModule->deltaRestore(memoryDelta);
     }
 

@@ -243,7 +243,7 @@ void WasmModule::restore(const std::string& snapshotKey)
     }
 }
 
-void WasmModule::zygoteDeltaRestore(const std::vector<uint8_t>& zygoteDelta)
+void WasmModule::zygoteDeltaRestore(std::span<const uint8_t> zygoteDelta)
 {
     ZoneScopedNS("WasmModule::zygoteDeltaRestore", 6);
     PROF_START(wasmZygoteDeltaRestore)
@@ -297,27 +297,23 @@ void WasmModule::storeZygoteSnapshot()
 }
 
 std::vector<uint8_t> WasmModule::deltaSnapshot(
-  const std::span<const uint8_t> oldMemory)
+  std::span<const uint8_t> oldMemory)
 {
     ZoneScopedNS("WasmModule::deltaSnapshot", 6);
-    auto newMemData = getMemoryBase();
-    auto newMemSize = getMemorySizeBytes();
+
     const auto& cfg = faabric::util::getSystemConfig();
     faabric::util::DeltaSettings dcfg(cfg.deltaSnapshotEncoding);
+    auto memory = getMemorySpan();
     {
         ZoneScopedN("Serialize delta");
-        ZoneValue(newMemSize);
+        ZoneValue(memory.size());
         ZoneValue(this->snapshotExcludedPtrLens.size());
-        return faabric::util::serializeDelta(dcfg,
-                                             oldMemory.data(),
-                                             oldMemory.size(),
-                                             newMemData,
-                                             newMemSize,
-                                             &this->snapshotExcludedPtrLens);
+        return faabric::util::serializeDelta(
+          dcfg, oldMemory, getMemorySpan(), this->snapshotExcludedPtrLens);
     }
 }
 
-void WasmModule::deltaRestore(const std::vector<uint8_t>& delta)
+void WasmModule::deltaRestore(std::span<const uint8_t> delta)
 {
     ZoneScopedNS("WasmModule::deltaRestore", 6);
     auto memSize = getMemorySizeBytes();
@@ -534,7 +530,8 @@ int32_t WasmModule::executeTask(
 
     const auto& zygoteDelta = msg.zygotedelta();
     if (!zygoteDelta.empty()) {
-        this->zygoteDeltaRestore(faabric::util::stringToBytes(zygoteDelta));
+        this->zygoteDeltaRestore(
+          std::span(BYTES_CONST(zygoteDelta.data()), zygoteDelta.size()));
     }
 
     // Perform the appropriate type of execution
