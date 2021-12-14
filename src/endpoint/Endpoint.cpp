@@ -257,14 +257,7 @@ void Endpoint::start(bool awaitSignal)
 
     int extraThreads = std::max(awaitSignal ? 0 : 1, this->threadCount - 1);
     state->ioThreads.reserve(extraThreads);
-    auto ioc_run = [&ioc{ state->ioc }]() {
-        try {
-            ioc.run();
-        } catch (std::exception& ex) {
-            SPDLOG_CRITICAL("Asio runner caught exception: {}", ex.what());
-            throw;
-        }
-    };
+    auto ioc_run = [&ioc{ state->ioc }]() { ioc.run(); };
     for (int i = 0; i < extraThreads; i++) {
         state->ioThreads.emplace_back(ioc_run);
     }
