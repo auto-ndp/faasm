@@ -358,6 +358,7 @@ faabric::util::SchedulingDecision Scheduler::makeSchedulingDecision(
   std::shared_ptr<faabric::BatchExecuteRequest> req,
   faabric::util::SchedulingTopologyHint topologyHint)
 {
+    ZoneScopedNS("Scheduler::makeSchedulingDecision", 5);
     int nMessages = req->messages_size();
     faabric::Message& firstMsg = req->mutable_messages()->at(0);
     std::string funcStr = faabric::util::funcToString(firstMsg, false);
@@ -375,6 +376,7 @@ faabric::util::SchedulingDecision Scheduler::makeSchedulingDecision(
     }
 
     std::vector<std::string> hosts;
+    hosts.reserve(nMessages);
     if (topologyHint == faabric::util::SchedulingTopologyHint::FORCE_LOCAL) {
         // We're forced to execute locally here so we do all the messages
         for (int i = 0; i < nMessages; i++) {
@@ -547,6 +549,7 @@ faabric::util::SchedulingDecision Scheduler::doCallFunctions(
   faabric::Message* caller,
   faabric::util::FullLock& lock)
 {
+    ZoneScopedNS("Scheduler::doCallFunctions", 5);
     faabric::Message& firstMsg = req->mutable_messages()->at(0);
     std::string funcStr = faabric::util::funcToString(firstMsg, false);
     int nMessages = req->messages_size();
@@ -603,6 +606,7 @@ faabric::util::SchedulingDecision Scheduler::doCallFunctions(
     // hosts hold which diffs.
     std::string snapshotKey = firstMsg.snapshotkey();
     if (!snapshotKey.empty()) {
+        ZoneScopedN("Push snapshot diffs");
         for (const auto& host : getFunctionRegisteredHosts(firstMsg, false)) {
             SnapshotClient& c = getSnapshotClient(host);
             auto snapshotData =
@@ -624,7 +628,10 @@ faabric::util::SchedulingDecision Scheduler::doCallFunctions(
 
     // Now reset the dirty page tracking just before we start executing
     SPDLOG_DEBUG("Resetting dirty tracking after pushing diffs {}", funcStr);
-    faabric::util::resetDirtyTracking();
+    if (req->type() != faabric::BatchExecuteRequest::FUNCTIONS) {
+        ZoneScopedNS("Reset dirty tracking", 5);
+        faabric::util::resetDirtyTracking();
+    }
 
     // -------------------------------------------
     // EXECTUION
