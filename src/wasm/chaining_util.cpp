@@ -150,10 +150,9 @@ int awaitChainedCallOutput(unsigned int messageId,
         SPDLOG_ERROR("Cannot find output for {}", messageId);
     }
 
-    std::vector<uint8_t> outputData =
-      faabric::util::stringToBytes(result.outputdata());
-    int outputLen =
-      faabric::util::safeCopyToBuffer(outputData, buffer, bufferLen);
+    const auto& outputData = result.outputdata();
+    int outputLen = faabric::util::safeCopyToBuffer(
+      BYTES_CONST(outputData.data()), outputData.size(), buffer, bufferLen);
 
     if (outputLen < outputData.size()) {
         SPDLOG_WARN(

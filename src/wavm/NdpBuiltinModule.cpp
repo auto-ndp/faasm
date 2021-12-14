@@ -46,8 +46,9 @@ static std::string userObjectPath(const std::string& user,
 static int ndpGet(NDPBuiltinModule& module, faabric::Message& msg)
 {
     ZoneScopedN("NdpBuiltinModule::ndpGet");
+    const auto& inputData = msg.inputdata();
     auto args = BuiltinNdpGetArgs::fromBytes(
-      faabric::util::stringToBytes(msg.inputdata()));
+      std::span(BYTES_CONST(inputData.data()), inputData.size()));
     TracyMessageL("Parsed input");
     std::string objPath = userObjectPath(msg.user(), args.key);
     if (!fs::exists(objPath)) {
@@ -97,8 +98,9 @@ static int ndpGet(NDPBuiltinModule& module, faabric::Message& msg)
 static int ndpPut(NDPBuiltinModule& module, faabric::Message& msg)
 {
     ZoneScopedN("NdpBuiltinModule::ndpPut");
+    const auto& inputData = msg.inputdata();
     auto args = BuiltinNdpPutArgs::fromBytes(
-      faabric::util::stringToBytes(msg.inputdata()));
+      std::span(BYTES_CONST(inputData.data()), inputData.size()));
     std::string objPath = userObjectPath(msg.user(), args.key);
     SPDLOG_INFO("NDP PUT {} bytes to file {}", args.value.size(), objPath);
     faabric::util::writeBytesToFile(objPath, args.value);

@@ -252,14 +252,12 @@ void UploadServer::handleStateUpload(const http_request& request,
     bodyStream.read_to_end(inputStream)
       .then([&inputStream, &user, &key](size_t size) {
           if (size > 0) {
-              std::string s = inputStream.collection();
-              const std::vector<uint8_t> bytesData =
-                faabric::util::stringToBytes(s);
+              const auto& data = inputStream.collection();
 
               faabric::state::State& state = faabric::state::getGlobalState();
               const std::shared_ptr<faabric::state::StateKeyValue>& kv =
-                state.getKV(user, key, bytesData.size());
-              kv->set(bytesData.data());
+                state.getKV(user, key, data.size());
+              kv->set(BYTES_CONST(data.data()));
               kv->pushFull();
           }
       })

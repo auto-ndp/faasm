@@ -3,6 +3,7 @@
 #include <array>
 #include <cstdint>
 #include <faabric/util/bytes.h>
+#include <span>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -45,6 +46,7 @@ struct BuiltinNdpPutArgs
         uint64_t keySize = key.size();
         uint64_t valueSize = value.size();
         std::vector<uint8_t> out;
+        out.reserve(16 + key.size() + value.size());
         faabric::util::appendBytesOf(out, keySize);
         faabric::util::appendBytesOf(out, valueSize);
         out.insert(out.end(), key.cbegin(), key.cend());
@@ -52,7 +54,7 @@ struct BuiltinNdpPutArgs
         return out;
     }
 
-    inline static BuiltinNdpPutArgs fromBytes(const std::vector<uint8_t>& bytes)
+    inline static BuiltinNdpPutArgs fromBytes(std::span<const uint8_t> bytes)
     {
         BuiltinNdpPutArgs out;
         uint64_t keySize{}, valueSize{};
@@ -77,6 +79,7 @@ struct BuiltinNdpGetArgs
     {
         uint64_t keySize = key.size();
         std::vector<uint8_t> out;
+        out.reserve(24 + key.size());
         faabric::util::appendBytesOf(out, keySize);
         faabric::util::appendBytesOf(out, offset);
         faabric::util::appendBytesOf(out, uptoBytes);
@@ -84,7 +87,7 @@ struct BuiltinNdpGetArgs
         return out;
     }
 
-    inline static BuiltinNdpGetArgs fromBytes(const std::vector<uint8_t>& bytes)
+    inline static BuiltinNdpGetArgs fromBytes(std::span<const uint8_t> bytes)
     {
         BuiltinNdpGetArgs out;
         uint64_t keySize{};

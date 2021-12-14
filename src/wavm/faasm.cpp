@@ -412,8 +412,7 @@ I32 _readInputImpl(I32 bufferPtr, I32 bufferLen)
 {
     // Get the input
     faabric::Message* call = getExecutingCall();
-    std::vector<uint8_t> inputBytes =
-      faabric::util::stringToBytes(call->inputdata());
+    const auto& inputBytes = call->inputdata();
 
     // If nothing, return nothing
     if (inputBytes.empty()) {
@@ -425,8 +424,8 @@ I32 _readInputImpl(I32 bufferPtr, I32 bufferLen)
     U8* buffer =
       Runtime::memoryArrayPtr<U8>(memoryPtr, (Uptr)bufferPtr, (Uptr)bufferLen);
 
-    int inputSize =
-      faabric::util::safeCopyToBuffer(inputBytes, buffer, bufferLen);
+    int inputSize = faabric::util::safeCopyToBuffer(
+      BYTES_CONST(inputBytes.data()), inputBytes.size(), buffer, bufferLen);
     return inputSize;
 }
 
