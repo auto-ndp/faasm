@@ -20,7 +20,7 @@ UffdMemoryRange::~UffdMemoryRange() noexcept
                    "Warning: error unmapping UffdMemoryRange");
         this->mapStart = nullptr;
         this->mapBytes = 0;
-        this->validBytes = 0;
+        resetPermissions();
     }
 }
 UffdMemoryRange::UffdMemoryRange(size_t pages, size_t alignmentLog2)
@@ -63,7 +63,7 @@ UffdMemoryRange::UffdMemoryRange(size_t pages, size_t alignmentLog2)
 
     this->mapStart = alignedPtr;
     this->mapBytes = numBytes;
-    this->validBytes = 0;
+    resetPermissions();
 }
 
 UffdMemoryArenaManager& UffdMemoryArenaManager::instance()
@@ -91,15 +91,19 @@ void sigbusHandler(int code, siginfo_t* siginfo, void* contextR)
         faabric::util::printStackTrace(contextR);
         ::exit(1);
     }
-    if (!range->pointerInValidRange(faultAddr)) [[unlikely]] {
+    if (range->pointerPermissions(faultAddr) == 0) [[unlikely]] {
+        SPDLOG_ERROR(
+          "UFFD out of bounds access of memory at pointer {} in range {}..{}",
+          (void*)(faultAddr),
+          (void*)(range->mapStart),
+          (void*)(range->mapStart + range->mapBytes));
         lock.unlock();
-        SPDLOG_ERROR("UFFD out of bounds access of memory at pointer {}",
-                     (void*)(faultAddr));
         faabric::util::printStackTrace(contextR);
         ::pthread_kill(::pthread_self(), SIGSEGV);
         return;
     }
     size_t offset = faultPage - range->mapStart;
+    range->touch(offset + FAULT_PAGE_SIZE);
     auto initSource = range->initSource;
     lock.unlock();
     if (offset < initSource.size()) {
@@ -139,73 +143,20 @@ std::byte* UffdMemoryArenaManager::allocateRange(size_t pages,
     return start;
 }
 
-void UffdMemoryArenaManager::validateAndResizeRange(std::byte* oldEnd,
-                                                    std::byte* newEnd)
-{
-    faabric::util::SharedLock lock{ mx };
-    auto range = this->ranges.find(oldEnd);
-    if (range == this->ranges.end()) {
-        throw std::runtime_error("Invalid pointer for UFFD range resize");
-    }
-    const std::byte* actualOldEnd =
-      range->mapStart + range->validBytes.load(std::memory_order_acquire);
-    if (actualOldEnd != oldEnd) {
-        // throw std::runtime_error("Mismatched UFFD range resize end
-        // pointers");
-        auto [minEnd, maxEnd] = std::minmax(oldEnd, newEnd);
-        madvise(minEnd, (maxEnd - minEnd), MADV_DONTNEED);
-        return;
-    }
-    if (!range->pointerInRange(newEnd) &&
-        (newEnd != range->mapStart + range->mapBytes)) {
-        SPDLOG_ERROR(
-          "New UFFD range end out of allocated range: {:08x} > {:08x}",
-          (size_t)newEnd,
-          (size_t)range->mapStart + range->mapBytes);
-        throw std::runtime_error("New UFFD range end out of allocated range");
-    }
-    const size_t newPages = (newEnd - range->mapStart) / 4096;
-    resizeRangeImpl(range, newPages);
-}
-
-void UffdMemoryArenaManager::discardAndResizeRange(std::byte* rangePtr,
-                                                   size_t newPages)
-{
-    faabric::util::SharedLock lock{ mx };
-    auto range = this->ranges.find(rangePtr);
-    if (range == this->ranges.end()) {
-        throw std::runtime_error("Invalid pointer for UFFD range resize");
-    }
-    const size_t oldEndBytes =
-      range->validBytes.load(std::memory_order_acquire);
-    const size_t newBytes = 4096 * newPages;
-    if (!range->pointerInRange(range->mapStart + newBytes) &&
-        (newBytes != range->mapBytes)) {
-        throw std::runtime_error("New UFFD range end out of allocated range");
-        SPDLOG_ERROR(
-          "New UFFD range end out of allocated range: {:08x} > {:08x}",
-          (size_t)newBytes,
-          range->mapBytes);
-    }
-    range->validBytes.store(newBytes, std::memory_order_release);
-    if (oldEndBytes > 0) {
-        checkErrno(
-          madvise((void*)(range->mapStart), oldEndBytes, MADV_DONTNEED),
-          "MADV_DONTNEED");
-    }
-}
-
-void UffdMemoryArenaManager::discardRange(std::byte* start)
+void UffdMemoryArenaManager::modifyRange(
+  std::byte* start,
+  std::function<void(UffdMemoryRange&)> action)
 {
     faabric::util::SharedLock lock{ mx };
     auto range = this->ranges.find(start);
     if (range == this->ranges.end()) {
-        throw std::runtime_error("Invalid pointer for UFFD range discard");
+        throw std::runtime_error("Invalid pointer for UFFD range action");
     }
-    checkErrno(madvise((void*)(range->mapStart),
-                       range->validBytes.load(std::memory_order_acquire),
-                       MADV_DONTNEED),
-               "MADV_DONTNEED");
+    if (!range->pointerInRange(start)) {
+        throw std::runtime_error("Invalid pointer found for UFFD range action");
+    }
+    faabric::util::FullLock rangeLock{ range->mx };
+    action(*range);
 }
 
 void UffdMemoryArenaManager::freeRange(std::byte* start)
@@ -219,25 +170,6 @@ void UffdMemoryArenaManager::freeRange(std::byte* start)
     size_t mapLength = range->mapBytes;
     uffd.unregisterAddressRange(mapStart, mapLength);
     this->ranges.erase(range);
-}
-
-void UffdMemoryArenaManager::resizeRangeImpl(
-  UffdMemoryArenaManager::RangeSet::iterator range,
-  size_t newPages)
-{
-    const size_t newValidBytes = newPages * 4096;
-    const size_t oldValidBytes =
-      range->validBytes.load(std::memory_order_acquire);
-    if (newValidBytes == oldValidBytes) {
-        return;
-    }
-    range->validBytes.store(newValidBytes, std::memory_order_release);
-    if (newValidBytes < oldValidBytes) {
-        checkErrno(madvise((void*)(range->mapStart + newValidBytes),
-                           oldValidBytes - newValidBytes,
-                           MADV_DONTNEED),
-                   "MADV_DONTNEED");
-    }
 }
 
 }

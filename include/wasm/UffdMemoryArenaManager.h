@@ -4,16 +4,21 @@
 #include <compare>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <span>
+#include <utility>
 
 #include <faabric/util/locks.h>
 #include <faabric/util/memory.h>
 
 #include <absl/container/btree_set.h>
+#include <boost/container/flat_map.hpp>
+#include <boost/container/small_vector.hpp>
 
 #include <fcntl.h>
 #include <signal.h>
 #include <sys/ioctl.h>
+#include <sys/mman.h>
 #include <sys/syscall.h>
 #include <unistd.h>
 
@@ -23,7 +28,17 @@ struct UffdMemoryRange
 {
     std::byte* mapStart = nullptr;
     size_t mapBytes = 0;
-    std::atomic<size_t> validBytes = 0;
+    std::atomic<size_t> maxUsedBytes = 0;
+    // map of PROT_R/W/X permissions
+    // key = starting address
+    // value = permissions until next address on the list
+    using PermissionList = boost::container::flat_map<
+      uintptr_t,
+      int,
+      std::less<uintptr_t>,
+      boost::container::small_vector<std::pair<uintptr_t, int>, 8>>;
+    PermissionList permissions;
+    std::shared_mutex mx;
     std::span<std::byte> initSource;
 
     UffdMemoryRange() = delete;
@@ -40,12 +55,83 @@ struct UffdMemoryRange
         this->~UffdMemoryRange();
         this->mapStart = rhs.mapStart;
         this->mapBytes = rhs.mapBytes;
-        this->validBytes.store(rhs.validBytes.load(std::memory_order_acquire),
-                               std::memory_order_release);
+        this->permissions = std::move(rhs.permissions);
+        rhs.permissions.clear();
+        rhs.permissions.emplace(0, 0);
+        rhs.permissions.emplace(UINTPTR_MAX, 0);
         rhs.mapStart = nullptr;
         rhs.mapBytes = 0;
-        rhs.validBytes = 0;
         return *this;
+    }
+
+    inline void resetPermissions()
+    {
+        permissions = { { 0, 0 }, { UINTPTR_MAX, 0 } };
+    }
+
+    inline void discardContent(const std::byte* begin, const std::byte* end)
+    {
+        if (begin == end) {
+            return;
+        }
+        if (end < begin || begin <= mapStart || end > (mapStart + mapBytes)) {
+            throw std::out_of_range("Discard UFFD range out of bounds");
+        }
+        madvise((void*)begin, end - begin, MADV_DONTNEED);
+    }
+
+    inline void touch(const size_t offset)
+    {
+        if (maxUsedBytes < offset) {
+            maxUsedBytes = offset;
+        }
+    }
+
+    inline void discardAll()
+    {
+        madvise((void*)mapStart, maxUsedBytes, MADV_DONTNEED);
+        maxUsedBytes = 0;
+    }
+
+    inline void setPermissions(const std::byte* begin,
+                               const std::byte* end,
+                               int perms)
+    {
+        const uintptr_t beginA = (uintptr_t)begin;
+        const uintptr_t endA = (uintptr_t)end;
+        const uintptr_t lastTouchedByte = end - mapStart;
+        if (lastTouchedByte > maxUsedBytes) {
+            maxUsedBytes = lastTouchedByte;
+        }
+        PermissionList oldPerms;
+        oldPerms.reserve(permissions.size() + 1);
+        oldPerms.swap(permissions);
+        int lastPerm = -1;
+        int endPerm = oldPerms.begin()->second;
+        bool needsEnd = true;
+        bool beginDone = false;
+        for (const auto& [oldAddr, oldPerm] : oldPerms) {
+            if (!beginDone && oldAddr >= beginA) {
+                beginDone = true;
+                if (lastPerm != perms) {
+                    permissions.emplace(beginA, perms);
+                }
+            }
+            if (oldAddr < beginA || oldAddr >= endA) {
+                if (oldPerm != lastPerm || oldAddr == UINTPTR_MAX) {
+                    permissions.emplace(oldAddr, oldPerm);
+                }
+                if (oldAddr == endA) {
+                    needsEnd = false;
+                }
+            } else {
+                endPerm = oldPerm;
+            }
+            lastPerm = oldPerm;
+        }
+        if (needsEnd) {
+            permissions.emplace(endA, endPerm);
+        }
     }
 
     inline bool pointerInRange(const std::byte* ptr) const
@@ -54,12 +140,15 @@ struct UffdMemoryRange
         return addr >= (size_t)mapStart && addr < (size_t)(mapStart + mapBytes);
     }
 
-    inline bool pointerInValidRange(const std::byte* ptr) const
+    inline int pointerPermissions(const std::byte* ptr) const
     {
         size_t addr = (size_t)ptr;
-        return addr >= (size_t)mapStart &&
-               addr < (size_t)(mapStart +
-                               validBytes.load(std::memory_order_acquire));
+        auto it = permissions.upper_bound(addr);
+        if (it == permissions.begin() || it == permissions.end()) {
+            return 0;
+        }
+        --it;
+        return it->second;
     }
 
     inline std::strong_ordering operator<=>(const UffdMemoryRange& rhs) const
@@ -94,13 +183,8 @@ class UffdMemoryArenaManager final
     // beginning of it.
     std::byte* allocateRange(size_t pages, size_t alignmentLog2 = 0);
 
-    void validateAndResizeRange(std::byte* oldEnd, std::byte* newEnd);
-
-    void discardAndResizeRange(std::byte* rangePtr, size_t newPages);
-
-    // Free all range memory, and set it to be valid with the underlying
-    // snapshot
-    void discardRange(std::byte* start);
+    void modifyRange(std::byte* start,
+                     std::function<void(UffdMemoryRange&)> action);
 
     // Remove and free a UFFD-backed range completely
     void freeRange(std::byte* start);
@@ -113,8 +197,6 @@ class UffdMemoryArenaManager final
     faabric::util::UserfaultFd uffd;
     using RangeSet = absl::btree_set<UffdMemoryRange, std::less<>>;
     RangeSet ranges;
-
-    void resizeRangeImpl(RangeSet::iterator range, size_t newPages);
 
     UffdMemoryArenaManager();
     ~UffdMemoryArenaManager() = default;

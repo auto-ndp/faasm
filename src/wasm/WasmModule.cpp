@@ -220,7 +220,14 @@ void WasmModule::restore(const std::string& snapshotKey)
                 throw std::runtime_error("Mapping non-restorable snapshot");
             }
             auto& umam = uffd::UffdMemoryArenaManager::instance();
-            umam.discardAndResizeRange((std::byte*)memoryBase, snapshot->size);
+            std::byte* memoryBegin = (std::byte*)memoryBase;
+            umam.modifyRange(memoryBegin, [&](uffd::UffdMemoryRange& range) {
+                range.resetPermissions();
+                range.discardAll();
+                range.setPermissions(range.mapStart,
+                                     range.mapStart + snapshot->size,
+                                     PROT_READ | PROT_WRITE);
+            });
             int fd = snapshot->fd;
             using faabric::util::checkErrno;
             checkErrno(::lseek(fd, 0, SEEK_SET), "snapshot fd seek");

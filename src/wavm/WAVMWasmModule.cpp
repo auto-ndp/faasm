@@ -73,6 +73,8 @@ static void instantiateBaseModules()
     PROF_END(BaseWasiModule)
 }
 
+constexpr bool LOG_UFFD = false;
+
 struct WavmUffdHooks : public Platform::MemoryOverrideHook
 {
     WavmUffdHooks() = default;
@@ -81,6 +83,9 @@ struct WavmUffdHooks : public Platform::MemoryOverrideHook
 
     U8* allocateVirtualPages(Uptr numPages) override
     {
+        if (LOG_UFFD) {
+            SPDLOG_INFO("allocateVirtualPages numPages={}", numPages);
+        }
         auto& umam = uffd::UffdMemoryArenaManager::instance();
         return (U8*)umam.allocateRange(numPages);
     }
@@ -91,6 +96,13 @@ struct WavmUffdHooks : public Platform::MemoryOverrideHook
     {
         auto& umam = uffd::UffdMemoryArenaManager::instance();
         std::byte* ptr = umam.allocateRange(numPages, alignmentLog2);
+        if (LOG_UFFD) {
+            SPDLOG_INFO("allocateAlignedVirtualPages numPages={} "
+                        "alignmentLog2={} allocated={}",
+                        numPages,
+                        alignmentLog2,
+                        (void*)ptr);
+        }
         outUnalignedBaseAddress = (U8*)ptr;
         return (U8*)ptr;
     }
@@ -99,10 +111,20 @@ struct WavmUffdHooks : public Platform::MemoryOverrideHook
                             Uptr numPages,
                             Platform::MemoryAccess access) override
     {
+        if (LOG_UFFD) {
+            SPDLOG_INFO("commitVirtualPages baseVA={} pages={} access={}",
+                        (void*)baseVirtualAddress,
+                        numPages,
+                        (int)access);
+        }
         auto& umam = uffd::UffdMemoryArenaManager::instance();
-        umam.validateAndResizeRange((std::byte*)baseVirtualAddress,
-                                    (std::byte*)baseVirtualAddress +
-                                      numPages * 4096);
+        std::byte* begin = (std::byte*)baseVirtualAddress;
+        umam.modifyRange(
+          begin, [begin, numPages, access](uffd::UffdMemoryRange& range) {
+              range.setPermissions(begin,
+                                   begin + numPages * 4096,
+                                   int(access != Platform::MemoryAccess::none));
+          });
         return true;
     }
 
@@ -110,25 +132,37 @@ struct WavmUffdHooks : public Platform::MemoryOverrideHook
                               Uptr numPages,
                               Platform::MemoryAccess access) override
     {
+        if (LOG_UFFD) {
+            SPDLOG_INFO("setVirtualPageAccess baseVA={} pages={} access={}",
+                        (void*)baseVirtualAddress,
+                        numPages,
+                        (int)access);
+        }
+        auto& umam = uffd::UffdMemoryArenaManager::instance();
         // Fall back to mprotect - this is only used for LLVM module mappings
-        int prot_flags = 0;
+        int protFlags = 0;
         switch (access) {
             case Platform::MemoryAccess::none:
                 break;
             case Platform::MemoryAccess::readOnly:
-                prot_flags = PROT_READ;
+                protFlags = PROT_READ;
                 break;
             case Platform::MemoryAccess::readWrite:
-                prot_flags = PROT_READ | PROT_WRITE;
+                protFlags = PROT_READ | PROT_WRITE;
                 break;
             case Platform::MemoryAccess::readExecute:
-                prot_flags = PROT_READ | PROT_EXEC;
+                protFlags = PROT_READ | PROT_EXEC;
                 break;
             case Platform::MemoryAccess::readWriteExecute:
-                prot_flags = PROT_READ | PROT_WRITE | PROT_EXEC;
+                protFlags = PROT_READ | PROT_WRITE | PROT_EXEC;
                 break;
         }
-        if (mprotect(baseVirtualAddress, numPages * 4096, prot_flags) < 0) {
+        std::byte* begin = (std::byte*)baseVirtualAddress;
+        umam.modifyRange(
+          begin, [begin, numPages, protFlags](uffd::UffdMemoryRange& range) {
+              range.setPermissions(begin, begin + numPages * 4096, protFlags);
+          });
+        if (mprotect(baseVirtualAddress, numPages * 4096, protFlags) < 0) {
             perror("mprotect failure");
             throw std::runtime_error("Mprotect call failed");
         }
@@ -137,14 +171,27 @@ struct WavmUffdHooks : public Platform::MemoryOverrideHook
 
     void decommitVirtualPages(U8* baseVirtualAddress, Uptr numPages) override
     {
+        if (LOG_UFFD) {
+            SPDLOG_INFO("decommitVirtualPages baseVA={} pages={}",
+                        (void*)baseVirtualAddress,
+                        numPages);
+        }
         auto& umam = uffd::UffdMemoryArenaManager::instance();
-        umam.validateAndResizeRange((std::byte*)baseVirtualAddress,
-                                    (std::byte*)baseVirtualAddress -
-                                      numPages * 4096);
+        std::byte* begin = (std::byte*)baseVirtualAddress;
+        umam.modifyRange(
+          begin, [begin, numPages](uffd::UffdMemoryRange& range) {
+              range.setPermissions(begin, begin + numPages * 4096, 0);
+              range.discardContent(begin, begin + numPages * 4096);
+          });
     }
 
     void freeVirtualPages(U8* baseVirtualAddress, Uptr numPages) override
     {
+        if (LOG_UFFD) {
+            SPDLOG_INFO("freeVirtualPages baseVA={} pages={}",
+                        (void*)baseVirtualAddress,
+                        numPages);
+        }
         auto& umam = uffd::UffdMemoryArenaManager::instance();
         umam.freeRange((std::byte*)baseVirtualAddress);
     }
@@ -153,6 +200,11 @@ struct WavmUffdHooks : public Platform::MemoryOverrideHook
                                  Uptr _numPages,
                                  Uptr _alignmentLog2) override
     {
+        if (LOG_UFFD) {
+            SPDLOG_INFO("freeAlignedVirtualPages baseVA={} pages={}",
+                        (void*)unalignedBaseAddress,
+                        _numPages);
+        }
         auto& umam = uffd::UffdMemoryArenaManager::instance();
         umam.freeRange((std::byte*)unalignedBaseAddress);
     }
