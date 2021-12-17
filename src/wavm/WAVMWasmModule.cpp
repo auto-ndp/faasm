@@ -1,3 +1,4 @@
+#include "WAVM/Runtime/Runtime.h"
 #include "syscalls.h"
 
 #include <absl/debugging/symbolize.h>
@@ -1211,15 +1212,28 @@ int32_t WAVMWasmModule::executeFunction(faabric::Message& msg)
               SPDLOG_ERROR("ABSL callstack symbolization:");
               const auto& csFrames = ex->callStack.frames;
               std::array<char, 1024> symbolName{};
+              std::string debugName{};
+              std::string_view symbolView{};
+              Runtime::InstructionSource iSrc;
               for (size_t i = 0; i < csFrames.size(); ++i) {
                   bool hasSymbol = absl::Symbolize((void*)csFrames[i].ip,
                                                    symbolName.data(),
                                                    symbolName.size());
+                  Runtime::getInstructionSourceByAddress(csFrames[i].ip, iSrc);
+                  if (hasSymbol) {
+                      symbolView = symbolName.data();
+                  } else if (iSrc.type ==
+                             Runtime::InstructionSource::Type::wasm) {
+                      debugName =
+                        Runtime::getFunctionDebugName(iSrc.wasm.function);
+                      symbolView = debugName;
+                  } else {
+                      symbolView = "<unknown symbol>"
+                  }
                   SPDLOG_ERROR("[{:2d}] {:#016x}: {}",
                                i,
                                (size_t)(csFrames[i].ip),
-                               hasSymbol ? symbolName.data()
-                                         : "<unknown symbol>");
+                               symbolView);
               }
               Runtime::destroyException(ex);
               returnValue = 1;
@@ -1499,8 +1513,9 @@ uint32_t WAVMWasmModule::shrinkMemory(U32 nBytes)
     const size_t pageChange =
       (getMemorySizeBytes() - newBrk) / WASM_BYTES_PER_PAGE;
 
+    Uptr newNumPages{};
     Runtime::GrowResult result =
-      Runtime::shrinkMemory(defaultMemory, pageChange, nullptr);
+      Runtime::shrinkMemory(defaultMemory, pageChange, &newNumPages);
 
     if (result != Runtime::GrowResult::success) {
         if (result == Runtime::GrowResult::outOfMemory) {
@@ -1527,7 +1542,7 @@ uint32_t WAVMWasmModule::shrinkMemory(U32 nBytes)
 
     SPDLOG_TRACE("MEM - shrinking memory {} -> {}", oldBrk, newBrk);
 
-    return oldBrk;
+    return newNumPages * WASM_BYTES_PER_PAGE;
 }
 
 void WAVMWasmModule::unmapMemory(U32 offset, U32 nBytes)
