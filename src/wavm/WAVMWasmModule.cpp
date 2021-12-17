@@ -1228,7 +1228,7 @@ int32_t WAVMWasmModule::executeFunction(faabric::Message& msg)
                         Runtime::getFunctionDebugName(iSrc.wasm.function);
                       symbolView = debugName;
                   } else {
-                      symbolView = "<unknown symbol>"
+                      symbolView = "<unknown symbol>";
                   }
                   SPDLOG_ERROR("[{:2d}] {:#016x}: {}",
                                i,
