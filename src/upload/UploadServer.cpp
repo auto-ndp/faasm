@@ -118,7 +118,7 @@ void UploadServer::handleGet(const http_request& request)
     // Shortcut for ping
     std::string relativeUri = uri::decode(request.relative_uri().path());
     if (relativeUri == "/ping") {
-        SPDLOG_DEBUG("Responding to ping request");
+        SPDLOG_TRACE("Responding to ping request");
         http_response response(status_codes::OK);
         response.set_body("PONG");
         setPermissiveHeaders(response);
