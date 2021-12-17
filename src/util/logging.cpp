@@ -1,12 +1,20 @@
 #include <faabric/util/config.h>
 #include <faabric/util/logging.h>
 
+#include <spdlog/sinks/stdout_color_sinks.h>
+
 namespace faabric::util {
 
 void initLogging()
 {
+    {
+        auto new_logger =
+          spdlog::stdout_color_mt("default", spdlog::color_mode::always);
+        spdlog::set_default_logger(std::move(new_logger));
+    }
+
     // Docs: https://github.com/gabime/spdlog/wiki/3.-Custom-formatting
-    spdlog::set_pattern("[%H:%M:%S:%e] [%t] [%l] %v");
+    spdlog::set_pattern("%^[%H:%M:%S:%e] [%t] [%l]%$ %v");
 
     // Set the current level for the level for the default logger (note that the
     // minimum log level is determined in the header).
