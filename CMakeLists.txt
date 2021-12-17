@@ -13,7 +13,7 @@ endif ()
 
 # Top-level CMake config
 set(CMAKE_CXX_FLAGS "-fwrapv -Wall -Wthread-safety -Werror=thread-safety")
-set(CMAKE_CXX_FLAGS_DEBUG "-g -Og")
+set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
