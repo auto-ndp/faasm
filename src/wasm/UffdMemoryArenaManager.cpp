@@ -92,11 +92,26 @@ void sigbusHandler(int code, siginfo_t* siginfo, void* contextR)
         ::exit(1);
     }
     if (range->pointerPermissions(faultAddr) == 0) [[unlikely]] {
-        SPDLOG_ERROR(
-          "UFFD out of bounds access of memory at pointer {} in range {}..{}",
-          (void*)(faultAddr),
-          (void*)(range->mapStart),
-          (void*)(range->mapStart + range->mapBytes));
+        SPDLOG_ERROR("[!] UFFD out of bounds access of memory at pointer {} in "
+                     "range {}..{}",
+                     (void*)(faultAddr),
+                     (void*)(range->mapStart),
+                     (void*)(range->mapStart + range->mapBytes));
+        for (auto it = range->permissions.cbegin();
+             it != range->permissions.cend();
+             it++) {
+            const auto& [regionStart, regionPerm] = *it;
+            if (regionStart == 0 || regionStart == UINTPTR_MAX) {
+                continue;
+            }
+            uintptr_t regionEnd = (it + 1)->second;
+            if (regionPerm != 0) {
+                SPDLOG_ERROR("[!] Registered permission range [{}]: {}..{}",
+                             regionPerm,
+                             (void*)regionStart,
+                             (void*)regionEnd);
+            }
+        }
         lock.unlock();
         faabric::util::printStackTrace(contextR);
         ::pthread_kill(::pthread_self(), SIGSEGV);
