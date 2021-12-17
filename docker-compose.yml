@@ -70,7 +70,7 @@ services:
       - "5000"
       - "8003-8010"
     ports:
-      - "8080"
+      - "8080:8080"
       - "8086:8086"
     privileged: true
     volumes:
@@ -153,11 +153,6 @@ services:
     image: nginx:latest
     volumes:
       - ./deploy/conf/nginx-local.conf:/etc/nginx/nginx.conf:ro
-    depends_on:
-      - worker
-      - worker-storage
-    ports:
-      - "8080:8080"
 
   # C/C++ functions
   cpp:
@@ -195,7 +190,7 @@ services:
       - minio
     environment:
       - UPLOAD_HOST=${UPLOAD_HOST:-upload}
-      - INVOKE_HOST=${INVOKE_HOST:-nginx}
+      - INVOKE_HOST=${INVOKE_HOST:-worker}
       - LOG_LEVEL=debug
       - REDIS_QUEUE_HOST=redis-queue
       - REDIS_STATE_HOST=redis-state
