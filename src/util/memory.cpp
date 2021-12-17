@@ -297,6 +297,9 @@ retry:
         if (errno == EAGAIN) {
             goto retry;
         }
+        if (errno == EEXIST) {
+            return;
+        }
         perror("UFFDIO_WRITEPROTECT error");
         throw std::runtime_error(
           "Couldn't write-protect-modify an address range through UFFD");
@@ -316,6 +319,9 @@ retry:
     if (ioctl(fd, UFFDIO_ZEROPAGE, &zp) < 0) {
         if (errno == EAGAIN) {
             goto retry;
+        }
+        if (errno == EEXIST) {
+            return;
         }
         perror("UFFDIO_ZEROPAGE error");
         throw std::runtime_error(
@@ -344,6 +350,9 @@ retry:
     if (ioctl(fd, UFFDIO_COPY, &cp) < 0) {
         if (errno == EAGAIN) {
             goto retry;
+        }
+        if (errno == EEXIST) {
+            return;
         }
         perror("UFFDIO_COPY error");
         throw std::runtime_error("Couldn't copy an address range through UFFD");
