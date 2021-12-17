@@ -49,6 +49,9 @@ services:
       - REDIS_QUEUE_HOST=redis-queue
       - REDIS_STATE_HOST=redis-state
       - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
+      - ASAN_OPTIONS=verbosity=1:halt_on_error=1
+      - TSAN_OPTIONS=halt_on_error=1:suppressions=/usr/local/code/faasm/thread-sanitizer-ignorelist.txt:history_size=7:second_deadlock_stack=1
+      - UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=1
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8002/ping" ]
       interval: 5s
@@ -100,6 +103,9 @@ services:
       - ENDPOINT_NUM_THREADS=1
       - OVERRIDE_CPU_COUNT=8
       - VM_ARENA_MODE=${VM_ARENA_MODE:-}
+      - ASAN_OPTIONS=verbosity=1:halt_on_error=1
+      - TSAN_OPTIONS=halt_on_error=1:suppressions=/usr/local/code/faasm/thread-sanitizer-ignorelist.txt:history_size=7:second_deadlock_stack=1
+      - UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=1
 
   worker-storage:
     image: kubasz51/faasm-worker:${FAASM_VERSION}
@@ -147,6 +153,9 @@ services:
       - ENDPOINT_NUM_THREADS=1
       - OVERRIDE_CPU_COUNT=8
       - VM_ARENA_MODE=${VM_ARENA_MODE:-}
+      - ASAN_OPTIONS=verbosity=1:halt_on_error=1
+      - TSAN_OPTIONS=halt_on_error=1:suppressions=/usr/local/code/faasm/thread-sanitizer-ignorelist.txt:history_size=7:second_deadlock_stack=1
+      - UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=1
 
   # Load balancer for local cluster
   nginx:
@@ -195,6 +204,9 @@ services:
       - REDIS_QUEUE_HOST=redis-queue
       - REDIS_STATE_HOST=redis-state
       - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
+      - ASAN_OPTIONS=verbosity=1:halt_on_error=1
+      - TSAN_OPTIONS=halt_on_error=1:suppressions=/code/faabric/thread-sanitizer-ignorelist.txt:history_size=7:second_deadlock_stack=1
+      - UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=1
     volumes:
       - ./:/usr/local/code/faasm/
       - ./dev/faasm/build/:${FAASM_BUILD_MOUNT}
