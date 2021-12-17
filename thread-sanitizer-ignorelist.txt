@@ -13,6 +13,7 @@ signal:*
 # False positive in promise/future, which are thread-safe according to the standard
 race:std::__future_base::_Result
 race:std::future<*>::get
+race:faabric::endpoint::FaabricEndpointHandler::onFunctionResult
 
 # Raciness inside webassembly openmp modules
 race:wasm::startReduceCritical
