@@ -169,7 +169,7 @@ inline void TraceFree(void* p)
 #endif
 }
 
-#if 1
+#if 1 && !(defined(__has_feature) && __has_feature(thread_sanitizer))
 
 void operator delete(void* p) noexcept
 {
