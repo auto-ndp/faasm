@@ -1,3 +1,4 @@
+#include <codegen/MachineCodeGenerator.h>
 #include <conf/FaasmConfig.h>
 #include <threads/ThreadState.h>
 #include <wasm/WasmExecutionContext.h>
@@ -316,7 +317,7 @@ std::vector<uint8_t> WasmModule::deltaSnapshot(
         ZoneValue(memory.size());
         ZoneValue(this->snapshotExcludedPtrLens.size());
         return faabric::util::serializeDelta(
-          dcfg, oldMemory, getMemorySpan(), this->snapshotExcludedPtrLens);
+          dcfg, oldMemory, memory, this->snapshotExcludedPtrLens);
     }
 }
 
@@ -440,6 +441,17 @@ void WasmModule::bindToFunction(faabric::Message& msg, bool cache)
     // Call into subclass hook, setting the context beforehand
     WasmExecutionContext ctx(this, &msg);
     doBindToFunction(msg, cache);
+}
+
+void WasmModule::debugMemorySummary(const char* msg)
+{
+    size_t newMemSize = this->getMemorySizeBytes();
+    auto checksum =
+      codegen::MachineCodeGenerator::hashBytes(this->getMemorySpan());
+    SPDLOG_DEBUG("DMS-{} : size={} checksum={}",
+                 msg,
+                 newMemSize,
+                 fmt::join(checksum, ","));
 }
 
 void WasmModule::prepareArgcArgv(const faabric::Message& msg)

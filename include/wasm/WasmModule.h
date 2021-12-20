@@ -167,6 +167,8 @@ class WasmModule
     // ----- Debugging -----
     virtual void printDebugInfo();
 
+    void debugMemorySummary(const char* msg);
+
   protected:
     void storeZygoteSnapshot();
 
