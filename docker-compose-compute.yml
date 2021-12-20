@@ -137,3 +137,4 @@ services:
       - ./:/usr/local/code/faasm/
       - ./dev/faasm/build/:/build/faasm/
       - ./dev/faasm-local:/usr/local/faasm
+      - ${CONAN_CACHE_MOUNT_SOURCE:-./dev/faasm/conan/}:/root/.conan
