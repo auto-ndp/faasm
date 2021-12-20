@@ -74,7 +74,7 @@ UffdMemoryArenaManager& UffdMemoryArenaManager::instance()
 
 void sigbusHandler(int code, siginfo_t* siginfo, void* contextR)
 {
-    constexpr size_t FAULT_PAGE_SIZE = 4096;
+    constexpr size_t FAULT_PAGE_SIZE = 65536;
     if (code != SIGBUS) [[unlikely]] {
         std::terminate();
     }
@@ -91,6 +91,7 @@ void sigbusHandler(int code, siginfo_t* siginfo, void* contextR)
         faabric::util::printStackTrace(contextR);
         ::exit(1);
     }
+    faabric::util::FullLock rangeLock{ range->mx };
     if (range->pointerPermissions(faultAddr) == 0) [[unlikely]] {
         SPDLOG_ERROR("[!] UFFD out of bounds access of memory at pointer {} in "
                      "range {}..{}",
