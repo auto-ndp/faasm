@@ -32,7 +32,7 @@ MachineCodeGenerator::MachineCodeGenerator(storage::FileLoader& loaderIn)
 {}
 
 std::vector<uint8_t> MachineCodeGenerator::hashBytes(
-  const std::vector<uint8_t>& bytes)
+  std::span<const uint8_t> bytes)
 {
     std::vector<uint8_t> result(SHA256_DIGEST_LENGTH);
     SHA256(reinterpret_cast<const unsigned char*>(bytes.data()),

@@ -4,6 +4,7 @@
 #include <storage/FileLoader.h>
 
 #include <cstdint>
+#include <span>
 
 namespace codegen {
 
@@ -18,11 +19,11 @@ class MachineCodeGenerator
 
     void codegenForSharedObject(const std::string& inputPath);
 
+    static std::vector<uint8_t> hashBytes(std::span<const uint8_t> bytes);
+
   private:
     conf::FaasmConfig& conf;
     storage::FileLoader& loader;
-
-    std::vector<uint8_t> hashBytes(const std::vector<uint8_t>& bytes);
 
     std::vector<uint8_t> doCodegen(std::vector<uint8_t>& bytes,
                                    conf::CodegenTargetSpec target,
