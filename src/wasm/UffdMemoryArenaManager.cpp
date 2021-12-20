@@ -79,8 +79,6 @@ void sigbusHandler(int code, siginfo_t* siginfo, void* contextR)
         std::terminate();
     }
     std::byte* faultAddr = (std::byte*)siginfo->si_addr;
-    std::byte* faultPage =
-      (std::byte*)((size_t)faultAddr & ~(FAULT_PAGE_SIZE - 1));
     UffdMemoryArenaManager& umam = UffdMemoryArenaManager::instance();
     faabric::util::SharedLock lock{ umam.mx };
     auto range = umam.ranges.find(faultAddr);
@@ -118,18 +116,22 @@ void sigbusHandler(int code, siginfo_t* siginfo, void* contextR)
         ::pthread_kill(::pthread_self(), SIGSEGV);
         return;
     }
-    size_t offset = faultPage - range->mapStart;
-    size_t faultEnd = std::min(size_t(faultPage) + FAULT_PAGE_SIZE,
-                               size_t(range->mapStart) + range->mapBytes);
-    size_t faultSize = faultEnd - size_t(faultPage);
+    size_t faultPageOffset =
+      ((size_t(faultAddr) - size_t(range->mapStart)) & ~(FAULT_PAGE_SIZE - 1));
+
+    size_t faultEnd =
+      std::min(size_t(faultPageOffset) + FAULT_PAGE_SIZE, range->mapBytes);
+    size_t faultSize = faultEnd - faultPageOffset;
     range->touch(faultEnd);
     auto initSource = range->initSource;
     lock.unlock();
-    if (offset < initSource.size()) {
-        umam.uffd.copyPages(
-          size_t(faultPage), faultSize, size_t(initSource.data() + offset));
+    if (faultPageOffset < initSource.size()) {
+        umam.uffd.copyPages(size_t(range->mapStart) + faultPageOffset,
+                            faultSize,
+                            size_t(initSource.data() + faultPageOffset));
     } else {
-        umam.uffd.zeroPages(size_t(faultPage), faultSize);
+        umam.uffd.zeroPages(size_t(range->mapStart) + faultPageOffset,
+                            faultSize);
     }
 }
 
