@@ -11,6 +11,6 @@ export FAASM_LOCAL_MOUNT=/usr/local/faasm
 docker-compose \
     up \
     -d \
-    nginx
+    worker worker-storage upload nginx
 
 popd > /dev/null
