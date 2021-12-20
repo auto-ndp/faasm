@@ -1097,7 +1097,8 @@ int32_t WAVMWasmModule::executeFunction(faabric::Message& msg)
     ZoneScopedNS("WAVMWasmModule::executeFunction", 5);
     ZoneText(boundFunction.c_str(), boundFunction.size());
     if (msg.forbidndp()) {
-        constexpr static std::string_view nondp_text = "[!ndp]";
+        [[maybe_unused]] constexpr static std::string_view nondp_text =
+          "[!ndp]";
         ZoneText(nondp_text.data(), nondp_text.size());
     }
     faabric::util::SharedLock lock(resetMx);
@@ -1426,7 +1427,7 @@ U32 WAVMWasmModule::growMemory(U32 nBytes)
     }
 
     Uptr newMemPageBase;
-    Uptr pageChange = newPages - oldPages;
+    Uptr pageChange = getNumberOfWasmPagesForBytes(nBytes);
     Runtime::GrowResult result =
       Runtime::growMemory(defaultMemory, pageChange, &newMemPageBase);
 
@@ -1510,8 +1511,7 @@ uint32_t WAVMWasmModule::shrinkMemory(U32 nBytes)
 
     // Note - we don't actually free the memory, we just change the brk
     U32 newBrk = oldBrk - nBytes;
-    const size_t pageChange =
-      (getMemorySizeBytes() - newBrk) / WASM_BYTES_PER_PAGE;
+    const size_t pageChange = getNumberOfWasmPagesForBytes(nBytes);
 
     Uptr newNumPages{};
     Runtime::GrowResult result =

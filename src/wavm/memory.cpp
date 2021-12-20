@@ -152,7 +152,7 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env, "__sbrk", I32, __sbrk, I32 increment)
     I32 result;
     if (increment < 0) {
         PROF_START(sbrkShrink)
-        result = module->shrinkMemory(-1 * increment);
+        result = module->shrinkMemory(-increment);
         PROF_END(sbrkShrink)
     } else {
         PROF_START(sbrkGrow)
