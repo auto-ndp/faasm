@@ -119,15 +119,17 @@ void sigbusHandler(int code, siginfo_t* siginfo, void* contextR)
         return;
     }
     size_t offset = faultPage - range->mapStart;
-    range->touch(offset + FAULT_PAGE_SIZE);
+    size_t faultEnd = std::min(size_t(faultPage) + FAULT_PAGE_SIZE,
+                               size_t(range->mapStart) + range->mapBytes);
+    size_t faultSize = faultEnd - size_t(faultPage);
+    range->touch(faultEnd);
     auto initSource = range->initSource;
     lock.unlock();
     if (offset < initSource.size()) {
-        umam.uffd.copyPages(size_t(faultPage),
-                            FAULT_PAGE_SIZE,
-                            size_t(initSource.data() + offset));
+        umam.uffd.copyPages(
+          size_t(faultPage), faultSize, size_t(initSource.data() + offset));
     } else {
-        umam.uffd.zeroPages(size_t(faultPage), FAULT_PAGE_SIZE);
+        umam.uffd.zeroPages(size_t(faultPage), faultSize);
     }
 }
 
