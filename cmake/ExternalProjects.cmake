@@ -141,7 +141,7 @@ target_link_libraries(TracyClient PUBLIC Threads::Threads dl)
 target_include_directories(TracyClient PUBLIC $<INSTALL_INTERFACE:include> $<BUILD_INTERFACE:${tracy_ext_SOURCE_DIR}>)
 target_compile_features(TracyClient PUBLIC cxx_std_20)
 target_compile_definitions(TracyClient PUBLIC
-    TRACY_ENABLE
+#    TRACY_ENABLE
     TRACY_ON_DEMAND
     TRACY_NO_BROADCAST
     TRACY_NO_FRAME_IMAGE
