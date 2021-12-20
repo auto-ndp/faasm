@@ -5,6 +5,8 @@ race:socket
 # Ignore ZeroMQ races
 race:zmq::*
 race:xsputn
+# Ignore stacktrace printing races
+race:absl::*::Symbolize
 # Config only changes in tests, and in places where being slightly racy doesn't matter
 race:faabric::util::SystemConfig::*
 race:conf::FaasmConfig::*
@@ -14,6 +16,10 @@ signal:*
 race:std::__future_base::_Result
 race:std::future<*>::get
 race:faabric::endpoint::FaabricEndpointHandler::onFunctionResult
+
+# Tracy races
+race:tracy::_memory_heap_lookup
+race:tracy::InitRpmalloc
 
 # Raciness inside webassembly openmp modules
 race:wasm::startReduceCritical
