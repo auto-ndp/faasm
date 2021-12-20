@@ -162,7 +162,9 @@ void Executor::executeTasks(std::vector<int> msgIdxs,
         const faabric::Message& msg = req->messages().at(msgIdx);
 
         int threadPoolIdx = -1;
-        if (availablePoolThreads.empty()) {
+        if (!isThreads) {
+            threadPoolIdx = 0;
+        } else if (availablePoolThreads.empty()) {
             // Here all threads are still executing, so we have to overload.
             // If any tasks are blocking we risk a deadlock, and can no longer
             // guarantee the application will finish.

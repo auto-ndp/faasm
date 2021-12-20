@@ -634,8 +634,9 @@ faabric::util::SchedulingDecision Scheduler::doCallFunctions(
     }
 
     // Now reset the dirty page tracking just before we start executing
-    SPDLOG_DEBUG("Resetting dirty tracking after pushing diffs {}", funcStr);
     if (req->type() != faabric::BatchExecuteRequest::FUNCTIONS) {
+        SPDLOG_DEBUG("Resetting dirty tracking after pushing diffs {}",
+                     funcStr);
         ZoneScopedNS("Reset dirty tracking", 5);
         faabric::util::resetDirtyTracking();
     }
