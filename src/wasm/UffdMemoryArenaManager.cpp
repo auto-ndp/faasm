@@ -80,15 +80,20 @@ void sigbusHandler(int code, siginfo_t* siginfo, void* contextR)
         std::terminate();
     }
     std::byte* faultAddr = (std::byte*)siginfo->si_addr;
+    thread_local std::weak_ptr<UffdMemoryRange> rangeCache;
+    std::shared_ptr range = rangeCache.lock();
     UffdMemoryArenaManager& umam = UffdMemoryArenaManager::instance();
-    faabric::util::SharedTraceableLock lock{ umam.mx };
-    auto range = umam.ranges.find(faultAddr);
-    if (range == umam.ranges.end()) [[unlikely]] {
-        lock.unlock();
-        SPDLOG_CRITICAL("SIGBUS invalid access of memory at pointer {}",
-                        (void*)(faultAddr));
-        faabric::util::printStackTrace(contextR);
-        ::exit(1);
+    if (!range || !range->pointerInRange(faultAddr)) [[unlikely]] {
+        auto ranges = umam.rangesSnapshot();
+        auto rangeIt = ranges->find(faultAddr);
+        if (rangeIt == ranges->end()) [[unlikely]] {
+            SPDLOG_CRITICAL("SIGBUS invalid access of memory at pointer {}",
+                            (void*)(faultAddr));
+            faabric::util::printStackTrace(contextR);
+            ::exit(1);
+        }
+        range = *rangeIt;
+        rangeCache = range;
     }
     faabric::util::FullLock rangeLock{ range->mx };
     if (range->pointerPermissions(faultAddr) == 0) [[unlikely]] {
@@ -112,7 +117,7 @@ void sigbusHandler(int code, siginfo_t* siginfo, void* contextR)
                              (void*)regionEnd);
             }
         }
-        lock.unlock();
+        rangeLock.unlock();
         faabric::util::printStackTrace(contextR);
         ::pthread_kill(::pthread_self(), SIGSEGV);
         return;
@@ -125,7 +130,7 @@ void sigbusHandler(int code, siginfo_t* siginfo, void* contextR)
     size_t faultSize = faultEnd - faultPageOffset;
     range->touch(faultEnd);
     auto initSource = range->initSource;
-    lock.unlock();
+    rangeLock.unlock();
     if (faultPageOffset < initSource.size()) {
         ZoneScopedN("copyPages");
         umam.uffd.copyPages(size_t(range->mapStart) + faultPageOffset,
@@ -149,19 +154,25 @@ UffdMemoryArenaManager::UffdMemoryArenaManager()
     sigemptyset(&action.sa_mask);
     checkErrno(sigaction(SIGBUS, &action, nullptr),
                "Couldn't register UFFD SIGBUS handler");
+    updateRanges(std::make_shared<RangeSet>());
     SPDLOG_INFO("Registered UFFD SIGBUS handler");
 }
 
 std::byte* UffdMemoryArenaManager::allocateRange(size_t pages,
                                                  size_t alignmentLog2)
 {
-    UffdMemoryRange range{ pages, alignmentLog2 };
-    std::byte* start = range.mapStart;
+    std::shared_ptr range =
+      std::make_shared<UffdMemoryRange>(pages, alignmentLog2);
+    std::byte* start = range->mapStart;
     {
         faabric::util::FullTraceableLock lock{ mx };
+
         this->uffd.registerAddressRange(
-          size_t(range.mapStart), range.mapBytes, true, false);
-        this->ranges.insert(std::move(range));
+          size_t(range->mapStart), range->mapBytes, true, false);
+        std::shared_ptr newRanges =
+          std::make_shared<RangeSet>(*rangesSnapshot());
+        newRanges->insert(std::move(range));
+        this->updateRanges(std::move(newRanges));
     }
     return start;
 }
@@ -170,29 +181,36 @@ void UffdMemoryArenaManager::modifyRange(
   std::byte* start,
   std::function<void(UffdMemoryRange&)> action)
 {
-    faabric::util::SharedTraceableLock lock{ mx };
-    auto range = this->ranges.find(start);
-    if (range == this->ranges.end()) {
+    auto rangesSnap = this->rangesSnapshot();
+    auto rangeIt = rangesSnap->find(start);
+    if (rangeIt == rangesSnap->end()) {
         throw std::runtime_error("Invalid pointer for UFFD range action");
     }
+    std::shared_ptr range = *rangeIt;
+    faabric::util::FullLock rangeLock{ range->mx };
     if (!range->pointerInRange(start)) {
         throw std::runtime_error("Invalid pointer found for UFFD range action");
     }
-    faabric::util::FullLock rangeLock{ range->mx };
     action(*range);
 }
 
 void UffdMemoryArenaManager::freeRange(std::byte* start)
 {
     faabric::util::FullTraceableLock lock{ mx };
-    auto range = this->ranges.find(start);
-    if (range == this->ranges.end()) {
+    std::shared_ptr newRanges = std::make_shared<RangeSet>(*rangesSnapshot());
+    auto rangeIt = newRanges->find(start);
+    if (rangeIt == newRanges->end()) {
         throw std::runtime_error("Invalid pointer for UFFD range removal");
     }
+    auto& range = *rangeIt;
+    faabric::util::FullLock rangeLock{ range->mx };
     size_t mapStart = size_t(range->mapStart);
     size_t mapLength = range->mapBytes;
     uffd.unregisterAddressRange(mapStart, mapLength);
-    this->ranges.erase(range);
+    range->resetPermissions();
+    rangeLock.unlock();
+    newRanges->erase(rangeIt);
+    this->updateRanges(std::move(newRanges));
 }
 
 }
