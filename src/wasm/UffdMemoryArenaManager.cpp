@@ -74,13 +74,14 @@ UffdMemoryArenaManager& UffdMemoryArenaManager::instance()
 
 void sigbusHandler(int code, siginfo_t* siginfo, void* contextR)
 {
+    ZoneScopedN("uffd-fh");
     constexpr size_t FAULT_PAGE_SIZE = 65536;
     if (code != SIGBUS) [[unlikely]] {
         std::terminate();
     }
     std::byte* faultAddr = (std::byte*)siginfo->si_addr;
     UffdMemoryArenaManager& umam = UffdMemoryArenaManager::instance();
-    faabric::util::SharedLock lock{ umam.mx };
+    faabric::util::SharedTraceableLock lock{ umam.mx };
     auto range = umam.ranges.find(faultAddr);
     if (range == umam.ranges.end()) [[unlikely]] {
         lock.unlock();
@@ -126,10 +127,12 @@ void sigbusHandler(int code, siginfo_t* siginfo, void* contextR)
     auto initSource = range->initSource;
     lock.unlock();
     if (faultPageOffset < initSource.size()) {
+        ZoneScopedN("copyPages");
         umam.uffd.copyPages(size_t(range->mapStart) + faultPageOffset,
                             faultSize,
                             size_t(initSource.data() + faultPageOffset));
     } else {
+        ZoneScopedN("zeroPages");
         umam.uffd.zeroPages(size_t(range->mapStart) + faultPageOffset,
                             faultSize);
     }
@@ -137,7 +140,7 @@ void sigbusHandler(int code, siginfo_t* siginfo, void* contextR)
 
 UffdMemoryArenaManager::UffdMemoryArenaManager()
 {
-    faabric::util::FullLock lock{ mx };
+    faabric::util::FullTraceableLock lock{ mx };
     uffd.create(O_CLOEXEC, true);
     struct sigaction action;
     action.sa_flags = SA_RESTART | SA_SIGINFO;
@@ -155,7 +158,7 @@ std::byte* UffdMemoryArenaManager::allocateRange(size_t pages,
     UffdMemoryRange range{ pages, alignmentLog2 };
     std::byte* start = range.mapStart;
     {
-        faabric::util::FullLock lock{ mx };
+        faabric::util::FullTraceableLock lock{ mx };
         this->uffd.registerAddressRange(
           size_t(range.mapStart), range.mapBytes, true, false);
         this->ranges.insert(std::move(range));
@@ -167,7 +170,7 @@ void UffdMemoryArenaManager::modifyRange(
   std::byte* start,
   std::function<void(UffdMemoryRange&)> action)
 {
-    faabric::util::SharedLock lock{ mx };
+    faabric::util::SharedTraceableLock lock{ mx };
     auto range = this->ranges.find(start);
     if (range == this->ranges.end()) {
         throw std::runtime_error("Invalid pointer for UFFD range action");
@@ -181,7 +184,7 @@ void UffdMemoryArenaManager::modifyRange(
 
 void UffdMemoryArenaManager::freeRange(std::byte* start)
 {
-    faabric::util::FullLock lock{ mx };
+    faabric::util::FullTraceableLock lock{ mx };
     auto range = this->ranges.find(start);
     if (range == this->ranges.end()) {
         throw std::runtime_error("Invalid pointer for UFFD range removal");

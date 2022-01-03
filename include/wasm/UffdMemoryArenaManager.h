@@ -193,7 +193,7 @@ class UffdMemoryArenaManager final
     friend void sigbusHandler(int code, siginfo_t* siginfo, void* contextR);
 
   private:
-    std::shared_mutex mx;
+    TraceableSharedMutex(mx);
     faabric::util::UserfaultFd uffd;
     using RangeSet = absl::btree_set<UffdMemoryRange, std::less<>>;
     RangeSet ranges;
