@@ -6,6 +6,7 @@ from tasks.util.env import get_version, PROJ_ROOT
 
 FAABRIC_IMAGE_NAME = "faabric"
 FAABRIC_BASE_IMAGE_NAME = "faabric-base"
+FAABRIC_BASE_RUNTIME_IMAGE_NAME = "faabric-base-runtime"
 MPI_NATIVE_IMAGE_NAME = "faabric-mpi-native"
 
 
@@ -62,6 +63,7 @@ def build_base(ctx, nocache=False, push=False):
     """
     Build faabric's base container
     """
+    _do_container_build(FAABRIC_BASE_RUNTIME_IMAGE_NAME, nocache=nocache, push=push)
     _do_container_build(FAABRIC_BASE_IMAGE_NAME, nocache=nocache, push=push)
 
 
