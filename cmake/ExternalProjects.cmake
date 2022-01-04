@@ -41,6 +41,7 @@ conan_cmake_autodetect(FAABRIC_CONAN_SETTINGS)
 
 conan_cmake_install(PATH_OR_REFERENCE .
                     BUILD outdated
+                    UPDATE
                     REMOTE conancenter
                     PROFILE_HOST ${FAABRIC_CONAN_PROFILE}
                     PROFILE_BUILD ${FAABRIC_CONAN_PROFILE}
