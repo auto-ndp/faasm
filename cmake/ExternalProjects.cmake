@@ -50,8 +50,7 @@ conan_cmake_install(PATH_OR_REFERENCE .
 include(${CMAKE_CURRENT_BINARY_DIR}/conan_paths.cmake)
 
 find_package(Catch2 REQUIRED)
-find_package(mimalloc-static REQUIRED)
-add_library(mimalloc::mimalloc ALIAS mimalloc-static::mimalloc-static)
+find_package(mimalloc REQUIRED)
 
 # 22/12/2021 - WARNING: we don't install AWS through Conan as the recipe proved
 # very unstable and failed frequently.
