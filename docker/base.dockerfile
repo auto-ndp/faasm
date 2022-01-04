@@ -19,6 +19,7 @@ RUN apt-get update \
     iproute2 \
     iptables \
     nasm \
+    libclang-common-11-dev \
     libcgroup-dev \
     && apt-get clean autoclean \
     && apt-get autoremove
