@@ -12,8 +12,8 @@
 // in a release build for performance reasons.
 
 #ifdef NDEBUG
-// Allow info and up in release build
-#define SPDLOG_ACTIVE_LEVEL 2
+// Allow debug and up in release build
+#define SPDLOG_ACTIVE_LEVEL 1
 #else
 // Allow all levels in debug build
 #define SPDLOG_ACTIVE_LEVEL 0
