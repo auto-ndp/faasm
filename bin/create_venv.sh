@@ -28,6 +28,7 @@ fi
 
 pip_cmd install -U pip
 pip_cmd install -U setuptools
+pip_cmd install -U wheel
 pip_cmd install -r faasmcli/requirements.txt
 
 pushd clients/cpp >> /dev/null
