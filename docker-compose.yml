@@ -9,8 +9,8 @@ services:
 
   minio:
     image: kubasz51/faasm-minio:${FAASM_VERSION}
-    expose:
-      - "9000"
+    ports:
+      - "9000:9000"
     environment:
       MINIO_ROOT_USER: minio
       MINIO_ROOT_PASSWORD: minio123
@@ -204,9 +204,10 @@ services:
       - REDIS_QUEUE_HOST=redis-queue
       - REDIS_STATE_HOST=redis-state
       - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
-      - ASAN_OPTIONS=verbosity=1:halt_on_error=1
-      - TSAN_OPTIONS=halt_on_error=1:suppressions=/code/faabric/thread-sanitizer-ignorelist.txt:history_size=7:second_deadlock_stack=1
-      - UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=1
+      - ASAN_OPTIONS=halt_on_error=1
+      - LSAN_OPTIONS=suppressions=/usr/local/code/faasm/leak-sanitizer-ignorelist.txt
+      - TSAN_OPTIONS=halt_on_error=1:suppressions=/usr/local/code/faasm/thread-sanitizer-ignorelist.txt:history_size=7:second_deadlock_stack=1
+      - UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1
     volumes:
       - ./:/usr/local/code/faasm/
       - ./dev/faasm/build/:${FAASM_BUILD_MOUNT}
@@ -224,6 +225,7 @@ services:
       - minio
       - upload
     environment:
+      - LD_LIBRARY_PATH=/usr/local/lib
       - LOG_LEVEL=debug
       - REDIS_QUEUE_HOST=redis-queue
       - REDIS_STATE_HOST=redis-state

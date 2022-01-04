@@ -28,6 +28,24 @@ std::vector<uint8_t> wavmCodegen(std::vector<uint8_t>& wasmBytes,
 template<class T>
 T unalignedWavmRead(WAVM::Runtime::Memory* memory, WAVM::Uptr offset)
 {
+    const uint8_t* bytes =
+      WAVM::Runtime::memoryArrayPtr<uint8_t>(memory, offset, sizeof(T));
+    return faabric::util::unalignedRead<T>(bytes);
+}
+
+template<class T>
+void unalignedWavmWrite(const T& value,
+                        WAVM::Runtime::Memory* memory,
+                        WAVM::Uptr offset)
+{
+    uint8_t* bytes =
+      WAVM::Runtime::memoryArrayPtr<uint8_t>(memory, offset, sizeof(T));
+    faabric::util::unalignedWrite<T>(value, bytes);
+}
+
+template<class T>
+T unalignedWavmRead(WAVM::Runtime::Memory* memory, WAVM::Uptr offset)
+{
     const std::byte* bytes =
       WAVM::Runtime::memoryArrayPtr<std::byte>(memory, offset, sizeof(T));
     return faabric::util::unalignedRead<T>(bytes);
@@ -243,7 +261,8 @@ class WAVMModuleCache
     std::pair<wasm::WAVMWasmModule&, faabric::util::SharedLock> getCachedModule(
       faabric::Message& msg);
 
-    void initialiseCachedModule(faabric::Message& msg);
+    std::string registerResetSnapshot(wasm::WasmModule& module,
+                                      faabric::Message& msg);
 
     void clear();
 

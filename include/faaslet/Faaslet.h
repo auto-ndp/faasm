@@ -25,7 +25,7 @@ class Faaslet final : public faabric::scheduler::Executor
       int msgIdx,
       std::shared_ptr<faabric::BatchExecuteRequest> req) override;
 
-    faabric::util::SnapshotData snapshot() override;
+    faabric::util::MemoryView getMemoryView() override;
 
     void restore(faabric::Message& call) override;
 
@@ -37,8 +37,6 @@ class Faaslet final : public faabric::scheduler::Executor
     void softShutdown() override;
 
   private:
-    bool isIsolated = false;
-
     std::string localResetSnapshotKey;
 
     std::shared_ptr<isolation::NetworkNamespace> ns;

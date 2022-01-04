@@ -663,7 +663,7 @@ void WAVMWasmModule::doBindToFunctionInternal(faabric::Message& msg,
      */
     if (useCache) {
         wasm::WAVMModuleCache& cache = getWAVMModuleCache();
-        auto [cached, lock] = cache.getCachedModule(msg);
+        auto [cached, cacheLock] = cache.getCachedModule(msg);
         clone(cached, "");
         return;
     }
@@ -1405,7 +1405,7 @@ U32 WAVMWasmModule::growMemory(U32 nBytes)
         return getMemorySizeBytes();
     }
 
-    faabric::util::FullLock lock(moduleMemoryMutex);
+    faabric::util::FullLock lock(moduleMutex);
 
     // Check if we can reclaim
     size_t oldBytes = getMemorySizeBytes();
@@ -1499,7 +1499,7 @@ uint32_t WAVMWasmModule::shrinkMemory(U32 nBytes)
         throw std::runtime_error("New break not page aligned");
     }
 
-    faabric::util::FullLock lock(moduleMemoryMutex);
+    faabric::util::FullLock lock(moduleMutex);
 
     U32 oldBrk = getMemorySizeBytes();
 
