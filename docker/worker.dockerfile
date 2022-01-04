@@ -1,5 +1,5 @@
 ARG FAASM_VERSION
-FROM kubasz51/faasm-base:${FAASM_VERSION}
+FROM kubasz51/faasm-base-runtime:${FAASM_VERSION}
 
 # Build the worker binary
 WORKDIR /build/faasm

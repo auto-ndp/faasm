@@ -1,5 +1,6 @@
+ARG FAASM_VERSION
 # Import build results
-FROM kubasz51/faasm-base:0.8.2 AS builder
+FROM kubasz51/faasm-base:${FAASM_VERSION} AS builder
 
 # Note - we don't often rebuild faabric-base so this dep may be behind
 FROM kubasz51/faasm-faabric-base-runtime:0.3.1
@@ -49,3 +50,6 @@ RUN mkdir -p /build/faasm/bin
 RUN mkdir -p /build/faasm/lib
 
 COPY --from=builder /build/faasm/lib/*.so /build/faasm/lib/
+COPY --from=builder /build/faasm/bin/func_runner /build/faasm/bin/func_sym \
+    /build/faasm/bin/codegen_func /build/faasm/bin/codegen_shared_obj  \
+    /build/faasm/bin/pool_runner /build/faasm/bin/upload /build/faasm/bin/

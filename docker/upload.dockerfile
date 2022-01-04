@@ -1,5 +1,5 @@
 ARG FAASM_VERSION
-FROM kubasz51/faasm-base:${FAASM_VERSION}
+FROM kubasz51/faasm-base-runtime:${FAASM_VERSION}
 
 # Build the upload and codegen targets
 WORKDIR /build/faasm
