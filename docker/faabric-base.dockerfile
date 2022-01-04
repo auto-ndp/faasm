@@ -1,24 +1,19 @@
-FROM debian:bookworm-20211115
+FROM kubasz51/faasm-faabric-base-runtime:0.3.1
 # Debian "12" testing
 
-RUN apt-get update
-RUN apt-get upgrade -y
-RUN apt-get install -y software-properties-common gpg wget curl
-
-RUN apt-get install -y \
+RUN apt-get update \
+    && apt-get upgrade --yes --no-install-recommends \
+    && apt-get install --yes --no-install-recommends software-properties-common gpg wget curl \
+    && apt-get install --yes --no-install-recommends \
     autoconf \
     automake \
     build-essential \
-    clang-11 \
     clang-13 \
-    clang-format-11 \
     clang-format-13 \
-    clang-tidy-11 \
     clang-tidy-13 \
     clang-tools-13 \
     cmake \
     g++-11 \
-    gdb \
     git \
     libboost-filesystem-dev \
     libc++-13-dev \
@@ -35,20 +30,11 @@ RUN apt-get install -y \
     libz-dev \
     lld-13 \
     lldb-13 \
+    llvm-11-dev \
     make \
     ninja-build \
-    pkg-config \
-    python3-dev \
-    python3-pip \
-    python3-venv \
-    redis-tools \
-    sudo \
-    unzip \
-    zsh
+    && apt-get clean autoclean \
+    && apt-get autoremove
 
 RUN pip install cmake==3.22.1
 RUN pip install conan==1.44.0
-
-# Tidy up
-RUN apt-get clean autoclean
-RUN apt-get autoremove
