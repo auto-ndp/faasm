@@ -176,7 +176,8 @@ class Scheduler
 
     void setFunctionResult(std::unique_ptr<faabric::Message> msg);
 
-    inline void setFunctionResult(const faabric::Message& msg) {
+    inline void setFunctionResult(const faabric::Message& msg)
+    {
         setFunctionResult(std::make_unique<faabric::Message>(msg));
     }
 

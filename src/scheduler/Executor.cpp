@@ -361,7 +361,7 @@ void Executor::threadPoolThread(int threadPoolIdx)
         faabric::util::MemoryView funcMemory = getMemoryView();
         if (!skippedExec && !funcMemory.getData().empty() && isLastInBatch &&
             task.needsSnapshotSync) {
-                ZoneScopedN("Task snapshot diff push");
+            ZoneScopedN("Task snapshot diff push");
             auto snap = faabric::snapshot::getSnapshotRegistry().getSnapshot(
               msg.snapshotkey());
 

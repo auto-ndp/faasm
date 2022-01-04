@@ -114,7 +114,7 @@ void FunctionCallServer::recvDirectResult(const uint8_t* buffer,
     ZoneScopedNS("FunctionCallServer::recvDirectResult", 6);
     PARSE_MSG(faabric::DirectResultTransmission, buffer, bufferSize)
 
-    std::unique_ptr<faabric::Message> result{msg.release_result()};
+    std::unique_ptr<faabric::Message> result{ msg.release_result() };
     scheduler.setFunctionResult(std::move(result));
 }
 }

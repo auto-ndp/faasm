@@ -4,6 +4,7 @@
 #include <faabric/util/macros.h>
 #include <faabric/util/timing.h>
 
+#include <functional>
 #include <optional>
 #include <pistache/endpoint.h>
 #include <pistache/listener.h>
@@ -48,9 +49,9 @@ class HttpConnection : public std::enable_shared_from_this<HttpConnection>
 
     void run()
     {
-        asio::dispatch(stream.get_executor(),
-                       beast::bind_front_handler(&HttpConnection::doRead,
-                                                 this->shared_from_this()));
+        asio::dispatch(
+          stream.get_executor(),
+          std::bind_front(&HttpConnection::doRead, this->shared_from_this()));
     }
 
   private:
@@ -63,17 +64,15 @@ class HttpConnection : public std::enable_shared_from_this<HttpConnection>
           stream,
           buffer,
           parser,
-          beast::bind_front_handler(&HttpConnection::onRead,
-                                    this->shared_from_this()));
+          std::bind_front(&HttpConnection::onRead, this->shared_from_this()));
     }
 
     void handleRequest(faabric::util::BeastHttpRequest msg)
     {
         HttpRequestContext hrc{ ioc,
                                 stream.get_executor(),
-                                beast::bind_front_handler(
-                                  &HttpConnection::sendResponse,
-                                  this->shared_from_this()) };
+                                std::bind_front(&HttpConnection::sendResponse,
+                                                this->shared_from_this()) };
         handler->onRequest(std::move(hrc), std::move(msg));
     }
 
@@ -95,18 +94,17 @@ class HttpConnection : public std::enable_shared_from_this<HttpConnection>
     void sendResponse(faabric::util::BeastHttpResponse&& response)
     {
         // response needs to be freed after the send completes
-        auto ownedResponse = std::make_unique<faabric::util::BeastHttpResponse>(
+        auto ownedResponse = std::make_shared<faabric::util::BeastHttpResponse>(
           std::move(response));
         ownedResponse->prepare_payload();
-        beast::http::async_write(
-          stream,
-          *ownedResponse,
-          beast::bind_front_handler(&HttpConnection::onWrite,
-                                    this->shared_from_this(),
-                                    std::move(ownedResponse)));
+        beast::http::async_write(stream,
+                                 *ownedResponse,
+                                 std::bind_front(&HttpConnection::onWrite,
+                                                 this->shared_from_this(),
+                                                 ownedResponse));
     }
 
-    void onWrite(std::unique_ptr<faabric::util::BeastHttpResponse> response,
+    void onWrite(std::shared_ptr<faabric::util::BeastHttpResponse> response,
                  beast::error_code ec,
                  size_t bytesTransferred)
     {
@@ -165,8 +163,8 @@ class EndpointListener : public std::enable_shared_from_this<EndpointListener>
     void run()
     {
         asio::dispatch(acceptor.get_executor(),
-                       beast::bind_front_handler(&EndpointListener::doAccept,
-                                                 this->shared_from_this()));
+                       std::bind_front(&EndpointListener::doAccept,
+                                       this->shared_from_this()));
     }
 
   private:
@@ -174,14 +172,14 @@ class EndpointListener : public std::enable_shared_from_this<EndpointListener>
     {
         // create a new strand (forces all related tasks to happen on one
         // thread)
-        acceptor.async_accept(
-          asio::make_strand(ioc),
-          beast::bind_front_handler(&EndpointListener::handleAccept,
-                                    this->shared_from_this()));
+        acceptor.async_accept(asio::make_strand(ioc),
+                              std::bind_front(&EndpointListener::handleAccept,
+                                              this->shared_from_this()));
     }
 
     void handleAccept(beast::error_code ec, asio::ip::tcp::socket socket)
     {
+        SPDLOG_DEBUG("handleAccept");
         if (ec) {
             SPDLOG_ERROR("Failed accept(): {}", ec.message());
         } else {
@@ -244,7 +242,7 @@ void Endpoint::start(bool awaitSignal)
 
     std::optional<asio::signal_set> signals;
     if (awaitSignal) {
-        signals.emplace(state->ioc, SIGINT, SIGTERM);
+        signals.emplace(state->ioc, SIGINT, SIGTERM, SIGQUIT);
         signals->async_wait([&](beast::error_code const& ec, int sig) {
             if (!ec) {
                 SPDLOG_INFO("Received signal: {}", sig);
