@@ -4,21 +4,19 @@ FROM kubasz51/faasm-base:$FAASM_VERSION
 SHELL ["/bin/bash", "-c"]
 
 # Install various deps
-RUN apt-get update
-RUN apt-get install --no-install-recommends --no-install-suggests -y \
-    clang-tidy-11 \
-    clang-tidy-13 \
-    libpython3-dev \
-    python3-dev \
-    python3-pip \
-    python3-venv \
+RUN apt-get update \
+    && apt-get upgrade --yes --no-install-recommends \
+    && apt-get install --yes --no-install-recommends \
     libcairo2-dev \
     python3-cairo \
-    vim
+    vim \
+    nano \
+    && apt-get clean autoclean \
+    && apt-get autoremove
 
 # Install wabt
 # TODO - pin this to a release
-RUN git clone https://github.com/WebAssembly/wabt/ /tmp/wabt
+RUN git clone --depth 1 https://github.com/WebAssembly/wabt/ /tmp/wabt
 WORKDIR /tmp/wabt/build
 RUN cmake -GNinja -DBUILD_TESTS=OFF -DBUILD_LIBWASM=OFF ..
 RUN ninja install
