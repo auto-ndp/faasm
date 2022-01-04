@@ -221,6 +221,8 @@ class SnapshotData
 
     size_t getMaxSize() const { return maxSize; }
 
+    int getFd() const { return fd; }
+
   private:
     size_t size = 0;
     size_t maxSize = 0;
