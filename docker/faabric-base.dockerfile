@@ -27,7 +27,7 @@ RUN apt-get update \
     libstdc++-11-dev \
     libtool \
     libunwind-13-dev \
-    libz-dev \
+    zlib1g-dev \
     lld-13 \
     lldb-13 \
     llvm-11-dev \

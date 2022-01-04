@@ -7,19 +7,21 @@ RUN apt-get update \
     && apt-get install --yes --no-install-recommends \
     gdb \
     gdbserver \
-    libc++-13 \
-    libc++abi-13 \
-    libcurl4-openssl \
-    libhiredis \
+    libc++1-13 \
+    libcurl4 \
+    libhiredis0.14 \
     libllvm11 \
     libllvm13 \
-    liblttng-ust \
-    lttng-tools \
-    libpython3 \
-    libssl \
-    libstdc++-6 \
+    liblttng-ust-ctl5 \
+    liblttng-ust1 \
+    libpython3-dev \
+    libssl1.1 \
+    libstdc++6 \
     libunwind-13 \
-    libz \
+    liburcu8 \
+    libz3-4 \
+    lttng-tools \
+    zlib1g \
     pkg-config \
     python3-dev \
     python3-pip \
