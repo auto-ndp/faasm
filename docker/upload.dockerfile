@@ -5,7 +5,7 @@ FROM kubasz51/faasm-base-runtime:${FAASM_VERSION}
 WORKDIR /build/faasm
 
 # Install hoststats
-RUN pip3 install hoststats==0.1.0
+# RUN pip3 install hoststats==0.1.0
 
 # Set up entrypoint
 COPY bin/entrypoint_codegen.sh /entrypoint_codegen.sh
