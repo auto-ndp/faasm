@@ -30,13 +30,7 @@ COPY --from=builder /opt/intel /opt/intel
 # Check out code (clean beforehand just in case)
 WORKDIR /usr/local/code
 RUN rm -rf faasm
-RUN git clone \
-    --depth 1 \
-    -b v${FAASM_VERSION} \
-    https://github.com/auto-ndp/faasm
-WORKDIR /usr/local/code/faasm
-
-RUN git submodule update --init --depth 1
+COPY --from=builder /usr/local/code/faasm /usr/local/code/faasm
 
 # Set up runtime filesystem
 WORKDIR /usr/local/code/faasm/ansible
