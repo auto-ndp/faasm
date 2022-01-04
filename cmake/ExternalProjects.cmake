@@ -30,7 +30,7 @@ endif()
 conan_cmake_configure(
     REQUIRES
         "abseil/20211102.0@#469a22da5f3d4beeb200450447aa5d04"
-        "boost/1.77.0@#d0be0b4b04a551f5d49ac540e59f51bd"
+        "boost/1.78.0@#c6275b1e5ecf6e51fe8baf1e322bb065"
         "catch2/2.13.7@#31c8cd08e3c957a9eac8cb1377cf5863"
         "cppcodec/0.2@#f6385611ce2f7cff954ac8b16e25c4fa"
         "cpprestsdk/2.10.18@#36e30936126a3da485ce05d619fb1249"
@@ -87,7 +87,7 @@ conan_cmake_install(PATH_OR_REFERENCE .
 include(${CMAKE_CURRENT_BINARY_DIR}/conan_paths.cmake)
 
 find_package(absl REQUIRED)
-find_package(Boost 1.77.0 REQUIRED)
+find_package(Boost 1.78.0 REQUIRED)
 find_package(Catch2 REQUIRED)
 find_package(Flatbuffers REQUIRED)
 find_package(Protobuf REQUIRED)
@@ -205,5 +205,6 @@ target_link_libraries(faabric_common_dependencies INTERFACE
 )
 target_compile_definitions(faabric_common_dependencies INTERFACE
     FMT_DEPRECATED= # Suppress warnings about use of deprecated api by spdlog
+    BOOST_NO_TYPEID=1 # Prevent odd crashes within asio implementation
 )
 add_library(faabric::common_dependencies ALIAS faabric_common_dependencies)
