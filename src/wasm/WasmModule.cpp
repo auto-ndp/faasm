@@ -262,7 +262,7 @@ void WasmModule::restore(const std::string& snapshotKey)
     }
 
     // Map the snapshot into memory
-    ZoneValue(data->size);
+    ZoneValue(data->getSize());
     uint8_t* memoryBase = getMemoryBase();
 
     switch (config.vmArenaMode) {
@@ -277,16 +277,16 @@ void WasmModule::restore(const std::string& snapshotKey)
                 range.resetPermissions();
                 range.discardAll();
                 range.setPermissions(range.mapStart,
-                                     range.mapStart + snapshot->size,
+                                     range.mapStart + data->getSize(),
                                      PROT_READ | PROT_WRITE);
             });
             int fd = data->getFd();
             using faabric::util::checkErrno;
             checkErrno(::lseek(fd, 0, SEEK_SET), "snapshot fd seek");
             size_t curPos = 0;
-            while (curPos < snapshot->size) {
+            while (curPos < data->getSize()) {
                 ssize_t bytes =
-                  ::read(fd, memoryBase + curPos, snapshot->size - curPos);
+                  ::read(fd, memoryBase + curPos, data->getSize() - curPos);
                 if (bytes < 0) {
                     if (errno == EINTR) {
                         continue;
