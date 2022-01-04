@@ -77,6 +77,7 @@ set(FAABRIC_CONAN_PROFILE "${CMAKE_CURRENT_LIST_DIR}/../conan-profile${FAABRIC_A
 
 conan_cmake_install(PATH_OR_REFERENCE .
                     BUILD outdated
+                    UPDATE
                     REMOTE conancenter
                     PROFILE_HOST ${FAABRIC_CONAN_PROFILE}
                     PROFILE_BUILD ${FAABRIC_CONAN_PROFILE}
