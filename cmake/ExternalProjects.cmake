@@ -64,8 +64,8 @@ find_package(mimalloc REQUIRED)
 # https://github.com/aws/aws-sdk-cpp/blob/main/Docs/CMake_External_Project.md
 # but they don't specify how to link the libraries, which required adding an
 # extra couple of CMake targets.
-set(AWS_CORE_LIBRARY ${CMAKE_INSTALL_PREFIX}/lib/libaws-cpp-sdk-core.so)
-set(AWS_S3_LIBRARY ${CMAKE_INSTALL_PREFIX}/lib/libaws-cpp-sdk-s3.so)
+set(AWS_CORE_LIBRARY ${CMAKE_INSTALL_PREFIX}/lib/libaws-cpp-sdk-core.a)
+set(AWS_S3_LIBRARY ${CMAKE_INSTALL_PREFIX}/lib/libaws-cpp-sdk-s3.a)
 ExternalProject_Add(aws_ext
     GIT_REPOSITORY   "https://github.com/aws/aws-sdk-cpp.git"
     GIT_TAG          "021372ca9e5518d2dc5ba10d0b2aa34172894eed"
@@ -75,26 +75,34 @@ ExternalProject_Add(aws_ext
     BUILD_BYPRODUCTS ${AWS_S3_LIBRARY} ${AWS_CORE_LIBRARY}
     CMAKE_CACHE_ARGS "-DCMAKE_INSTALL_PREFIX:STRING=${CMAKE_INSTALL_PREFIX}"
     LIST_SEPARATOR    "|"
-    CMAKE_ARGS       -DBUILD_SHARED_LIBS=ON
+    CMAKE_ARGS       -DBUILD_SHARED_LIBS=OFF
                      -DBUILD_ONLY=s3|sts
                      -DAUTORUN_UNIT_TESTS=OFF
+                     -DENABLE_UNITY_BUILD=ON
                      -DENABLE_TESTING=OFF
                      -DCMAKE_BUILD_TYPE=Release
 )
 
-add_library(aws_ext_core SHARED IMPORTED)
-add_library(aws_ext_s3 SHARED IMPORTED)
+add_library(aws_ext_core STATIC IMPORTED)
+add_library(aws_ext_s3 STATIC IMPORTED)
 set_target_properties(aws_ext_core
     PROPERTIES IMPORTED_LOCATION
-    ${CMAKE_INSTALL_PREFIX}/lib/libaws-cpp-sdk-core.so)
+    ${CMAKE_INSTALL_PREFIX}/lib/libaws-cpp-sdk-core.a)
 set_target_properties(aws_ext_s3
     PROPERTIES IMPORTED_LOCATION
-    ${CMAKE_INSTALL_PREFIX}/lib/libaws-cpp-sdk-s3.so)
+    ${CMAKE_INSTALL_PREFIX}/lib/libaws-cpp-sdk-s3.a)
 add_dependencies(aws_ext_core aws_ext)
 add_dependencies(aws_ext_s3 aws_ext)
 # Merge the two libraries in one aliased interface
 add_library(aws_ext_s3_lib INTERFACE)
-target_link_libraries(aws_ext_s3_lib INTERFACE aws_ext_s3 aws_ext_core)
+target_link_directories(aws_ext_s3_lib INTERFACE "${CMAKE_INSTALL_PREFIX}/lib")
+target_link_libraries(aws_ext_s3_lib INTERFACE aws-crt-cpp aws-c-auth aws-c-cal
+    aws-c-common aws-c-compression aws-c-event-stream aws-c-http
+    aws-c-io aws-c-mqtt aws-c-s3 aws-checksums s2n
+    pthread curl crypto ssl z
+    aws_ext_s3 aws_ext_core
+)
+add_dependencies(aws_ext_s3_lib aws_ext)
 add_library(AWS::s3 ALIAS aws_ext_s3_lib)
 
 # Tightly-coupled dependencies
