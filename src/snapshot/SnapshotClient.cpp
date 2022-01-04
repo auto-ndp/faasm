@@ -14,7 +14,8 @@ namespace faabric::snapshot {
 
 static std::mutex mockMutex;
 
-static std::vector<std::pair<std::string, faabric::util::SnapshotData>>
+static std::vector<
+  std::pair<std::string, std::shared_ptr<faabric::util::SnapshotData>>>
   snapshotPushes;
 
 static std::vector<
@@ -26,7 +27,8 @@ static std::vector<std::pair<std::string, std::string>> snapshotDeletes;
 static std::vector<std::pair<std::string, std::pair<uint32_t, int>>>
   threadResults;
 
-std::vector<std::pair<std::string, faabric::util::SnapshotData>>
+std::vector<
+  std::pair<std::string, std::shared_ptr<faabric::util::SnapshotData>>>
 getSnapshotPushes()
 {
     faabric::util::UniqueLock lock(mockMutex);
@@ -71,28 +73,45 @@ SnapshotClient::SnapshotClient(const std::string& hostIn)
                                               SNAPSHOT_SYNC_PORT)
 {}
 
-void SnapshotClient::pushSnapshot(const std::string& key,
-                                  int groupId,
-                                  const faabric::util::SnapshotData& data)
+void SnapshotClient::pushSnapshot(
+  const std::string& key,
+  std::shared_ptr<faabric::util::SnapshotData> data)
 {
-    if (data.size == 0) {
+    if (data->getSize() == 0) {
         SPDLOG_ERROR("Cannot push snapshot {} with size zero to {}", key, host);
         throw std::runtime_error("Pushing snapshot with zero size");
     }
 
-    SPDLOG_DEBUG("Pushing snapshot {} to {} ({} bytes)", key, host, data.size);
+    SPDLOG_DEBUG(
+      "Pushing snapshot {} to {} ({} bytes)", key, host, data->getSize());
 
     if (faabric::util::isMockMode()) {
         faabric::util::UniqueLock lock(mockMutex);
+
         snapshotPushes.emplace_back(host, data);
     } else {
         // Set up the main request
-        // TODO - avoid copying data here
+        // TODO - avoid copying data here?
         flatbuffers::FlatBufferBuilder mb;
+
+        std::vector<flatbuffers::Offset<SnapshotMergeRegionRequest>>
+          mrsFbVector;
+        mrsFbVector.reserve(data->getMergeRegions().size());
+        for (const auto& m : data->getMergeRegions()) {
+            auto mr = CreateSnapshotMergeRegionRequest(mb,
+                                                       m.second.offset,
+                                                       m.second.length,
+                                                       m.second.dataType,
+                                                       m.second.operation);
+            mrsFbVector.push_back(mr);
+        }
+
         auto keyOffset = mb.CreateString(key);
-        auto dataOffset = mb.CreateVector<uint8_t>(data.data, data.size);
-        auto requestOffset =
-          CreateSnapshotPushRequest(mb, keyOffset, groupId, dataOffset);
+        auto dataOffset =
+          mb.CreateVector<uint8_t>(data->getDataPtr(), data->getSize());
+        auto mrsOffset = mb.CreateVector(mrsFbVector);
+        auto requestOffset = CreateSnapshotPushRequest(
+          mb, keyOffset, data->getMaxSize(), dataOffset, mrsOffset);
         mb.Finish(requestOffset);
 
         // Send it
@@ -100,38 +119,84 @@ void SnapshotClient::pushSnapshot(const std::string& key,
     }
 }
 
+void SnapshotClient::pushSnapshotUpdate(
+  std::string snapshotKey,
+  const std::shared_ptr<faabric::util::SnapshotData>& data,
+  const std::vector<faabric::util::SnapshotDiff>& diffs)
+{
+    SPDLOG_DEBUG("Pushing update to snapshot {} to {} ({} diffs, {} regions)",
+                 snapshotKey,
+                 host,
+                 diffs.size(),
+                 data->getMergeRegions().size());
+
+    doPushSnapshotDiffs(snapshotKey, data, diffs);
+}
+
 void SnapshotClient::pushSnapshotDiffs(
   std::string snapshotKey,
-  int groupId,
-  std::vector<faabric::util::SnapshotDiff> diffs)
+  const std::vector<faabric::util::SnapshotDiff>& diffs)
+{
+    SPDLOG_DEBUG("Pushing {} diffs for snapshot {} to {}",
+                 diffs.size(),
+                 snapshotKey,
+                 host);
+
+    doPushSnapshotDiffs(snapshotKey, nullptr, diffs);
+}
+
+void SnapshotClient::doPushSnapshotDiffs(
+  const std::string& snapshotKey,
+  const std::shared_ptr<faabric::util::SnapshotData>& data,
+  const std::vector<faabric::util::SnapshotDiff>& diffs)
 {
     if (faabric::util::isMockMode()) {
         faabric::util::UniqueLock lock(mockMutex);
         snapshotDiffPushes.emplace_back(host, diffs);
     } else {
-        SPDLOG_DEBUG("Pushing {} diffs for snapshot {} to {}",
-                     diffs.size(),
-                     snapshotKey,
-                     host);
-
         flatbuffers::FlatBufferBuilder mb;
 
-        // Create objects for all the chunks
-        std::vector<flatbuffers::Offset<SnapshotDiffChunk>> diffsFbVector;
+        // Create objects for all the diffs
+        std::vector<flatbuffers::Offset<SnapshotDiffRequest>> diffsFbVector;
+        diffsFbVector.reserve(diffs.size());
         for (const auto& d : diffs) {
-            auto dataOffset = mb.CreateVector<uint8_t>(d.data, d.size);
+            std::span<const uint8_t> diffData = d.getData();
+            auto dataOffset =
+              mb.CreateVector<uint8_t>(diffData.data(), diffData.size());
 
-            auto chunk = CreateSnapshotDiffChunk(
-              mb, d.offset, d.dataType, d.operation, dataOffset);
-            diffsFbVector.push_back(chunk);
+            auto diff = CreateSnapshotDiffRequest(
+              mb, d.getOffset(), d.getDataType(), d.getOperation(), dataOffset);
+            diffsFbVector.push_back(diff);
         }
 
-        // Set up the main request
-        // TODO - avoid copying data here
+        // If we have snapshot data, we need to include the merge regions and
+        // force too.
+        std::vector<flatbuffers::Offset<SnapshotMergeRegionRequest>>
+          mrsFbVector;
+        bool force = false;
+        if (data != nullptr) {
+            mrsFbVector.reserve(data->getMergeRegions().size());
+            for (const auto& m : data->getMergeRegions()) {
+                auto mr = CreateSnapshotMergeRegionRequest(mb,
+                                                           m.second.offset,
+                                                           m.second.length,
+                                                           m.second.dataType,
+                                                           m.second.operation);
+                mrsFbVector.push_back(mr);
+            }
+
+            force = true;
+        } else {
+            force = false;
+        }
+
         auto keyOffset = mb.CreateString(snapshotKey);
         auto diffsOffset = mb.CreateVector(diffsFbVector);
-        auto requestOffset =
-          CreateSnapshotDiffPushRequest(mb, keyOffset, groupId, diffsOffset);
+        auto mrsOffset = mb.CreateVector(mrsFbVector);
+
+        auto requestOffset = CreateSnapshotDiffPushRequest(
+          mb, keyOffset, force, mrsOffset, diffsOffset);
+
         mb.Finish(requestOffset);
 
         SEND_FB_MSG(SnapshotCalls::PushSnapshotDiffs, mb);

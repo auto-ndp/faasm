@@ -1,6 +1,9 @@
 #include <catch2/catch.hpp>
+
 #include <faabric/util/macros.h>
 #include <faabric/util/memory.h>
+
+#include <cstring>
 #include <sys/mman.h>
 #include <unistd.h>
 
@@ -351,5 +354,130 @@ TEST_CASE("Test dirty region checking", "[util]")
         REQUIRE(actual.at(i).first == expected.at(i).first);
         REQUIRE(actual.at(i).second == expected.at(i).second);
     }
+}
+
+TEST_CASE("Test allocating and claiming memory", "[util]")
+{
+    // Allocate some virtual memory
+    size_t vMemSize = 100 * HOST_PAGE_SIZE;
+    MemoryRegion vMem = allocateVirtualMemory(vMemSize);
+
+    size_t sizeA = 10 * HOST_PAGE_SIZE;
+    claimVirtualMemory({ vMem.get(), sizeA });
+
+    // Write something to the new memory
+    vMem[10] = 1;
+    vMem[5 * HOST_PAGE_SIZE] = 2;
+    vMem[6 * HOST_PAGE_SIZE + 10] = 3;
+
+    size_t sizeB = 5 * HOST_PAGE_SIZE;
+    claimVirtualMemory({ vMem.get() + sizeA, sizeB });
+
+    // Write something to the new memory
+    vMem[sizeA + 10] = 4;
+    vMem[sizeA + 3 * HOST_PAGE_SIZE] = 5;
+    vMem[sizeA + 4 * HOST_PAGE_SIZE + 10] = 6;
+
+    // Check all edits still there
+    REQUIRE(vMem[10] == 1);
+    REQUIRE(vMem[5 * HOST_PAGE_SIZE] == 2);
+    REQUIRE(vMem[6 * HOST_PAGE_SIZE + 10] == 3);
+    REQUIRE(vMem[sizeA + 10] == 4);
+    REQUIRE(vMem[sizeA + 3 * HOST_PAGE_SIZE] == 5);
+    REQUIRE(vMem[sizeA + 4 * HOST_PAGE_SIZE + 10] == 6);
+}
+
+TEST_CASE("Test mapping memory", "[util]")
+{
+    size_t vMemSize = 100 * HOST_PAGE_SIZE;
+    MemoryRegion vMem = allocateVirtualMemory(vMemSize);
+
+    // Set up some data in memory
+    std::vector<uint8_t> chunk(10 * HOST_PAGE_SIZE, 3);
+    claimVirtualMemory({ vMem.get(), chunk.size() });
+    std::memcpy(vMem.get(), chunk.data(), chunk.size());
+
+    // Write this to a file descriptor
+    int fd = createFd(chunk.size(), "foobar");
+    writeToFd(fd, 0, { vMem.get(), chunk.size() });
+
+    // Map some new memory to this fd
+    MemoryRegion memA = allocatePrivateMemory(chunk.size());
+    mapMemoryPrivate({ memA.get(), chunk.size() }, fd);
+
+    std::vector<uint8_t> memAData(memA.get(), memA.get() + chunk.size());
+    REQUIRE(memAData == chunk);
+
+    // Extend the memory and copy some new data in
+    std::vector<uint8_t> chunkB(5 * HOST_PAGE_SIZE, 4);
+    claimVirtualMemory({ vMem.get() + chunk.size(), chunkB.size() });
+    std::memcpy(vMem.get() + chunk.size(), chunkB.data(), chunkB.size());
+
+    // Append the data to the fd
+    appendDataToFd(fd, { chunkB.data(), chunkB.size() });
+
+    // Map a region to both chunks
+    MemoryRegion memB = allocatePrivateMemory(chunk.size() + chunkB.size());
+    mapMemoryPrivate({ memB.get(), chunk.size() + chunkB.size() }, fd);
+
+    // Check region now contains both bits of data
+    std::vector<uint8_t> memBData(memB.get(),
+                                  memB.get() + chunk.size() + chunkB.size());
+    std::vector<uint8_t> expected;
+    expected.insert(expected.end(), chunk.begin(), chunk.end());
+    expected.insert(expected.end(), chunkB.begin(), chunkB.end());
+
+    REQUIRE(memBData == expected);
+}
+
+TEST_CASE("Test mapping memory fails with invalid fd", "[util]")
+{
+    size_t memSize = 10 * HOST_PAGE_SIZE;
+    MemoryRegion sharedMem = allocatePrivateMemory(memSize);
+
+    int fd = 0;
+    SECTION("Zero fd") { fd = 0; }
+
+    SECTION("Negative fd") { fd = -2; }
+
+    REQUIRE_THROWS(mapMemoryPrivate({ sharedMem.get(), memSize }, fd));
+}
+
+TEST_CASE("Test remapping memory", "[util]")
+{
+    // Set up some data
+    size_t dataSize = 10 * HOST_PAGE_SIZE;
+    std::vector<uint8_t> expectedData(dataSize, 3);
+
+    // Write this to a file descriptor
+    int fd = createFd(expectedData.size(), "foobar");
+    writeToFd(fd, 0, { expectedData.data(), expectedData.size() });
+
+    // Map some new memory to this fd
+    MemoryRegion mappedMem = allocatePrivateMemory(dataSize);
+    mapMemoryPrivate({ mappedMem.get(), dataSize }, fd);
+
+    std::vector<uint8_t> actualData(mappedMem.get(),
+                                    mappedMem.get() + dataSize);
+    REQUIRE(actualData == expectedData);
+
+    // Modify the memory
+    std::vector<uint8_t> update(100, 4);
+    size_t updateOffset = HOST_PAGE_SIZE + 10;
+    std::memcpy(mappedMem.get() + updateOffset, update.data(), update.size());
+
+    // Spot check to make sure update has been made
+    REQUIRE(*(mappedMem.get() + (updateOffset + 5)) == (uint8_t)4);
+
+    // Remap
+    mapMemoryPrivate({ mappedMem.get(), dataSize }, fd);
+
+    // Spot check to make sure update has been removed
+    REQUIRE(*(mappedMem.get() + (updateOffset + 5)) == (uint8_t)3);
+
+    // Check all data
+    std::vector<uint8_t> actualDataAfter(mappedMem.get(),
+                                         mappedMem.get() + dataSize);
+    REQUIRE(actualDataAfter == expectedData);
 }
 }

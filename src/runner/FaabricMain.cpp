@@ -18,6 +18,8 @@ void FaabricMain::startBackground()
     // Crash handler
     faabric::util::setUpCrashHandler();
 
+    PROF_BEGIN
+
     // Start basics
     startRunner();
 
@@ -32,6 +34,8 @@ void FaabricMain::startBackground()
 
     // Work sharing
     startFunctionCallServer();
+
+    PROF_SUMMARY
 }
 
 void FaabricMain::startRunner()

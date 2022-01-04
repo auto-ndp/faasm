@@ -6,11 +6,13 @@
 #include <faabric/transport/PointToPointBroker.h>
 #include <faabric/transport/common.h>
 #include <faabric/transport/macros.h>
+#include <faabric/util/bytes.h>
 #include <faabric/util/func.h>
 #include <faabric/util/logging.h>
+#include <faabric/util/memory.h>
 #include <faabric/util/snapshot.h>
 
-#include <sys/mman.h>
+using namespace faabric::util;
 
 namespace faabric::snapshot {
 SnapshotServer::SnapshotServer()
@@ -18,14 +20,9 @@ SnapshotServer::SnapshotServer()
       SNAPSHOT_ASYNC_PORT,
       SNAPSHOT_SYNC_PORT,
       SNAPSHOT_INPROC_LABEL,
-      faabric::util::getSystemConfig().snapshotServerThreads)
+      getSystemConfig().snapshotServerThreads)
   , broker(faabric::transport::getPointToPointBroker())
 {}
-
-size_t SnapshotServer::diffsApplied() const
-{
-    return diffsAppliedCounter.load(std::memory_order_acquire);
-}
 
 void SnapshotServer::doAsyncRecv(int header,
                                  const uint8_t* buffer,
@@ -76,26 +73,31 @@ std::unique_ptr<google::protobuf::Message> SnapshotServer::recvPushSnapshot(
         throw std::runtime_error("Received snapshot with zero size");
     }
 
-    SPDLOG_DEBUG("Receiving snapshot {} (size {})",
+    SPDLOG_DEBUG("Receiving snapshot {} (size {}, max {})",
                  r->key()->c_str(),
-                 r->contents()->size());
+                 r->contents()->size(),
+                 r->max_size());
 
     faabric::snapshot::SnapshotRegistry& reg =
       faabric::snapshot::getSnapshotRegistry();
 
     // Set up the snapshot
-    faabric::util::SnapshotData data;
-    data.size = r->contents()->size();
+    size_t snapSize = r->contents()->size();
+    std::string snapKey = r->key()->str();
+    auto snap = std::make_shared<SnapshotData>(
+      std::span((uint8_t*)r->contents()->Data(), snapSize), r->max_size());
 
-    // TODO - avoid this copy by changing server superclass to allow subclasses
-    // to provide a buffer to receive data.
-    // TODO - work out snapshot ownership here, how do we know when to delete
-    // this data?
-    data.data = (uint8_t*)mmap(
-      nullptr, data.size, PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    std::memcpy(data.data, r->contents()->Data(), data.size);
+    // Add the merge regions
+    for (const auto* mr : *r->merge_regions()) {
+        snap->addMergeRegion(
+          mr->offset(),
+          mr->length(),
+          static_cast<SnapshotDataType>(mr->data_type()),
+          static_cast<SnapshotMergeOperation>(mr->merge_op()));
+    }
 
-    reg.takeSnapshot(r->key()->str(), data, true);
+    // Register snapshot
+    reg.registerSnapshot(snapKey, snap);
 
     // Send response
     return std::make_unique<faabric::EmptyResponse>();
@@ -119,102 +121,46 @@ SnapshotServer::recvPushSnapshotDiffs(const uint8_t* buffer, size_t bufferSize)
 {
     const SnapshotDiffPushRequest* r =
       flatbuffers::GetRoot<SnapshotDiffPushRequest>(buffer);
-    int groupId = r->groupid();
 
     SPDLOG_DEBUG(
-      "Applying {} diffs to snapshot {}", r->chunks()->size(), r->key()->str());
+      "Applying {} diffs to snapshot {}", r->diffs()->size(), r->key()->str());
 
     // Get the snapshot
     faabric::snapshot::SnapshotRegistry& reg =
       faabric::snapshot::getSnapshotRegistry();
     auto snap = reg.getSnapshot(r->key()->str());
 
-    // Lock the function group if it exists
-    if (groupId > 0 &&
-        faabric::transport::PointToPointGroup::groupExists(groupId)) {
-        faabric::transport::PointToPointGroup::getGroup(r->groupid())
-          ->localLock();
+    // Convert diffs to snapshot diff objects
+    std::vector<SnapshotDiff> diffs;
+    diffs.reserve(r->diffs()->size());
+    for (const auto* diff : *r->diffs()) {
+        diffs.emplace_back(
+          static_cast<SnapshotDataType>(diff->data_type()),
+          static_cast<SnapshotMergeOperation>(diff->merge_op()),
+          diff->offset(),
+          std::span<const uint8_t>(diff->data()->data(), diff->data()->size()));
     }
 
-    // Iterate through the chunks passed in the request
-    for (const auto* chunk : *r->chunks()) {
-        uint8_t* dest = snap->data + chunk->offset();
+    // Queue on the snapshot
+    snap->queueDiffs(diffs);
 
-        SPDLOG_TRACE("Applying snapshot diff to {} at {}-{}",
-                     r->key()->str(),
-                     chunk->offset(),
-                     chunk->offset() + chunk->data()->size());
+    // Write diffs and set merge regions if necessary
+    if (r->force()) {
+        // Write queued diffs
+        snap->writeQueuedDiffs();
 
-        switch (chunk->dataType()) {
-            case (faabric::util::SnapshotDataType::Raw): {
-                switch (chunk->mergeOp()) {
-                    case (faabric::util::SnapshotMergeOperation::Overwrite): {
-                        std::memcpy(
-                          dest, chunk->data()->data(), chunk->data()->size());
-                        break;
-                    }
-                    default: {
-                        SPDLOG_ERROR("Unsupported raw merge operation: {}",
-                                     chunk->mergeOp());
-                        throw std::runtime_error(
-                          "Unsupported raw merge operation");
-                    }
-                }
-                break;
-            }
-            case (faabric::util::SnapshotDataType::Int): {
-                const auto* value =
-                  reinterpret_cast<const int32_t*>(chunk->data()->data());
-                auto* destValue = reinterpret_cast<int32_t*>(dest);
-                switch (chunk->mergeOp()) {
-                    case (faabric::util::SnapshotMergeOperation::Sum): {
-                        *destValue += *value;
-                        break;
-                    }
-                    case (faabric::util::SnapshotMergeOperation::Subtract): {
-                        *destValue -= *value;
-                        break;
-                    }
-                    case (faabric::util::SnapshotMergeOperation::Product): {
-                        *destValue *= *value;
-                        break;
-                    }
-                    case (faabric::util::SnapshotMergeOperation::Min): {
-                        *destValue = std::min(*destValue, *value);
-                        break;
-                    }
-                    case (faabric::util::SnapshotMergeOperation::Max): {
-                        *destValue = std::max(*destValue, *value);
-                        break;
-                    }
-                    default: {
-                        SPDLOG_ERROR("Unsupported int merge operation: {}",
-                                     chunk->mergeOp());
-                        throw std::runtime_error(
-                          "Unsupported int merge operation");
-                    }
-                }
-                break;
-            }
-            default: {
-                SPDLOG_ERROR("Unsupported data type: {}", chunk->dataType());
-                throw std::runtime_error("Unsupported merge data type");
-            }
+        // Clear merge regions
+        snap->clearMergeRegions();
+
+        // Add merge regions from request
+        for (const auto* mr : *r->merge_regions()) {
+            snap->addMergeRegion(
+              mr->offset(),
+              mr->length(),
+              static_cast<SnapshotDataType>(mr->data_type()),
+              static_cast<SnapshotMergeOperation>(mr->merge_op()));
         }
-        // make changes visible to other threads
-        std::atomic_thread_fence(std::memory_order_release);
-        this->diffsAppliedCounter.fetch_add(1, std::memory_order_acq_rel);
     }
-
-    // Unlock group if exists
-    if (groupId > 0 &&
-        faabric::transport::PointToPointGroup::groupExists(groupId)) {
-        faabric::transport::PointToPointGroup::getGroup(r->groupid())
-          ->localUnlock();
-    }
-
-    // Reset dirty tracking having applied diffs
-    SPDLOG_DEBUG("Resetting dirty page tracking having applied diffs");
 
     // Send response
     return std::make_unique<faabric::EmptyResponse>();

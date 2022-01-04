@@ -11,6 +11,7 @@
 #include <faabric/util/locks.h>
 #include <faabric/util/logging.h>
 #include <faabric/util/memory.h>
+#include <faabric/util/network.h>
 #include <faabric/util/random.h>
 #include <faabric/util/scheduling.h>
 #include <faabric/util/snapshot.h>
@@ -144,8 +145,7 @@ const char* Scheduler::getGlobalSetNameForFunction(
 
 void Scheduler::resetThreadLocalCache()
 {
-    auto tid = (pid_t)syscall(SYS_gettid);
-    SPDLOG_DEBUG("Resetting scheduler thread-local cache for thread {}", tid);
+    SPDLOG_DEBUG("Resetting scheduler thread-local cache");
 
     functionCallClients.clear();
     snapshotClients.clear();
@@ -616,18 +616,20 @@ faabric::util::SchedulingDecision Scheduler::doCallFunctions(
         ZoneScopedN("Push snapshot diffs");
         for (const auto& host : getFunctionRegisteredHosts(firstMsg, false)) {
             SnapshotClient& c = getSnapshotClient(host);
-            auto snapshotData =
+            auto snap =
               faabric::snapshot::getSnapshotRegistry().getSnapshot(snapshotKey);
 
             // See if we've already pushed this snapshot to the given host,
             // if so, just push the diffs
             if (pushedSnapshotsMap[snapshotKey].contains(host)) {
+                MemoryView snapMemView({ snap->getDataPtr(), snap->getSize() });
+
                 std::vector<faabric::util::SnapshotDiff> snapshotDiffs =
-                  snapshotData->getDirtyPages();
-                c.pushSnapshotDiffs(
-                  snapshotKey, firstMsg.groupid(), snapshotDiffs);
+                  snapMemView.getDirtyRegions();
+
+                c.pushSnapshotUpdate(snapshotKey, snap, snapshotDiffs);
             } else {
-                c.pushSnapshot(snapshotKey, firstMsg.groupid(), *snapshotData);
+                c.pushSnapshot(snapshotKey, snap);
                 pushedSnapshotsMap[snapshotKey].insert(host);
             }
         }
@@ -642,7 +644,7 @@ faabric::util::SchedulingDecision Scheduler::doCallFunctions(
     }
 
     // -------------------------------------------
-    // EXECTUION
+    // EXECUTION
     // -------------------------------------------
 
     // Records for tests - copy messages before execution to avoid
@@ -1088,12 +1090,21 @@ void Scheduler::pushSnapshotDiffs(
   const faabric::Message& msg,
   const std::vector<faabric::util::SnapshotDiff>& diffs)
 {
-    bool isMaster = msg.masterhost() == conf.endpointHost;
-
-    if (!isMaster && !diffs.empty()) {
-        SnapshotClient& c = getSnapshotClient(msg.masterhost());
-        c.pushSnapshotDiffs(msg.snapshotkey(), msg.groupid(), diffs);
+    if (diffs.empty()) {
+        return;
     }
+
+    bool isMaster = msg.masterhost() == conf.endpointHost;
+    const std::string& snapKey = msg.snapshotkey();
+    if (isMaster) {
+        SPDLOG_ERROR("{} pushing snapshot diffs for {} on master",
+                     faabric::util::funcToString(msg, false),
+                     snapKey);
+        throw std::runtime_error("Cannot push snapshot diffs on master");
+    }
+
+    SnapshotClient& c = getSnapshotClient(msg.masterhost());
+    c.pushSnapshotDiffs(snapKey, diffs);
 }
 
 void Scheduler::setThreadResultLocally(uint32_t msgId, int32_t returnValue)

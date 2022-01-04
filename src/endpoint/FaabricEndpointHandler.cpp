@@ -65,7 +65,7 @@ void FaabricEndpointHandler::onRequest(
                 response.body() = std::string("RUNNING");
             } else if (result.returnvalue() == 0) {
                 response.result(beast::http::status::ok);
-                response.body() = "SUCCESS: " + result.outputdata();
+                response.body() = faabric::util::messageToJson(result);
             } else {
                 response.result(beast::http::status::internal_server_error);
                 response.body() = "FAILED: " + result.outputdata();
