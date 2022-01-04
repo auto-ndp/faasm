@@ -44,7 +44,7 @@ services:
     environment:
       - CODEGEN_TARGETS=x86_64:skylake;aarch64:thunderx2t99
       - DELTA_SNAPSHOT_ENCODING=pages=64
-      - LOG_LEVEL=debug
+      - LOG_LEVEL=${LOG_LEVEL:-debug}
       - PYTHON_CODEGEN=${PYTHON_CODEGEN:-off}
       - REDIS_QUEUE_HOST=${COMPUTE_NODE}
       - REDIS_STATE_HOST=${STORAGE_NODE}
@@ -96,7 +96,7 @@ services:
       - DELTA_SNAPSHOT_ENCODING=pages=64
       - IS_STORAGE_NODE=1
       - GLOBAL_MESSAGE_TIMEOUT=600000
-      - LOG_LEVEL=debug
+      - LOG_LEVEL=${LOG_LEVEL:-debug}
       - NETNS_MODE=off
       - REDIS_QUEUE_HOST=${COMPUTE_NODE}
       - REDIS_STATE_HOST=${STORAGE_NODE}
@@ -165,7 +165,7 @@ services:
     environment:
       - UPLOAD_HOST=${STORAGE_NODE}
       - INVOKE_HOST=${COMPUTE_NODE}
-      - LOG_LEVEL=debug
+      - LOG_LEVEL=${LOG_LEVEL:-debug}
       - REDIS_QUEUE_HOST=${COMPUTE_NODE}
       - REDIS_STATE_HOST=${STORAGE_NODE}
       - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib

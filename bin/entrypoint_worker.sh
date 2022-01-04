@@ -25,3 +25,9 @@ popd >> /dev/null
 
 # Continue with normal command
 exec "$@"
+
+# Comment the above to run an infinite loop and allow running with gdb
+while true
+do
+    sleep 1;
+done
