@@ -12,7 +12,7 @@ source ./bin/cluster_env.sh
 echo FAASM_BUILD_MOUNT: $FAASM_BUILD_MOUNT
 
 if [[ "$1" == "--rebuild" ]]; then
-  docker-compose -f docker-compose.yml exec faasm-cli /bin/bash -c '. /usr/local/code/faasm/bin/cluster_env.sh; inv -r faasmcli/faasmcli dev.cc faasm_dev_tools -p $(($(nproc) - 2))'
+  docker-compose -f docker-compose.yml exec faasm-cli /bin/bash -c '. /usr/local/code/faasm/bin/cluster_env.sh; . /usr/local/code/faasm/bin/workon.sh; inv -r faasmcli/faasmcli dev.cc faasm_dev_tools -p $(($(nproc) - 2))'
 fi
 
 docker-compose -f docker-compose.yml exec redis-queue redis-cli flushall
