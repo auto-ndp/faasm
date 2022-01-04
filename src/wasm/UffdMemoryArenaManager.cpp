@@ -74,7 +74,7 @@ UffdMemoryArenaManager& UffdMemoryArenaManager::instance()
 
 void sigbusHandler(int code, siginfo_t* siginfo, void* contextR)
 {
-    ZoneScopedN("uffd-fh");
+    // ZoneScopedN("uffd-fh");
     constexpr size_t FAULT_PAGE_SIZE = 65536;
     if (code != SIGBUS) [[unlikely]] {
         std::terminate();
@@ -132,12 +132,12 @@ void sigbusHandler(int code, siginfo_t* siginfo, void* contextR)
     auto initSource = range->initSource;
     rangeLock.unlock();
     if (faultPageOffset < initSource.size()) {
-        ZoneScopedN("copyPages");
+        // ZoneScopedN("copyPages");
         umam.uffd.copyPages(size_t(range->mapStart) + faultPageOffset,
                             faultSize,
                             size_t(initSource.data() + faultPageOffset));
     } else {
-        ZoneScopedN("zeroPages");
+        // ZoneScopedN("zeroPages");
         umam.uffd.zeroPages(size_t(range->mapStart) + faultPageOffset,
                             faultSize);
     }
