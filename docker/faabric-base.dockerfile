@@ -25,6 +25,8 @@ RUN apt-get install -y \
     libc++abi-13-dev \
     libcurl4-openssl-dev \
     libhiredis-dev \
+    liblttng-ust-dev \
+    lttng-tools \
     libpython3-dev \
     libssl-dev \
     libstdc++-11-dev \
@@ -44,8 +46,8 @@ RUN apt-get install -y \
     unzip \
     zsh
 
-RUN pip install cmake
-RUN pip install conan
+RUN pip install cmake==3.22.1
+RUN pip install conan==1.44.0
 
 # Tidy up
 RUN apt-get clean autoclean
