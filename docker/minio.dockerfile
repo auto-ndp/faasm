@@ -1,3 +1,3 @@
-FROM minio/minio:RELEASE.2021-12-10T23-03-39Z
+FROM minio/minio:RELEASE.2022-01-03T18-22-58Z
 
 CMD ["server", "/data/minio"]
