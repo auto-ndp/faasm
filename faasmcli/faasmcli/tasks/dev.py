@@ -24,6 +24,7 @@ def cmake(
     build="Debug",
     perf=False,
     prof=False,
+    tracy=False,
     sanitiser="None",
 ):
     """
@@ -47,6 +48,7 @@ def cmake(
         "-DCMAKE_INSTALL_PREFIX={}".format(FAASM_INSTALL_DIR),
         "-DFAASM_PERF_PROFILING=ON" if perf else "",
         "-DFAASM_SELF_TRACING=ON" if prof else "",
+        "-DFAABRIC_TRACY_TRACING={}".format("ON" if tracy else "OFF"),
         "-DFAABRIC_USE_SANITISER={}".format(sanitiser),
         "-DFAASM_USE_SANITISER={}".format(sanitiser),
         PROJ_ROOT,
@@ -58,11 +60,13 @@ def cmake(
 
 
 @task
-def tools(ctx, clean=False, build="Debug", parallel=0, sanitiser="None"):
+def tools(
+    ctx, clean=False, build="Debug", parallel=0, sanitiser="None", tracy=False
+):
     """
     Builds all the targets commonly used for development
     """
-    cmake(ctx, clean=clean, build=build, sanitiser=sanitiser)
+    cmake(ctx, clean=clean, build=build, sanitiser=sanitiser, tracy=tracy)
 
     targets = " ".join(DEV_TARGETS)
 

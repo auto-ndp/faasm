@@ -120,8 +120,11 @@ FetchContent_MakeAvailable(wamr_ext)
 
 # Allow access to headers nested in other projects
 set(FAASM_WAVM_SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}/../third-party/wavm)
+
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION FALSE)
 add_subdirectory(${FAASM_WAVM_SOURCE_DIR})
 message(STATUS FAASM_WAVM_SOURCE_DIR ${FAASM_WAVM_SOURCE_DIR})
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ${IPO_SUPPORTED})
 
 FetchContent_GetProperties(wamr_ext SOURCE_DIR WAMR_ROOT_DIR)
 message(STATUS WAMR_ROOT_DIR ${WAMR_ROOT_DIR})

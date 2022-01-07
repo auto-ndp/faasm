@@ -44,6 +44,15 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_EXE_LINKER_FLAGS "-fuse-ld=lld")
 
+include(CheckIPOSupported)
+check_ipo_supported(RESULT IPO_SUPPORTED OUTPUT IPO_NOT_SUPPORTED_ERROR LANGUAGES C CXX)
+if(IPO_SUPPORTED)
+    message(STATUS "IPO (LTO) supported, enabling")
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+else()
+    message(WARNING "IPO (LTO) not supported: ${IPO_NOT_SUPPORTED_ERROR}")
+endif()
+
 # Faasm profiling
 if (${FAASM_SELF_TRACING})
     message("-- Activated FAASM tracing")

@@ -29,6 +29,10 @@
                     "type": "BOOL",
                     "value": false
                 },
+                "FAABRIC_TRACY_TRACING": {
+                    "type": "BOOL",
+                    "value": true
+                },
                 "CMAKE_CXX_COMPILER": {
                     "type": "FILEPATH",
                     "value": "/usr/bin/clang++"
