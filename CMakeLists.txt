@@ -147,6 +147,7 @@ target_include_directories(faabric PUBLIC
 target_compile_options(faabric PUBLIC -fno-omit-frame-pointer)
 target_link_options(faabric PUBLIC -Wl,--export-dynamic)
 
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION FALSE)
 # Tests - only include in static builds _and_ when requested
 if (BUILD_SHARED_LIBS)
     message(STATUS "Skipping test build with shared libs")
