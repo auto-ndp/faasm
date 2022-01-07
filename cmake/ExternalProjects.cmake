@@ -37,8 +37,8 @@ conan_cmake_configure(
         "cppzmq/4.8.1@#e0f26b0614b3d812815edc102ce0d881"
         "flatbuffers/2.0.0@#82f5d13594b370c3668bb8abccffc706"
         "hiredis/1.0.2@#297f55bf1e66f8b9c1dc0e7d35e705ab"
-        "protobuf/3.17.1@#12f6551f4a57bbd3bf38ff3aad6aaa7e"
-        "rapidjson/cci.20200410@#abe3eeacf36801901f6f6d82d124781a"
+        "protobuf/3.19.1@#985baec06b243f56bce18cf7acbc4e34"
+        "rapidjson/cci.20211112@#65b4e5feb6f1edfc8cbac0f669acaf17"
         "readerwriterqueue/1.0.5@#4232c2ff826eb41e33d8ad8efd3c4c4c"
         "spdlog/1.9.2@#3724602b7b7e843c5e0a687c45e279c9"
         "zeromq/4.3.4@#3b9b0de9c4509784dc92629f3aaf2fe4"
@@ -90,7 +90,7 @@ find_package(absl REQUIRED)
 find_package(Boost 1.78.0 REQUIRED)
 find_package(Catch2 REQUIRED)
 find_package(Flatbuffers REQUIRED)
-find_package(Protobuf REQUIRED)
+find_package(Protobuf 3.19.1 REQUIRED)
 find_package(RapidJSON REQUIRED)
 find_package(ZLIB REQUIRED)
 find_package(ZeroMQ REQUIRED)
@@ -128,19 +128,19 @@ set(ZSTD_LZ4_SUPPORT OFF CACHE INTERNAL "")
 
 FetchContent_Declare(zstd_ext
     GIT_REPOSITORY "https://github.com/facebook/zstd"
-    GIT_TAG "v1.5.0"
+    GIT_TAG "v1.5.1"
     SOURCE_SUBDIR "build/cmake"
 )
 
 FetchContent_MakeAvailable(zstd_ext)
 # Work around zstd not declaring its targets properly
-target_include_directories(libzstd_static INTERFACE $<BUILD_INTERFACE:${zstd_ext_SOURCE_DIR}/lib>)
+target_include_directories(libzstd_static SYSTEM INTERFACE $<BUILD_INTERFACE:${zstd_ext_SOURCE_DIR}/lib>)
 add_library(zstd::libzstd_static ALIAS libzstd_static)
 
 # Tracy (not in Conan)
 FetchContent_Declare(tracy_ext
     GIT_REPOSITORY "https://github.com/wolfpld/tracy.git"
-    GIT_TAG "a13b04669839e45a2ed5ed33abac787b71eb0414"
+    GIT_TAG "fd4f458e3d78978fbf3bc38ccc0518d927b1d71e"
 )
 FetchContent_GetProperties(tracy_ext)
 if(NOT tracy_ext_POPULATED)
@@ -159,6 +159,9 @@ target_compile_definitions(TracyClient PUBLIC
     TRACY_DELAYED_INIT
     TRACY_PORT=8086 # 8086 is the default
 )
+if(FAABRIC_TRACY_TRACING)
+    target_compile_definitions(TracyClient PUBLIC TRACY_ENABLE)
+endif()
 if(BUILD_SHARED_LIBS)
     target_compile_options(TracyClient PRIVATE "-fPIC")
 endif()
@@ -173,7 +176,7 @@ install(
 install(EXPORT TracyClientExport DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Tracy)
 
 # Adds Tracy::TracyClient
-message(STATUS "Tracy enabled: ${TRACY_ENABLE}")
+message(STATUS "Tracy enabled: ${FAABRIC_TRACY_TRACING}")
 
 add_library(faabric_common_dependencies INTERFACE)
 target_include_directories(faabric_common_dependencies INTERFACE

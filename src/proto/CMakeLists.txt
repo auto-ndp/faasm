@@ -4,25 +4,14 @@
 
 set(PB_HEADER_COPIED "${FAABRIC_INCLUDE_DIR}/faabric/proto/faabric.pb.h")
 
-protobuf_generate_cpp(PB_SRC PB_HEADER faabric.proto)
-
-# Copy the generated headers into place
-add_custom_command(
-    OUTPUT "${PB_HEADER_COPIED}"
-    DEPENDS "${PB_HEADER}"
-    COMMAND ${CMAKE_COMMAND}
-    ARGS -E copy ${PB_HEADER} ${FAABRIC_INCLUDE_DIR}/faabric/proto/
-)
-
-add_custom_target(
-    faabric_pbh_copied
-    DEPENDS ${PB_HEADER_COPIED}
-)
+add_library(proto STATIC faabric.proto)
+target_link_libraries(proto PUBLIC protobuf::libprotobuf)
+target_include_directories(proto PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS TARGET proto)
 
 # ----------------------------------------------
 # Faabric wrapper library
 # ----------------------------------------------
 
-faabric_lib(proto ${PB_SRC})
-add_dependencies(faabric_common_dependencies faabric_pbh_copied)
-target_include_directories(proto_deps INTERFACE ${CMAKE_CURRENT_BINARY_DIR})
+target_link_libraries(faabric_common_dependencies INTERFACE proto)
+add_library(faabric::proto ALIAS proto)

@@ -4,6 +4,7 @@ project(faabric)
 option(FAABRIC_WASM_BUILD "Build Faabric wasm library" OFF)
 option(FAABRIC_BUILD_TESTS "Build Faabric tests" ON)
 option(FAABRIC_SELF_TRACING "Turn on system tracing using the logger" OFF)
+option(FAABRIC_TRACY_TRACING "Turn on system tracing using the Tracy profiler" OFF)
 
 # Enable colorized compiler output
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
@@ -19,6 +20,15 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXE_LINKER_FLAGS "-fuse-ld=lld")
+
+include(CheckIPOSupported)
+check_ipo_supported(RESULT IPO_SUPPORTED OUTPUT IPO_NOT_SUPPORTED_ERROR LANGUAGES C CXX)
+if(IPO_SUPPORTED)
+    message(STATUS "IPO (LTO) supported, enabling")
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+else()
+    message(WARNING "IPO (LTO) not supported: ${IPO_NOT_SUPPORTED_ERROR}")
+endif()
 
 # Compile comamnds for clang tools
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -108,7 +118,6 @@ add_library(faabric
         faabric.cpp
         $<TARGET_OBJECTS:endpoint_obj>
         $<TARGET_OBJECTS:flat_obj>
-        $<TARGET_OBJECTS:proto_obj>
         $<TARGET_OBJECTS:redis_obj>
         $<TARGET_OBJECTS:runner_obj>
         $<TARGET_OBJECTS:scheduler_obj>
@@ -117,6 +126,7 @@ add_library(faabric
         $<TARGET_OBJECTS:transport_obj>
         $<TARGET_OBJECTS:util_obj>
         )
+target_link_libraries(faabric PUBLIC faabric::proto)
 add_library(faabric::faabric ALIAS faabric)
 
 if (BUILD_SHARED_LIBS)
