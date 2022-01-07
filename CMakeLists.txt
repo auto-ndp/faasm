@@ -262,6 +262,7 @@ add_subdirectory(src/wamr)
 add_subdirectory(src/wavm)
 
 # Tests
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION FALSE)
 add_subdirectory(tests/test)
 add_subdirectory(tests/dist)
 add_subdirectory(tests/utils)

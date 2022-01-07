@@ -241,7 +241,7 @@ class UffdMemoryArenaManager final
     }
 
   private:
-    TraceableSharedMutex(mx);
+    std::shared_mutex mx;
     faabric::util::UserfaultFd uffd;
     std::shared_ptr<RangeSet> ranges;
 

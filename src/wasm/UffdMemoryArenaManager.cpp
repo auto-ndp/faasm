@@ -145,7 +145,7 @@ void sigbusHandler(int code, siginfo_t* siginfo, void* contextR)
 
 UffdMemoryArenaManager::UffdMemoryArenaManager()
 {
-    faabric::util::FullTraceableLock lock{ mx };
+    faabric::util::FullLock lock{ mx };
     uffd.create(O_CLOEXEC, true);
     struct sigaction action;
     action.sa_flags = SA_RESTART | SA_SIGINFO;
@@ -165,7 +165,7 @@ std::byte* UffdMemoryArenaManager::allocateRange(size_t pages,
       std::make_shared<UffdMemoryRange>(pages, alignmentLog2);
     std::byte* start = range->mapStart;
     {
-        faabric::util::FullTraceableLock lock{ mx };
+        faabric::util::FullLock lock{ mx };
 
         this->uffd.registerAddressRange(
           size_t(range->mapStart), range->mapBytes, true, false);
@@ -196,7 +196,7 @@ void UffdMemoryArenaManager::modifyRange(
 
 void UffdMemoryArenaManager::freeRange(std::byte* start)
 {
-    faabric::util::FullTraceableLock lock{ mx };
+    faabric::util::FullLock lock{ mx };
     std::shared_ptr newRanges = std::make_shared<RangeSet>(*rangesSnapshot());
     auto rangeIt = newRanges->find(start);
     if (rangeIt == newRanges->end()) {
