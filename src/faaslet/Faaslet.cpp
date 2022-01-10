@@ -71,7 +71,7 @@ Faaslet::Faaslet(faabric::MessageInBatch msg)
     } else if (conf.wasmVm == "wamr") {
 #if (FAASM_SGX)
         // When SGX is enabled, we may still be running with vanilla WAMR
-        if (msg.issgx()) {
+        if (msg->issgx()) {
             module = std::make_unique<wasm::SGXWAMRWasmModule>();
         } else {
             module = std::make_unique<wasm::WAMRWasmModule>(1);
