@@ -95,7 +95,7 @@ void FaasmConfig::initialise()
               .cpu = std::string(pairStr.substr(splitPos + 1)) });
         }
     }
-    chainedCallTimeout = this->getIntParam("CHAINED_CALL_TIMEOUT", "300000");
+    chainedCallTimeout = this->getIntParam("CHAINED_CALL_TIMEOUT", "25000");
 
     std::string faasmLocalDir =
       getEnvVar("FAASM_LOCAL_DIR", "/usr/local/faasm");
