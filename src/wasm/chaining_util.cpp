@@ -108,32 +108,36 @@ int spawnChainedThread(const std::string& snapshotKey,
     faabric::scheduler::Scheduler& sch = faabric::scheduler::getScheduler();
 
     faabric::Message* originalCall = getExecutingCall();
-    faabric::Message call = faabric::util::messageFactory(
-      originalCall->user(), originalCall->function());
-    call.set_isasync(true);
-    call.set_forbidndp(originalCall->forbidndp());
+    auto req = faabric::util::batchExecFactory(originalCall->user(),
+                                               originalCall->function());
+    req->set_type(req->FUNCTIONS);
+    faabric::MessageInBatch call(req, 0);
+    call->set_isasync(true);
+    call->set_forbidndp(originalCall->forbidndp());
 
     // Propagate app ID
-    call.set_appid(originalCall->appid());
+    call->set_appid(originalCall->appid());
 
     // Snapshot details
-    call.set_snapshotkey(snapshotKey);
+    call->set_snapshotkey(snapshotKey);
 
     // Function pointer and args
     // NOTE - with a pthread interface we only ever pass the function a single
     // pointer argument, hence we use the input data here to hold this argument
     // as a string
-    call.set_funcptr(funcPtr);
-    call.set_inputdata(std::to_string(argsPtr));
+    call->set_funcptr(funcPtr);
+    call->set_inputdata(std::to_string(argsPtr));
 
     const std::string origStr =
       faabric::util::funcToString(*originalCall, false);
     const std::string chainedStr = faabric::util::funcToString(call, false);
 
-    // Schedule the call
-    sch.callFunction(call, false, originalCall);
+    auto callId = call->id();
 
-    return call.id();
+    // Schedule the call
+    sch.callFunction(std::move(call), false, originalCall);
+
+    return callId;
 }
 
 int awaitChainedCallOutput(unsigned int messageId,
@@ -188,47 +192,49 @@ int chainNdpCall(std::span<const uint8_t> zygoteDelta,
     faabric::scheduler::Scheduler& sch = faabric::scheduler::getScheduler();
 
     faabric::Message* originalCall = getExecutingCall();
-    faabric::Message call = faabric::util::messageFactory(
-      originalCall->user(), originalCall->function());
-    call.set_forbidndp(originalCall->forbidndp());
-    call.set_isasync(true);
+    auto req = faabric::util::batchExecFactory(originalCall->user(),
+                                               originalCall->function());
+    req->set_type(req->FUNCTIONS);
+    faabric::MessageInBatch call(req, 0);
+    call->set_forbidndp(originalCall->forbidndp());
+    call->set_isasync(true);
 
     // Snapshot details
-    call.set_snapshotkey("");
-    call.mutable_zygotedelta()->assign(
+    call->set_snapshotkey("");
+    call->mutable_zygotedelta()->assign(
       reinterpret_cast<const char*>(zygoteDelta.data()), zygoteDelta.size());
 
     // Function pointer and args
-    call.set_funcptr(funcPtr);
-    call.mutable_inputdata()->assign(inputData.data(), inputData.size());
-    call.set_isstorage(true);
-    call.set_isoutputmemorydelta(true);
-    call.mutable_wasmglobals()->Assign(wasmGlobals.begin(), wasmGlobals.end());
-    call.mutable_extraarguments()->Assign(extraArgs.begin(), extraArgs.end());
-    call.set_cmdline(originalCall->cmdline());
-    call.set_directresulthost(fcfg.endpointHost);
+    call->set_funcptr(funcPtr);
+    call->mutable_inputdata()->assign(inputData.data(), inputData.size());
+    call->set_isstorage(true);
+    call->set_isoutputmemorydelta(true);
+    call->mutable_wasmglobals()->Assign(wasmGlobals.begin(), wasmGlobals.end());
+    call->mutable_extraarguments()->Assign(extraArgs.begin(), extraArgs.end());
+    call->set_cmdline(originalCall->cmdline());
+    call->set_directresulthost(fcfg.endpointHost);
 
-    call.set_pythonuser(originalCall->pythonuser());
-    call.set_pythonfunction(originalCall->pythonfunction());
+    call->set_pythonuser(originalCall->pythonuser());
+    call->set_pythonfunction(originalCall->pythonfunction());
     if (pyFuncName != nullptr && pyFuncName[0] != '\0') {
-        call.set_pythonentry(pyFuncName);
+        call->set_pythonentry(pyFuncName);
     }
-    call.set_ispython(originalCall->ispython());
+    call->set_ispython(originalCall->ispython());
 
-    const std::string origStr =
-      faabric::util::funcToString(*originalCall, false);
-    const std::string chainedStr = faabric::util::funcToString(call, false);
+    auto callId = call->id();
 
     // Schedule the call
-    sch.callFunction(call, false, originalCall);
     SPDLOG_DEBUG("Chained NDP call {} ({}) -> {} {}() py?:{}",
-                 origStr,
+                 faabric::util::funcToString(*originalCall, false),
                  faabric::util::getSystemConfig().endpointHost,
-                 chainedStr,
+                 faabric::util::funcToString(call, false),
                  funcPtr,
                  pyFuncName ? pyFuncName : "wasmptr");
+    sch.callFunctions(std::move(req),
+                      faabric::util::SchedulingTopologyHint::NORMAL,
+                      originalCall);
 
-    return call.id();
+    return callId;
 }
 
 }
