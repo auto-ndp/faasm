@@ -55,7 +55,7 @@ class Executor
   public:
     std::string id;
 
-    explicit Executor(faabric::Message& msg);
+    explicit Executor(faabric::MessageInBatch msg);
 
     virtual ~Executor() = default;
 
@@ -88,7 +88,7 @@ class Executor
 
     virtual void postFinish();
 
-    faabric::Message boundMessage;
+    faabric::MessageInBatch boundMessage;
 
     uint32_t threadPoolSize = 0;
 
@@ -306,7 +306,7 @@ class Scheduler
     std::unordered_map<std::string, std::set<std::string>> registeredHosts;
 
     faabric::util::SchedulingDecision makeSchedulingDecision(
-      std::shared_ptr<faabric::BatchExecuteRequest> req,
+      const faabric::BatchExecuteRequest& req,
       faabric::util::SchedulingTopologyHint topologyHint);
 
     faabric::util::SchedulingDecision doCallFunctions(
@@ -315,7 +315,7 @@ class Scheduler
       faabric::Message* caller,
       faabric::util::FullLock& lock);
 
-    std::shared_ptr<Executor> claimExecutor(faabric::Message& msg);
+    std::shared_ptr<Executor> claimExecutor(const faabric::MessageInBatch& msg);
 
     std::vector<std::string> getUnregisteredHosts(const std::string& funcStr,
                                                   bool noCache = false);

@@ -7,7 +7,7 @@ namespace faabric::scheduler {
 class DummyExecutor final : public Executor
 {
   public:
-    DummyExecutor(faabric::Message& msg);
+    DummyExecutor(faabric::MessageInBatch msg);
 
     ~DummyExecutor() override;
 

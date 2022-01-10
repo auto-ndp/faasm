@@ -12,7 +12,8 @@ class DummyExecutorFactory : public ExecutorFactory
     int getFlushCount();
 
   protected:
-    std::shared_ptr<Executor> createExecutor(faabric::Message& msg) override;
+    std::shared_ptr<Executor> createExecutor(
+      faabric::MessageInBatch msg) override;
 
     void flushHost() override;
 

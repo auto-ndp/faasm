@@ -296,7 +296,7 @@ class PointToPointClientServerFixture
 class TestExecutor final : public faabric::scheduler::Executor
 {
   public:
-    TestExecutor(faabric::Message& msg);
+    TestExecutor(faabric::MessageInBatch msg);
 
     faabric::util::MemoryRegion dummyMemory = nullptr;
     size_t dummyMemorySize = 0;
@@ -317,6 +317,6 @@ class TestExecutorFactory : public faabric::scheduler::ExecutorFactory
 {
   protected:
     std::shared_ptr<faabric::scheduler::Executor> createExecutor(
-      faabric::Message& msg) override;
+      faabric::MessageInBatch msg) override;
 };
 }

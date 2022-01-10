@@ -10,8 +10,8 @@
 
 namespace faabric::scheduler {
 
-DummyExecutor::DummyExecutor(faabric::Message& msg)
-  : Executor(msg)
+DummyExecutor::DummyExecutor(faabric::MessageInBatch msg)
+  : Executor(std::move(msg))
 {}
 
 DummyExecutor::~DummyExecutor() {}

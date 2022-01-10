@@ -6,9 +6,9 @@
 namespace faabric::scheduler {
 
 std::shared_ptr<Executor> DummyExecutorFactory::createExecutor(
-  faabric::Message& msg)
+  faabric::MessageInBatch msg)
 {
-    return std::make_shared<DummyExecutor>(msg);
+    return std::make_shared<DummyExecutor>(std::move(msg));
 }
 
 int DummyExecutorFactory::getFlushCount()

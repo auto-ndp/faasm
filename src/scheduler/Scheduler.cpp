@@ -312,7 +312,6 @@ faabric::util::SchedulingDecision Scheduler::callFunctions(
   faabric::Message* caller)
 {
     ZoneScopedNS("Scheduler::callFunctions", 5);
-    auto& config = faabric::util::getSystemConfig();
 
     // Note, we assume all the messages are for the same function and have the
     // same master host
@@ -340,7 +339,7 @@ faabric::util::SchedulingDecision Scheduler::callFunctions(
 
     faabric::util::FullLock lock(mx);
 
-    SchedulingDecision decision = makeSchedulingDecision(req, topologyHint);
+    SchedulingDecision decision = makeSchedulingDecision(*req, topologyHint);
 
     // Send out point-to-point mappings if necessary (unless being forced to
     // execute locally, in which case they will be transmitted from the
@@ -351,16 +350,16 @@ faabric::util::SchedulingDecision Scheduler::callFunctions(
     }
 
     // Pass decision as hint
-    return doCallFunctions(req, decision, caller, lock);
+    return doCallFunctions(std::move(req), decision, caller, lock);
 }
 
 faabric::util::SchedulingDecision Scheduler::makeSchedulingDecision(
-  std::shared_ptr<faabric::BatchExecuteRequest> req,
+  const faabric::BatchExecuteRequest& req,
   faabric::util::SchedulingTopologyHint topologyHint)
 {
     ZoneScopedNS("Scheduler::makeSchedulingDecision", 5);
-    int nMessages = req->messages_size();
-    faabric::Message& firstMsg = req->mutable_messages()->at(0);
+    int nMessages = req.messages_size();
+    const faabric::Message& firstMsg = req.messages().at(0);
     std::string funcStr = faabric::util::funcToString(firstMsg, false);
 
     bool isStorage = firstMsg.isstorage();
@@ -535,7 +534,7 @@ faabric::util::SchedulingDecision Scheduler::makeSchedulingDecision(
     // Set up decision
     SchedulingDecision decision(firstMsg.appid(), firstMsg.groupid());
     for (int i = 0; i < hosts.size(); i++) {
-        decision.addMessage(hosts.at(i), req->messages().at(i));
+        decision.addMessage(hosts.at(i), req.messages().at(i));
     }
 
     return decision;
@@ -547,7 +546,7 @@ faabric::util::SchedulingDecision Scheduler::callFunctions(
   faabric::Message* caller)
 {
     faabric::util::FullLock lock(mx);
-    return doCallFunctions(req, hint, caller, lock);
+    return doCallFunctions(std::move(req), hint, caller, lock);
 }
 
 faabric::util::SchedulingDecision Scheduler::doCallFunctions(
@@ -557,7 +556,7 @@ faabric::util::SchedulingDecision Scheduler::doCallFunctions(
   faabric::util::FullLock& lock)
 {
     ZoneScopedNS("Scheduler::doCallFunctions", 5);
-    faabric::Message& firstMsg = req->mutable_messages()->at(0);
+    const faabric::Message& firstMsg = req->messages().at(0);
     std::string funcStr = faabric::util::funcToString(firstMsg, false);
     int nMessages = req->messages_size();
 
@@ -611,7 +610,7 @@ faabric::util::SchedulingDecision Scheduler::doCallFunctions(
     // to *all* hosts, regardless of whether they will be executing
     // functions. This greatly simplifies the reasoning about which
     // hosts hold which diffs.
-    std::string snapshotKey = firstMsg.snapshotkey();
+    const std::string& snapshotKey = firstMsg.snapshotkey();
     if (!snapshotKey.empty()) {
         ZoneScopedN("Push snapshot diffs");
         for (const auto& host : getFunctionRegisteredHosts(firstMsg, false)) {
@@ -660,6 +659,7 @@ faabric::util::SchedulingDecision Scheduler::doCallFunctions(
     for (const std::string& host : orderedHosts) {
         // Work out which indexes are scheduled on this host
         std::vector<int> thisHostIdxs;
+        thisHostIdxs.reserve(decision.hosts.size());
         for (int i = 0; i < decision.hosts.size(); i++) {
             if (decision.hosts.at(i) == host) {
                 thisHostIdxs.push_back(i);
@@ -700,7 +700,7 @@ faabric::util::SchedulingDecision Scheduler::doCallFunctions(
                     ZoneScopedN(
                       "Scheduler::callFunctions claiming new executor");
                     // Create executor if not exists
-                    e = claimExecutor(firstMsg);
+                    e = claimExecutor(faabric::MessageInBatch(req, 0));
                 } else if (thisExecutors.size() == 1) {
                     // Use existing executor if exists
                     e = thisExecutors.back();
@@ -720,21 +720,22 @@ faabric::util::SchedulingDecision Scheduler::doCallFunctions(
             } else {
                 // Non-threads require one executor per task
                 for (auto i : thisHostIdxs) {
-                    faabric::Message& localMsg = req->mutable_messages()->at(i);
+                    auto localMsg = faabric::MessageInBatch(req, i);
 
-                    if (localMsg.directresulthost() == conf.endpointHost) {
-                        localMsg.set_directresulthost("");
+                    if (localMsg->directresulthost() == conf.endpointHost) {
+                        localMsg->set_directresulthost("");
                     }
 
-                    if (localMsg.executeslocally()) {
+                    if (localMsg->executeslocally()) {
                         faabric::util::UniqueLock resultsLock(
                           localResultsMutex);
                         localResults.insert(
-                          { localMsg.id(),
+                          { localMsg->id(),
                             std::make_shared<MessageLocalResult>() });
                     }
 
-                    std::shared_ptr<Executor> e = claimExecutor(localMsg);
+                    std::shared_ptr<Executor> e =
+                      claimExecutor(std::move(localMsg));
                     e->executeTasks({ i }, req);
                 }
             }
@@ -903,7 +904,8 @@ Scheduler::getRecordedMessagesShared()
     return recordedMessagesShared;
 }
 
-std::shared_ptr<Executor> Scheduler::claimExecutor(faabric::Message& msg)
+std::shared_ptr<Executor> Scheduler::claimExecutor(
+  const faabric::MessageInBatch& msg)
 {
     std::string funcStr = faabric::util::funcToString(msg, false);
 

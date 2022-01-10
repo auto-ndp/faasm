@@ -31,9 +31,8 @@ ExecutorTask::ExecutorTask(int messageIndexIn,
   , skipReset(skipResetIn)
 {}
 
-// TODO - avoid the copy of the message here?
-Executor::Executor(faabric::Message& msg)
-  : boundMessage(msg)
+Executor::Executor(faabric::MessageInBatch msg)
+  : boundMessage(std::move(msg))
   , threadPoolSize(faabric::util::getUsableCores())
   , threadPoolThreads(threadPoolSize)
   , resetDone(false)
@@ -41,8 +40,8 @@ Executor::Executor(faabric::Message& msg)
 {
     faabric::util::SystemConfig& conf = faabric::util::getSystemConfig();
 
-    assert(!boundMessage.user().empty());
-    assert(!boundMessage.function().empty());
+    assert(!boundMessage->user().empty());
+    assert(!boundMessage->function().empty());
 
     // Set an ID for this Executor
     id = conf.endpointHost + "_" + std::to_string(faabric::util::generateGid());
@@ -92,8 +91,6 @@ void Executor::finish()
     this->postFinish();
 
     // Reset variables
-    boundMessage.Clear();
-
     claimed = false;
 
     threadPoolThreads.clear();

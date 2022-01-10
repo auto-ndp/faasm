@@ -29,8 +29,8 @@ namespace tests {
 std::atomic<int> restoreCount = 0;
 std::atomic<int> resetCount = 0;
 
-TestExecutor::TestExecutor(faabric::Message& msg)
-  : Executor(msg)
+TestExecutor::TestExecutor(faabric::MessageInBatch msg)
+  : Executor(std::move(msg))
 {}
 
 void TestExecutor::reset(faabric::Message& msg)
@@ -216,9 +216,9 @@ int32_t TestExecutor::executeTask(
 }
 
 std::shared_ptr<Executor> TestExecutorFactory::createExecutor(
-  faabric::Message& msg)
+  faabric::MessageInBatch msg)
 {
-    return std::make_shared<TestExecutor>(msg);
+    return std::make_shared<TestExecutor>(std::move(msg));
 }
 
 class TestExecutorFixture
