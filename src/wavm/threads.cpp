@@ -210,6 +210,8 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
     SPDLOG_TRACE("S - pthread_mutex_init {} {}", mx, attr);
 
     // getPthreadGroup(mx);
+    std::unique_lock lock{ getExecutingModule()->wasmMutexMx };
+    getExecutingModule()->wasmMutex[mx];
 
     return 0;
 }
@@ -223,7 +225,10 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
     // SPDLOG_TRACE("S - pthread_mutex_lock {}", mx);
 
     // getPthreadGroup(mx)->localLock();
-    getExecutingModule()->wasmMutex.lock();
+    std::shared_lock lock{ getExecutingModule()->wasmMutexMx };
+    auto& wmx = getExecutingModule()->wasmMutex.at(mx);
+    lock.unlock();
+    wmx.lock();
 
     return 0;
 }
@@ -237,7 +242,10 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
     // SPDLOG_TRACE("S - pthread_mutex_trylock {}", mx);
 
     // bool success = getPthreadGroup(mx)->localTryLock();
-    bool success = getExecutingModule()->wasmMutex.try_lock();
+    std::shared_lock lock{ getExecutingModule()->wasmMutexMx };
+    auto& wmx = getExecutingModule()->wasmMutex.at(mx);
+    lock.unlock();
+    bool success = wmx.try_lock();
 
     if (!success) {
         return EBUSY;
@@ -254,7 +262,10 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
 {
     // SPDLOG_TRACE("S - pthread_mutex_unlock {}", mx);
     // getPthreadGroup(mx)->localUnlock();
-    getExecutingModule()->wasmMutex.unlock();
+    std::shared_lock lock{ getExecutingModule()->wasmMutexMx };
+    auto& wmx = getExecutingModule()->wasmMutex.at(mx);
+    lock.unlock();
+    wmx.unlock();
 
     return 0;
 }
@@ -266,6 +277,9 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
                                I32 mx)
 {
     SPDLOG_TRACE("S - pthread_mutex_destroy {}", mx);
+    std::unique_lock lock{ getExecutingModule()->wasmMutexMx };
+    getExecutingModule()->wasmMutex.erase(mx);
+
     return 0;
 }
 
