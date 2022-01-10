@@ -68,7 +68,7 @@ int doRun(std::ofstream& outFs,
     }
 
     // Create faaslet
-    faaslet::Faaslet f(msg);
+    faaslet::Faaslet f(faabric::MessageInBatch(req, 0));
 
     // Preflight if necessary
     if (PREFLIGHT_CALLS) {

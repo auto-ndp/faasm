@@ -122,8 +122,7 @@ TEST_CASE_METHOD(FlushingTestFixture,
     // Execute a task
     std::shared_ptr<faabric::BatchExecuteRequest> req =
       faabric::util::batchExecFactory("demo", "echo", 1);
-    faabric::Message& msg = req->mutable_messages()->at(0);
-    faaslet::Faaslet f(msg);
+    faaslet::Faaslet f(faabric::MessageInBatch(req, 0));
     f.executeTask(0, 0, req);
 
     // Check the module has been cached

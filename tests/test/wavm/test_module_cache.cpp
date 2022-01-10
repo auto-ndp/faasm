@@ -41,7 +41,7 @@ TEST_CASE("Test creating cached WAVM modules", "[wasm]")
     REQUIRE(moduleA.isBound());
 
     // Execute the function normally and make sure cached module is not used
-    faaslet::Faaslet faaslet(msgA);
+    faaslet::Faaslet faaslet(faabric::MessageInBatch(req, 0));
     int returnValue = faaslet.executeTask(0, 0, req);
     REQUIRE(returnValue == 0);
 

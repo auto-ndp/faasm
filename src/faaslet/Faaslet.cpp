@@ -60,13 +60,13 @@ void preloadPythonRuntime()
     sch.callFunction(msg, true);
 }
 
-Faaslet::Faaslet(faabric::Message& msg)
+Faaslet::Faaslet(faabric::MessageInBatch msg)
   : Executor(msg)
 {
     conf::FaasmConfig& conf = conf::getFaasmConfig();
 
     // Instantiate the right wasm module for the chosen runtime
-    if (isBuiltin(msg.function())) {
+    if (isBuiltin(msg->function())) {
         module = std::make_unique<wasm::NDPBuiltinModule>();
     } else if (conf.wasmVm == "wamr") {
 #if (FAASM_SGX)
@@ -186,9 +186,9 @@ std::string Faaslet::getLocalResetSnapshotKey()
 FaasletFactory::~FaasletFactory() {}
 
 std::shared_ptr<faabric::scheduler::Executor> FaasletFactory::createExecutor(
-  faabric::Message& msg)
+  faabric::MessageInBatch msg)
 {
-    return std::make_shared<Faaslet>(msg);
+    return std::make_shared<Faaslet>(std::move(msg));
 }
 
 void FaasletFactory::flushHost()

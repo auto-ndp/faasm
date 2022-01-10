@@ -14,7 +14,7 @@ namespace faaslet {
 class Faaslet final : public faabric::scheduler::Executor
 {
   public:
-    explicit Faaslet(faabric::Message& msg);
+    explicit Faaslet(faabric::MessageInBatch msg);
 
     std::unique_ptr<wasm::WasmModule> module;
 
@@ -50,7 +50,7 @@ class FaasletFactory final : public faabric::scheduler::ExecutorFactory
 
   protected:
     std::shared_ptr<faabric::scheduler::Executor> createExecutor(
-      faabric::Message& msg) override;
+      faabric::MessageInBatch msg) override;
 
     void flushHost() override;
 };

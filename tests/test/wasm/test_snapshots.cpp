@@ -152,8 +152,7 @@ TEST_CASE_METHOD(WasmSnapTestFixture,
     {
         std::shared_ptr<faabric::BatchExecuteRequest> req =
           faabric::util::batchExecFactory(user, function, 1);
-        faabric::Message& m = req->mutable_messages()->at(0);
-        faaslet::Faaslet f(m);
+        faaslet::Faaslet f(faabric::MessageInBatch(req, 0));
 
         // Reset dirty page tracking _after_ binding
         faabric::util::resetDirtyTracking();
@@ -183,7 +182,7 @@ TEST_CASE_METHOD(WasmSnapTestFixture,
         faabric::Message& mSnap = reqSnap->mutable_messages()->at(0);
         mSnap.set_snapshotkey(snapKey);
 
-        faaslet::Faaslet fSnap(mSnap);
+        faaslet::Faaslet fSnap(faabric::MessageInBatch(reqSnap, 0));
         fSnap.restore(mSnap);
 
         faabric::util::resetDirtyTracking();
@@ -247,7 +246,9 @@ TEST_CASE_METHOD(WasmSnapTestFixture,
 {
     std::string user = "demo";
     std::string function = "echo";
-    faabric::Message m = faabric::util::messageFactory(user, function);
+    std::shared_ptr<faabric::BatchExecuteRequest> req =
+      faabric::util::batchExecFactory(user, function, 1);
+    faabric::Message& m = req->mutable_messages()->at(0);
 
     // Set up some dummy data
     std::vector<uint8_t> dummyDataA(100, 1);
@@ -310,7 +311,7 @@ TEST_CASE_METHOD(WasmSnapTestFixture,
 
     SECTION("Faaslet")
     {
-        faaslet::Faaslet f(m);
+        faaslet::Faaslet f(faabric::MessageInBatch(req, 0));
 
         size_t defaultMemSize = f.module->getMemorySizeBytes();
 
