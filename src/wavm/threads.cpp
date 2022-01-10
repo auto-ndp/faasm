@@ -177,11 +177,30 @@ I32 s__futex(I32 uaddrPtr,
 
 std::shared_ptr<faabric::transport::PointToPointGroup> getPthreadGroup(int mx)
 {
-    faabric::Message* msg = getExecutingCall();
-    faabric::transport::PointToPointGroup::addGroupIfNotExists(
-      msg->appid(), mx, 0);
+    thread_local std::weak_ptr<faabric::transport::PointToPointGroup> cache{};
+    thread_local uint64_t cacheId{};
 
-    return faabric::transport::PointToPointGroup::getGroup(mx);
+    faabric::Message* msg = getExecutingCall();
+    // https://stackoverflow.com/questions/3058139/hash-32bit-int-to-16bit-int
+    uint64_t id64{ uint64_t(msg->appid()) | (uint64_t(mx) << 32) };
+    uint32_t grpId = ((id64 * 0x8000000080000001ull) >> 32);
+
+    if (auto cached = cache.lock(); cached) {
+        if (cacheId == id64) {
+            return cached;
+        } else {
+            cache = decltype(cache)();
+            cacheId = 0;
+        }
+    }
+
+    faabric::transport::PointToPointGroup::addGroupIfNotExists(
+      msg->appid(), grpId, 0);
+
+    auto group = faabric::transport::PointToPointGroup::getGroup(grpId);
+    cache = group;
+    cacheId = id64;
+    return group;
 }
 
 WAVM_DEFINE_INTRINSIC_FUNCTION(env,
@@ -193,9 +212,7 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
 {
     SPDLOG_TRACE("S - pthread_mutex_init {} {}", mx, attr);
 
-    faabric::Message* msg = getExecutingCall();
-    faabric::transport::PointToPointGroup::addGroupIfNotExists(
-      msg->appid(), mx, 0);
+    getPthreadGroup(mx);
 
     return 0;
 }
