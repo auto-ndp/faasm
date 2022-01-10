@@ -15,7 +15,7 @@ class FaabricEndpointHandler final
   private:
     void executeFunction(HttpRequestContext&& ctx,
                          faabric::util::BeastHttpResponse&& partialResponse,
-                         faabric::Message&& msg);
+                         faabric::MessageInBatch msg);
 
     void onFunctionResult(HttpRequestContext&& ctx,
                           faabric::util::BeastHttpResponse&& partialResponse,

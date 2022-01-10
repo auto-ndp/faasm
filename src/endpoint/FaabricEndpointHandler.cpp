@@ -51,14 +51,17 @@ void FaabricEndpointHandler::onRequest(
         response.result(beast::http::status::bad_request);
         response.body() = std::string("Empty request");
     } else {
-        faabric::Message msg = faabric::util::jsonToMessage(requestStr);
+        auto req = faabric::util::batchExecFactory();
+        req->set_type(req->FUNCTIONS);
+        *req->add_messages() = faabric::util::jsonToMessage(requestStr);
+        faabric::MessageInBatch msg(req, 0);
         faabric::scheduler::Scheduler& sched =
           faabric::scheduler::getScheduler();
 
-        if (msg.isstatusrequest()) {
+        if (msg->isstatusrequest()) {
             SPDLOG_DEBUG("Processing status request");
             const faabric::Message result =
-              sched.getFunctionResult(msg.id(), 0);
+              sched.getFunctionResult(msg->id(), 0);
 
             if (result.type() == faabric::Message_MessageType_EMPTY) {
                 response.result(beast::http::status::ok);
@@ -70,14 +73,14 @@ void FaabricEndpointHandler::onRequest(
                 response.result(beast::http::status::internal_server_error);
                 response.body() = "FAILED: " + result.outputdata();
             }
-        } else if (msg.isexecgraphrequest()) {
+        } else if (msg->isexecgraphrequest()) {
             SPDLOG_DEBUG("Processing execution graph request");
             faabric::scheduler::ExecGraph execGraph =
-              sched.getFunctionExecGraph(msg.id());
+              sched.getFunctionExecGraph(msg->id());
             response.result(beast::http::status::ok);
             response.body() = faabric::scheduler::execGraphToJson(execGraph);
 
-        } else if (msg.type() == faabric::Message_MessageType_FLUSH) {
+        } else if (msg->type() == faabric::Message_MessageType_FLUSH) {
             SPDLOG_DEBUG("Broadcasting flush request");
             sched.broadcastFlush();
             response.result(beast::http::status::ok);
@@ -96,18 +99,18 @@ void FaabricEndpointHandler::onRequest(
 void FaabricEndpointHandler::executeFunction(
   HttpRequestContext&& ctx,
   faabric::util::BeastHttpResponse&& response,
-  faabric::Message&& msg)
+  faabric::MessageInBatch msg)
 {
     ZoneScopedNS("Execute HTTP function", 4);
     faabric::util::SystemConfig& conf = faabric::util::getSystemConfig();
 
-    if (msg.user().empty()) {
+    if (msg->user().empty()) {
         response.result(beast::http::status::bad_request);
         response.body() = std::string("Empty user");
         return ctx.sendFunction(std::move(response));
     }
 
-    if (msg.function().empty()) {
+    if (msg->function().empty()) {
         response.result(beast::http::status::bad_request);
         response.body() = std::string("Empty function");
         return ctx.sendFunction(std::move(response));
@@ -116,11 +119,11 @@ void FaabricEndpointHandler::executeFunction(
     // Set message ID and master host
     faabric::util::setMessageId(msg);
     std::string thisHost = faabric::util::getSystemConfig().endpointHost;
-    msg.set_masterhost(thisHost);
+    msg->set_masterhost(thisHost);
     // This is set to false by the scheduler if the function ends up being sent
     // elsewhere
-    if (!msg.isasync()) {
-        msg.set_executeslocally(true);
+    if (!msg->isasync()) {
+        msg->set_executeslocally(true);
     }
 
     auto tid = (pid_t)syscall(SYS_gettid);
@@ -130,12 +133,12 @@ void FaabricEndpointHandler::executeFunction(
     // Schedule it
     faabric::scheduler::Scheduler& sch = faabric::scheduler::getScheduler();
     {
-        ZoneScopedN("Scheduler.callFunction");
-        sch.callFunction(msg);
+        ZoneScopedN("Scheduler.callFunctions");
+        sch.callFunctions(msg.batch);
     }
 
     // Await result on global bus (may have been executed on a different worker)
-    if (msg.isasync()) {
+    if (msg->isasync()) {
         response.result(beast::http::status::ok);
         response.body() = faabric::util::buildAsyncResponse(msg);
         return ctx.sendFunction(std::move(response));
@@ -143,7 +146,7 @@ void FaabricEndpointHandler::executeFunction(
 
     SPDLOG_DEBUG("Worker thread {} awaiting {}", tid, funcStr);
     sch.getFunctionResultAsync(
-      msg.id(),
+      msg->id(),
       conf.globalMessageTimeout,
       ctx.ioc,
       ctx.executor,
