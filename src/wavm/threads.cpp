@@ -188,9 +188,6 @@ std::shared_ptr<faabric::transport::PointToPointGroup> getPthreadGroup(int mx)
     if (auto cached = cache.lock(); cached) {
         if (cacheId == id64) {
             return cached;
-        } else {
-            cache = decltype(cache)();
-            cacheId = 0;
         }
     }
 
@@ -212,7 +209,7 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
 {
     SPDLOG_TRACE("S - pthread_mutex_init {} {}", mx, attr);
 
-    getPthreadGroup(mx);
+    // getPthreadGroup(mx);
 
     return 0;
 }
@@ -225,7 +222,8 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
 {
     // SPDLOG_TRACE("S - pthread_mutex_lock {}", mx);
 
-    getPthreadGroup(mx)->localLock();
+    // getPthreadGroup(mx)->localLock();
+    getExecutingModule()->wasmMutex.lock();
 
     return 0;
 }
@@ -238,7 +236,8 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
 {
     // SPDLOG_TRACE("S - pthread_mutex_trylock {}", mx);
 
-    bool success = getPthreadGroup(mx)->localTryLock();
+    // bool success = getPthreadGroup(mx)->localTryLock();
+    bool success = getExecutingModule()->wasmMutex.try_lock();
 
     if (!success) {
         return EBUSY;
@@ -254,7 +253,8 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
                                I32 mx)
 {
     // SPDLOG_TRACE("S - pthread_mutex_unlock {}", mx);
-    getPthreadGroup(mx)->localUnlock();
+    // getPthreadGroup(mx)->localUnlock();
+    getExecutingModule()->wasmMutex.unlock();
 
     return 0;
 }

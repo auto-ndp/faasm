@@ -170,6 +170,8 @@ class WasmModule
 
     void debugMemorySummary(const char* msg);
 
+    std::shared_mutex wasmMutex;
+
   protected:
     void storeZygoteSnapshot();
     std::shared_mutex moduleMutex;
