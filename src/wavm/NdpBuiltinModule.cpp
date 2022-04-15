@@ -52,7 +52,7 @@ static int ndpGet(NDPBuiltinModule& module, faabric::Message& msg)
     TracyMessageL("Parsed input");
     std::string objPath = userObjectPath(msg.user(), args.key);
     if (!fs::exists(objPath)) {
-        SPDLOG_DEBUG("NDP GET file {} doesn't exist", objPath);
+        SPDLOG_WARN("NDP GET file {} doesn't exist", objPath);
         return 1;
     }
     TracyMessageL("Checked file existance");
@@ -86,7 +86,7 @@ static int ndpGet(NDPBuiltinModule& module, faabric::Message& msg)
     close(fd);
 
     TracyMessageL("Read file to bytes");
-    SPDLOG_INFO("NDP GET from file {} "
+    SPDLOG_DEBUG("NDP GET from file {} "
                 "[bytes={}, args.offset={}, uptoBytes={}]",
                 objPath,
                 msg.outputdata().size(),
@@ -102,7 +102,7 @@ static int ndpPut(NDPBuiltinModule& module, faabric::Message& msg)
     auto args = BuiltinNdpPutArgs::fromBytes(
       std::span(BYTES_CONST(inputData.data()), inputData.size()));
     std::string objPath = userObjectPath(msg.user(), args.key);
-    SPDLOG_INFO("NDP PUT {} bytes to file {}", args.value.size(), objPath);
+    SPDLOG_DEBUG("NDP PUT {} bytes to file {}", args.value.size(), objPath);
     faabric::util::writeBytesToFile(objPath, args.value);
     return 0;
 }
