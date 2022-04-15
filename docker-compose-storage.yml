@@ -1,4 +1,4 @@
-version: "3.8"
+version: "3"
 
 services:
   # Storage
@@ -30,7 +30,6 @@ services:
   # Storage
   upload:
     image: kubasz51/faasm-upload:${FAASM_VERSION}
-    init: true
     ports:
       - "8002:8002"
     depends_on:
@@ -62,7 +61,6 @@ services:
   # Storage
   worker-storage:
     image: kubasz51/faasm-worker:${FAASM_VERSION}
-    init: true
     security_opt:
       - seccomp:unconfined
     # Allows for tracy thread&ctx switch tracking to work better
@@ -115,7 +113,6 @@ services:
   # Both
   cpp:
     image: ${CPP_CLI_IMAGE}
-    init: true
     working_dir: /code/cpp
     stdin_open: true
     tty: true
@@ -155,7 +152,6 @@ services:
   # Both
   faasm-cli:
     image: ${FAASM_CLI_IMAGE}
-    init: true
     working_dir: /usr/local/code/faasm
     stdin_open: true
     tty: true
