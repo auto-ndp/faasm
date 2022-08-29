@@ -36,11 +36,12 @@ conan_cmake_configure(
         "cppzmq/4.8.1@#010df8fa1c5ebbc615704e8c16693bac"
         "flatbuffers/2.0.5@#c6a9508bd476da080f7aecbe7a094b68"
         "hiredis/1.0.2@#370dad964286cadb1f15dc90252e8ef3"
-        "protobuf/3.19.4@#a0bea09d5f31f0dc4fc0197644f5bc93"
+        "protobuf/3.20.0@#8e4de7081bea093469c9e6076149b2b4"
         "rapidjson/cci.20211112@#65b4e5feb6f1edfc8cbac0f669acaf17"
         "readerwriterqueue/1.0.6@#a95c8da3d68822dec4d4c13fff4b5c96"
         "spdlog/1.10.0@#6406c337028e15e56cd6a070cbac54c4"
         "zeromq/4.3.4@#d4fe4001f6c2e5960e58c251687c5b2f"
+        "zlib/1.2.12@#3b9e037ae1c615d045a06c67d88491ae"
     GENERATORS
         cmake_find_package
         cmake_paths

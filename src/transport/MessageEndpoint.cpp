@@ -232,13 +232,16 @@ zmq::socket_t MessageEndpoint::setUpSocket(
 void MessageEndpoint::sendMessage(zmq::socket_t& socket,
                                   uint8_t header,
                                   const uint8_t* data,
-                                  size_t dataSize)
+                                  size_t dataSize,
+                                  int sequenceNum)
 {
     ZoneScopedNS("MessageEndpoint::doSend", 6);
     ZoneValue(dataSize);
     uint8_t buffer[HEADER_MSG_SIZE];
     faabric::util::unalignedWrite<uint8_t>(header, buffer);
     faabric::util::unalignedWrite<size_t>(dataSize, buffer + sizeof(uint8_t));
+    faabric::util::unalignedWrite<int>(
+      sequenceNum, buffer + sizeof(uint8_t) + sizeof(size_t));
 
     sendBuffer(socket, buffer, HEADER_MSG_SIZE, true);
     sendBuffer(socket, data, dataSize, false);
@@ -260,12 +263,15 @@ Message MessageEndpoint::recvMessage(zmq::socket_t& socket, bool async)
       faabric::util::unalignedRead<uint8_t>(headerMessage.udata());
     size_t msgSize = faabric::util::unalignedRead<size_t>(
       headerMessage.udata() + sizeof(uint8_t));
+    int sequenceNum = faabric::util::unalignedRead<int>(
+      headerMessage.udata() + sizeof(uint8_t) + sizeof(size_t));
 
     SPDLOG_TRACE(
       "Received header {} size {} on {}", header, msgSize, getAddress());
 
     Message body = recvBuffer(socket, msgSize);
     body.setHeader(header);
+    body.setSequenceNum(sequenceNum);
 
     if (body.getHeader() == SHUTDOWN_HEADER) {
         if (body.dataCopy() == shutdownPayload) {
@@ -373,10 +379,11 @@ AsyncSendMessageEndpoint::AsyncSendMessageEndpoint(const std::string& hostIn,
 
 void AsyncSendMessageEndpoint::send(uint8_t header,
                                     const uint8_t* data,
-                                    size_t dataSize)
+                                    size_t dataSize,
+                                    int sequenceNum)
 {
     SPDLOG_TRACE("PUSH {} ({} bytes)", address, dataSize);
-    sendMessage(socket, header, data, dataSize);
+    sendMessage(socket, header, data, dataSize, sequenceNum);
 }
 
 AsyncInternalSendMessageEndpoint::AsyncInternalSendMessageEndpoint(
@@ -390,10 +397,11 @@ AsyncInternalSendMessageEndpoint::AsyncInternalSendMessageEndpoint(
 
 void AsyncInternalSendMessageEndpoint::send(uint8_t header,
                                             const uint8_t* data,
-                                            size_t dataSize)
+                                            size_t dataSize,
+                                            int sequenceNum)
 {
-    SPDLOG_TRACE("PUSH {} ({} bytes)", address, dataSize);
-    sendMessage(socket, header, data, dataSize);
+    SPDLOG_TRACE("PUSH {} ({} bytes)", address, sequenceNum, dataSize);
+    sendMessage(socket, header, data, dataSize, sequenceNum);
 }
 
 // ----------------------------------------------

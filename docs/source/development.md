@@ -27,7 +27,7 @@ faabric_tests
 To stop the `faabric`-related containers run:
 
 ```bash
-docker-compose down
+docker compose down
 ```
 
 ### Native
@@ -120,7 +120,7 @@ To run the distributed tests as if in CI:
 
 ```bash
 # Clean up
-docker-compose stop
+docker compose stop
 
 # Build and run
 ./dist-test/build.sh
@@ -135,7 +135,6 @@ bumped version. It should appear in:
 - `VERSION`
 - `.env`
 - `.github/workflows/tests.yml`.
-- `mpi-native/mpi-native.env`
 
 Once done, commit and push, then run:
 

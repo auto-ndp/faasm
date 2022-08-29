@@ -7,7 +7,6 @@ from tasks.util.env import get_version, PROJ_ROOT
 FAABRIC_IMAGE_NAME = "faabric"
 FAABRIC_BASE_IMAGE_NAME = "faabric-base"
 FAABRIC_BASE_RUNTIME_IMAGE_NAME = "faabric-base-runtime"
-MPI_NATIVE_IMAGE_NAME = "faabric-mpi-native"
 
 
 def _get_docker_tag(img_name):
@@ -68,14 +67,6 @@ def build_base(ctx, nocache=False, push=False):
 
 
 @task
-def build_mpi_native(ctx, nocache=False, push=False):
-    """
-    Build current native MPI container
-    """
-    _do_container_build(MPI_NATIVE_IMAGE_NAME, nocache=nocache, push=push)
-
-
-@task
 def push(ctx):
     """
     Push current version of faabric container
@@ -89,11 +80,3 @@ def push_base(ctx):
     Push faabric's base container
     """
     _do_push(FAABRIC_BASE_IMAGE_NAME)
-
-
-@task
-def push_mpi_native(ctx):
-    """
-    Push current version of the native MPI container
-    """
-    _do_push(MPI_NATIVE_IMAGE_NAME)

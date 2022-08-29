@@ -20,7 +20,8 @@ thread_local std::vector<uint8_t> msgBuffer;
 }
 
 void MessageEndpointClient::asyncSend(int header,
-                                      google::protobuf::Message* msg)
+                                      google::protobuf::Message* msg,
+                                      int sequenceNum)
 {
     ZoneScopedNS("MessageEndpointClient::asyncSend@2", 6);
     size_t msgSize = msg->ByteSizeLong();
@@ -32,16 +33,17 @@ void MessageEndpointClient::asyncSend(int header,
         throw std::runtime_error("Error serialising message");
     }
 
-    asyncSend(header, msgBuffer.data(), msgBuffer.size());
+    asyncSend(header, msgBuffer.data(), msgBuffer.size(), sequenceNum);
 }
 
 void MessageEndpointClient::asyncSend(int header,
                                       const uint8_t* buffer,
-                                      size_t bufferSize)
+                                      size_t bufferSize,
+                                      int sequenceNum)
 {
     ZoneScopedNS("MessageEndpointClient::asyncSend@3", 6);
     ZoneValue(bufferSize);
-    asyncEndpoint.send(header, buffer, bufferSize);
+    asyncEndpoint.send(header, buffer, bufferSize, sequenceNum);
 }
 
 void MessageEndpointClient::syncSend(int header,

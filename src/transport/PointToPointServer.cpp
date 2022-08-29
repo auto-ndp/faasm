@@ -22,17 +22,25 @@ PointToPointServer::PointToPointServer()
 void PointToPointServer::doAsyncRecv(transport::Message& message)
 {
     uint8_t header = message.getHeader();
+    int sequenceNum = message.getSequenceNum();
     switch (header) {
         case (faabric::transport::PointToPointCall::MESSAGE): {
             PARSE_MSG(
               faabric::PointToPointMessage, message.udata(), message.size())
 
-            // Send the message locally to the downstream socket
+            // If the sequence number is set, we must also set the ordering
+            // flag
+            bool mustOrderMsg = sequenceNum != -1;
+
+            // Send the message locally to the downstream socket, add the
+            // sequence number for in-order reception
             broker.sendMessage(parsedMsg.groupid(),
                                parsedMsg.sendidx(),
                                parsedMsg.recvidx(),
                                BYTES_CONST(parsedMsg.data().c_str()),
-                               parsedMsg.data().size());
+                               parsedMsg.data().size(),
+                               mustOrderMsg,
+                               sequenceNum);
             break;
         }
         case faabric::transport::PointToPointCall::LOCK_GROUP: {

@@ -28,6 +28,7 @@
 #include <shared_mutex>
 
 #define AVAILABLE_HOST_SET "available_hosts"
+#define MIGRATED_FUNCTION_RETURN_VALUE -99
 #define AVAILABLE_STORAGE_HOST_SET "available_storage_hosts"
 #define ALL_STORAGE_HOST_SET "all_storage_hosts"
 

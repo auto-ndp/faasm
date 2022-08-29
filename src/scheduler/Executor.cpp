@@ -509,7 +509,6 @@ void Executor::threadPoolThread(std::stop_token st, int threadPoolIdx)
         int64_t nowTimestamp = faabric::util::getGlobalClock().epochMillis();
         int32_t returnValue;
         bool skippedExec = false;
-        bool migrated = false;
         if ((nowTimestamp - msgTimestamp) >= conf.globalMessageTimeout) {
             returnValue = 1;
             skippedExec = true;
@@ -525,9 +524,8 @@ void Executor::threadPoolThread(std::stop_token st, int threadPoolIdx)
 
 	            // Note that when a task has been migrated, we need to perform all
 	            // the normal executor shutdown, but we must NOT set the result for
-	            // the call.
-	            migrated = true;
-	            returnValue = -99;
+				// the call
+            	returnValue = MIGRATED_FUNCTION_RETURN_VALUE;
 
 	            // MPI migration
 	            if (msg.ismpi()) {
@@ -696,11 +694,6 @@ void Executor::threadPoolThread(std::stop_token st, int threadPoolIdx)
         // executor.
         ZoneScopedN("Task vacate slot");
         sch.vacateSlot();
-        // If the function has been migrated, we drop out here and shut down the
-        // executor
-        if (migrated) {
-            break;
-        }
 
 
     }
