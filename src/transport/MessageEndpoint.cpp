@@ -126,7 +126,7 @@ zmq::socket_t socketFactory(zmq::socket_type socketType,
                 }
                 default: {
                     SPDLOG_ERROR(
-                      "Invalid bind socket type {} ({})", socketType, address);
+                      "Invalid bind socket type {} ({})", (int) socketType, address);
                     throw std::runtime_error(
                       "Binding with invalid socket type");
                 }
@@ -179,7 +179,7 @@ zmq::socket_t socketFactory(zmq::socket_type socketType,
                 }
                 default: {
                     SPDLOG_ERROR("Invalid connect socket type {} ({})",
-                                 socketType,
+                                 (int) socketType,
                                  address);
                     throw std::runtime_error(
                       "Connecting with unrecognized socket type");

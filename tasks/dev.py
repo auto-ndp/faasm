@@ -60,7 +60,7 @@ def cmake(
 
 
 @task
-def cc(ctx, target, shared=False):
+def cc(ctx, target, shared=False, parallel = 0):
     """
     Compile the given target
     """
@@ -68,8 +68,11 @@ def cc(ctx, target, shared=False):
         FAABRIC_SHARED_BUILD_DIR if shared else FAABRIC_STATIC_BUILD_DIR
     )
 
+    cmake_cmd = "cmake --build . --target {}".format(target)
+    if parallel > 0:
+        cmake_cmd += " --parallel {}".format(parallel)
     run(
-        "cmake --build . --target {}".format(target),
+        cmake_cmd,
         check=True,
         cwd=build_dir,
         shell=True,

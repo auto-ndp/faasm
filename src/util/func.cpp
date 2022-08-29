@@ -54,6 +54,17 @@ std::shared_ptr<faabric::BatchExecuteRequest> batchExecFactory()
     return req;
 }
 
+std::shared_ptr<faabric::BatchExecuteRequest> batchExecFactory(faabric::Message&& msg)
+{
+    auto req = batchExecFactory();
+
+    uint32_t appId = faabric::util::generateGid();
+    *req->add_messages() = std::move(msg);
+    req->mutable_messages()->at(0).set_appid(appId);
+
+    return req;
+}
+
 std::shared_ptr<faabric::BatchExecuteRequest> batchExecFactory(
   const std::string& user,
   const std::string& function,

@@ -170,12 +170,7 @@ void FaabricEndpointHandler::onFunctionResult(
                  (pid_t)syscall(SYS_gettid),
                  faabric::util::funcToString(result, true));
 
-    if (result.sgxresult().empty()) {
-        response.body() = result.outputdata();
-        return ctx.sendFunction(std::move(response));
-    }
-
-    response.body() = faabric::util::getJsonOutput(result);
+    response.body() = result.outputdata();
     return ctx.sendFunction(std::move(response));
     /*
     } catch (faabric::redis::RedisNoResponseException& ex) {

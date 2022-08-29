@@ -29,7 +29,7 @@ class SlowExecutor final : public Executor
 {
   public:
     SlowExecutor(faabric::Message& msg)
-      : Executor(msg)
+      : Executor(faabric::MessageInBatch(msg))
     {
         setUpDummyMemory(dummyMemorySize);
     }
@@ -67,8 +67,7 @@ class SlowExecutor final : public Executor
 
 class SlowExecutorFactory : public ExecutorFactory
 {
-  protected:
-    std::shared_ptr<Executor> createExecutor(faabric::Message& msg) override
+    std::shared_ptr<Executor> createExecutor(faabric::MessageInBatch msg) override
     {
         return std::make_shared<SlowExecutor>(msg);
     }

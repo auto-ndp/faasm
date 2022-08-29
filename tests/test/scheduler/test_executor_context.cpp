@@ -22,7 +22,7 @@ TEST_CASE_METHOD(ExecutorContextTestFixture,
 
     std::shared_ptr<DummyExecutorFactory> fac =
       std::make_shared<DummyExecutorFactory>();
-    auto exec = fac->createExecutor(msg);
+    auto exec = fac->createExecutor(faabric::MessageInBatch(msg));
 
     auto req = faabric::util::batchExecFactory("foo", "bar", 5);
 

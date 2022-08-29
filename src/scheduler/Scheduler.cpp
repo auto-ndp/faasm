@@ -411,7 +411,7 @@ faabric::util::SchedulingDecision Scheduler::callFunctions(
     SchedulingDecision decision = doSchedulingDecision(req, topologyHint);
 
     // Pass decision as hint
-    return doCallFunctions(std::move(req), decision, lock, topologyHint);
+    return doCallFunctions(std::move(req), decision, caller, lock, topologyHint);
 }
 
 faabric::util::SchedulingDecision Scheduler::makeSchedulingDecision(
@@ -424,12 +424,12 @@ faabric::util::SchedulingDecision Scheduler::makeSchedulingDecision(
 }
 
 faabric::util::SchedulingDecision Scheduler::doSchedulingDecision(
-  const faabric::BatchExecuteRequest& req,
+  std::shared_ptr<faabric::BatchExecuteRequest> req,
   faabric::util::SchedulingTopologyHint topologyHint)
 {
     ZoneScopedNS("Scheduler::makeSchedulingDecision", 5);
-    int nMessages = req.messages_size();
-    const faabric::Message& firstMsg = req.messages().at(0);
+    int nMessages = req->messages_size();
+    const faabric::Message& firstMsg = req->messages().at(0);
     std::string funcStr = faabric::util::funcToString(firstMsg, false);
 
     bool isStorage = firstMsg.isstorage();
@@ -668,7 +668,7 @@ faabric::util::SchedulingDecision Scheduler::doSchedulingDecision(
     // Set up decision
     SchedulingDecision decision(firstMsg.appid(), firstMsg.groupid());
     for (int i = 0; i < hosts.size(); i++) {
-        decision.addMessage(hosts.at(i), req.messages().at(i));
+        decision.addMessage(hosts.at(i), req->messages().at(i));
     }
 
     // Cache decision for next time if necessary
@@ -1250,8 +1250,8 @@ void Scheduler::setFunctionResult(std::unique_ptr<faabric::Message> msg)
 
     // Remove the app from in-flight map if still there, and this host is the
     // master host for the message
-    if (msg.masterhost() == thisHost) {
-        removePendingMigration(msg.appid());
+    if (msg->masterhost() == thisHost) {
+        removePendingMigration(msg->appid());
     }
 
     // Write the successful result to the result queue

@@ -33,6 +33,8 @@ faabric::Message messageFactory(const std::string& user,
 
 std::shared_ptr<faabric::BatchExecuteRequest> batchExecFactory();
 
+std::shared_ptr<faabric::BatchExecuteRequest> batchExecFactory(faabric::Message&& msg);
+
 std::shared_ptr<faabric::BatchExecuteRequest> batchExecFactory(
   const std::string& user,
   const std::string& function,

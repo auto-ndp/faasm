@@ -31,7 +31,7 @@ void FunctionCallServer::doAsyncRecv(transport::Message& message)
             break;
         }
         case faabric::scheduler::FunctionCalls::DirectResult: {
-            recvDirectResult(buffer, bufferSize);
+            recvDirectResult(message.udata(), message.size());
             break;
         }
         default: {

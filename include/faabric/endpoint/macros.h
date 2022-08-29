@@ -1,4 +1,4 @@
-#include <faabric/endpoint/Endpoint.h>
+#include <faabric/endpoint/FaabricEndpoint.h>
 
 using namespace faabric::endpoint;
 

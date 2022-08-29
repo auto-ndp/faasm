@@ -10,15 +10,14 @@ list(PREPEND CMAKE_PREFIX_PATH ${CMAKE_CURRENT_BINARY_DIR})
 
 if(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/conan.cmake")
   message(STATUS "Downloading conan.cmake from https://github.com/conan-io/cmake-conan")
-  file(DOWNLOAD "https://raw.githubusercontent.com/conan-io/cmake-conan/v0.16.1/conan.cmake"
-                "${CMAKE_CURRENT_BINARY_DIR}/conan.cmake"
-                EXPECTED_HASH SHA256=396e16d0f5eabdc6a14afddbcfff62a54a7ee75c6da23f32f7a31bc85db23484
+  file(DOWNLOAD "https://raw.githubusercontent.com/conan-io/cmake-conan/0.18.1/conan.cmake"
+                "${CMAKE_BINARY_DIR}/conan.cmake"
                 TLS_VERIFY ON)
 endif()
 
 include(${CMAKE_CURRENT_BINARY_DIR}/conan.cmake)
 
-conan_check(VERSION 1.43.0 REQUIRED)
+conan_check(VERSION 1.51.3 REQUIRED)
 
 # Enable revisions in the conan config
 execute_process(COMMAND ${CONAN_CMD} config set general.revisions_enabled=1
@@ -29,19 +28,19 @@ endif()
 
 conan_cmake_configure(
     REQUIRES
-        "abseil/20211102.0@#469a22da5f3d4beeb200450447aa5d04"
-        "boost/1.78.0@#c6275b1e5ecf6e51fe8baf1e322bb065"
-        "catch2/2.13.7@#31c8cd08e3c957a9eac8cb1377cf5863"
+        "abseil/20220623.0@#732381dc99db29b4cfd293684891da56"
+        "boost/1.79.0@#3249d9bd2b863a9489767bf9c8a05b4b"
+        "catch2/2.13.9@#8793d3e6287d3684201418de556d98fe"
         "cppcodec/0.2@#f6385611ce2f7cff954ac8b16e25c4fa"
-        "cpprestsdk/2.10.18@#36e30936126a3da485ce05d619fb1249"
-        "cppzmq/4.8.1@#e0f26b0614b3d812815edc102ce0d881"
-        "flatbuffers/2.0.0@#82f5d13594b370c3668bb8abccffc706"
-        "hiredis/1.0.2@#297f55bf1e66f8b9c1dc0e7d35e705ab"
-        "protobuf/3.19.1@#985baec06b243f56bce18cf7acbc4e34"
+        "cpprestsdk/2.10.18@#ed9788e9d202d6eadd92581368ddfc2f"
+        "cppzmq/4.8.1@#010df8fa1c5ebbc615704e8c16693bac"
+        "flatbuffers/2.0.5@#c6a9508bd476da080f7aecbe7a094b68"
+        "hiredis/1.0.2@#370dad964286cadb1f15dc90252e8ef3"
+        "protobuf/3.19.4@#a0bea09d5f31f0dc4fc0197644f5bc93"
         "rapidjson/cci.20211112@#65b4e5feb6f1edfc8cbac0f669acaf17"
-        "readerwriterqueue/1.0.5@#4232c2ff826eb41e33d8ad8efd3c4c4c"
-        "spdlog/1.9.2@#3724602b7b7e843c5e0a687c45e279c9"
-        "zeromq/4.3.4@#3b9b0de9c4509784dc92629f3aaf2fe4"
+        "readerwriterqueue/1.0.6@#a95c8da3d68822dec4d4c13fff4b5c96"
+        "spdlog/1.10.0@#6406c337028e15e56cd6a070cbac54c4"
+        "zeromq/4.3.4@#d4fe4001f6c2e5960e58c251687c5b2f"
     GENERATORS
         cmake_find_package
         cmake_paths
@@ -89,7 +88,7 @@ include(${CMAKE_CURRENT_BINARY_DIR}/conan_paths.cmake)
 find_package(absl REQUIRED)
 find_package(Boost 1.78.0 REQUIRED)
 find_package(Catch2 REQUIRED)
-find_package(Flatbuffers REQUIRED)
+find_package(FlatBuffers REQUIRED)
 find_package(Protobuf 3.19.1 REQUIRED)
 find_package(RapidJSON REQUIRED)
 find_package(ZLIB REQUIRED)

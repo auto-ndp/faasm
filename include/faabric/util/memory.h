@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <fcntl.h>
 #include <functional>
-#include <linux/userfaultfd.h>
+#include "userfaultfd.h"
 #include <memory>
 #include <optional>
 #include <span>

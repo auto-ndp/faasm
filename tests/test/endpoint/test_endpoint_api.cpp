@@ -2,7 +2,7 @@
 
 #include "faabric_utils.h"
 
-#include <faabric/endpoint/Endpoint.h>
+#include <faabric/endpoint/FaabricEndpoint.h>
 #include <faabric/endpoint/FaabricEndpointHandler.h>
 #include <faabric/scheduler/ExecutorFactory.h>
 #include <faabric/scheduler/Scheduler.h>
@@ -24,7 +24,7 @@ class EndpointApiTestExecutor final : public Executor
 {
   public:
     EndpointApiTestExecutor(faabric::Message& msg)
-      : Executor(msg)
+      : Executor(faabric::MessageInBatch(msg))
     {}
 
     ~EndpointApiTestExecutor() {}
@@ -63,7 +63,7 @@ class EndpointApiTestExecutor final : public Executor
 class EndpointApiTestExecutorFactory : public ExecutorFactory
 {
   protected:
-    std::shared_ptr<Executor> createExecutor(faabric::Message& msg) override
+    std::shared_ptr<Executor> createExecutor(faabric::MessageInBatch msg) override
     {
         return std::make_shared<EndpointApiTestExecutor>(msg);
     }

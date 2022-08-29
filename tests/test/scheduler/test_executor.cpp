@@ -732,9 +732,9 @@ TEST_CASE_METHOD(TestExecutorFixture,
     std::shared_ptr<faabric::scheduler::ExecutorFactory> fac =
       faabric::scheduler::getExecutorFactory();
     std::shared_ptr<faabric::scheduler::Executor> execA =
-      fac->createExecutor(msgA);
+      fac->createExecutor(faabric::MessageInBatch(msgA));
     std::shared_ptr<faabric::scheduler::Executor> execB =
-      fac->createExecutor(msgB);
+      fac->createExecutor(faabric::MessageInBatch(msgB));
 
     // Claim one
     REQUIRE(execA->tryClaim());
@@ -766,7 +766,7 @@ TEST_CASE_METHOD(TestExecutorFixture,
     std::shared_ptr<faabric::scheduler::ExecutorFactory> fac =
       faabric::scheduler::getExecutorFactory();
     std::shared_ptr<faabric::scheduler::Executor> exec =
-      fac->createExecutor(msg);
+      fac->createExecutor(faabric::MessageInBatch(msg));
 
     long millisA = exec->getMillisSinceLastExec();
 
@@ -1158,7 +1158,7 @@ TEST_CASE_METHOD(TestExecutorFixture, "Test executor restore", "[executor]")
     // Create an executor
     std::shared_ptr<faabric::scheduler::ExecutorFactory> fac =
       faabric::scheduler::getExecutorFactory();
-    std::shared_ptr<faabric::scheduler::Executor> exec = fac->createExecutor(m);
+    std::shared_ptr<faabric::scheduler::Executor> exec = fac->createExecutor(faabric::MessageInBatch(m));
 
     // Restore from snapshot
     exec->restore(snapKey);
@@ -1195,7 +1195,7 @@ TEST_CASE_METHOD(TestExecutorFixture,
     // Create an executor
     std::shared_ptr<faabric::scheduler::ExecutorFactory> fac =
       faabric::scheduler::getExecutorFactory();
-    std::shared_ptr<faabric::scheduler::Executor> exec = fac->createExecutor(m);
+    std::shared_ptr<faabric::scheduler::Executor> exec = fac->createExecutor(faabric::MessageInBatch(m));
 
     // Get a pointer to the TestExecutor so we can override the max memory
     auto testExec = std::static_pointer_cast<TestExecutor>(exec);

@@ -1,4 +1,4 @@
-FROM debian:bookworm-20211220-slim
+FROM debian:bookworm-20220822-slim
 # Debian "12" testing
 
 RUN apt-get update \
@@ -15,7 +15,7 @@ RUN apt-get update \
     liblttng-ust-ctl5 \
     liblttng-ust1 \
     libpython3-dev \
-    libssl1.1 \
+    libssl3 \
     libstdc++6 \
     libunwind-13 \
     liburcu8 \
@@ -30,6 +30,6 @@ RUN apt-get update \
     redis-tools \
     sudo \
     unzip \
-    && apt-get clean autoclean \
-    && apt-get autoremove
+    && apt-get clean autoclean --yes \
+    && apt-get autoremove --yes
 

@@ -1,5 +1,9 @@
 #pragma once
 
+#ifndef __packed
+#define __packed __attribute__((__packed__))
+#endif
+
 // ------------------------------------------------------
 // This is copied into Faabric from the kernel source because not all the UFFD
 // definitions are available when running with HWE on Ubuntu 20.04.

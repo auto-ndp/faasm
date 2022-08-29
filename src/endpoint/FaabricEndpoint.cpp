@@ -1,4 +1,4 @@
-#include <faabric/endpoint/Endpoint.h>
+#include <faabric/endpoint/FaabricEndpoint.h>
 #include <faabric/scheduler/Scheduler.h>
 #include <faabric/util/logging.h>
 #include <faabric/util/macros.h>
@@ -253,7 +253,7 @@ void Endpoint::start(EndpointMode mode)
 
     std::make_shared<SchedulerMonitoringTask>(state->ioc)->run();
 
-    int extraThreads = std::max(awaitSignal ? 0 : 1, this->threadCount - 1);
+    int extraThreads = std::max((mode == EndpointMode::SIGNAL) ? 0 : 1, this->threadCount - 1);
     state->ioThreads.reserve(extraThreads);
     auto ioc_run = [&ioc{ state->ioc }]() { ioc.run(); };
     for (int i = 0; i < extraThreads; i++) {

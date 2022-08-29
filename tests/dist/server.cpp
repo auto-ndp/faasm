@@ -1,7 +1,7 @@
 #include "DistTestExecutor.h"
 #include "init.h"
 
-#include <faabric/endpoint/Endpoint.h>
+#include <faabric/endpoint/FaabricEndpoint.h>
 #include <faabric/endpoint/FaabricEndpointHandler.h>
 #include <faabric/runner/FaabricMain.h>
 #include <faabric/scheduler/ExecutorFactory.h>

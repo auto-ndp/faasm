@@ -1,6 +1,6 @@
 #pragma once
 
-#include <faabric/endpoint/Endpoint.h>
+#include <faabric/endpoint/FaabricEndpoint.h>
 #include <faabric/endpoint/FaabricEndpointHandler.h>
 #include <faabric/scheduler/ExecutorFactory.h>
 #include <faabric/scheduler/Scheduler.h>

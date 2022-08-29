@@ -414,7 +414,7 @@ void Executor::threadPoolThread(std::stop_token st, int threadPoolIdx)
             bool isThreads =
               task.req->type() == faabric::BatchExecuteRequest::THREADS;
             if (isThreads) {
-                sch.setThreadResult(msg, 1);
+                sch.setThreadResult(msg, 1, "", {});
             } else {
                 sch.setFunctionResult(msg);
             }

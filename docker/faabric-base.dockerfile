@@ -3,7 +3,6 @@ FROM kubasz51/faasm-faabric-base-runtime:0.3.1
 
 RUN apt-get update \
     && apt-get upgrade --yes --no-install-recommends \
-    && apt-get install --yes --no-install-recommends software-properties-common gpg wget curl \
     && apt-get install --yes --no-install-recommends \
     autoconf \
     automake \
@@ -14,7 +13,7 @@ RUN apt-get update \
     clang-tools-13 \
     cmake \
     doxygen \
-    g++-11 \
+    g++-12 \
     git \
     libboost-filesystem-dev \
     libc++-13-dev \
@@ -34,11 +33,11 @@ RUN apt-get update \
     llvm-11-dev \
     make \
     ninja-build \
-    && apt-get clean autoclean \
-    && apt-get autoremove
+    && apt-get clean autoclean --yes \
+    && apt-get autoremove --yes
 
 # Update pip
 RUN pip install -U pip
 
-RUN pip install cmake==3.22.1
-RUN pip install conan==1.44.0
+RUN pip install cmake==3.24.1
+RUN pip install conan==1.51.3
