@@ -2,9 +2,9 @@ name: Tests
 
 on:
   push:
-    branches: [master]
+    branches: [main]
   pull_request:
-    branches: [master]
+    branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
 
 defaults:
@@ -15,62 +15,42 @@ jobs:
   conan-cache:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
-    env:
-      HOST_TYPE: ci
-      REDIS_QUEUE_HOST: redis
-      REDIS_STATE_HOST: redis
     container:
-      image: faasm/faabric:0.2.3
+      image: faasm/faabric:0.3.2
     defaults:
       run:
         working-directory: /code/faabric
-    services:
-      redis:
-        image: redis
     steps:
-      # --- Code update ---
+      - uses: faasm/conan-cache-action@v1
+        with:
+           directory: /code/faabric
+      - name: "Build dependencies to be shared by all runs"
+        run: inv dev.cmake -b Debug
+
+  docs:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    container:
+      image: faasm/faabric:0.3.2
+    defaults:
+      run:
+        working-directory: /code/faabric
+    steps:
       - name: "Fetch ref"
         run: git fetch origin ${GITHUB_REF}:ci-branch
       - name: "Check out branch"
         run: git checkout --force ci-branch
-      # --- Set-up ---
-      - name: "Ping redis"
-        run: redis-cli -h redis ping
-      # --- Cache based on Conan version and ExternalProjects cmake source
-      - name: Get Conan version
-        id: get-conan-version
-        run: |
-          echo "::set-output name=conan-version::$(conan --version | tr -d '[:alpha:] ')"
-      - name: Hash ExternalProjects
-        id: hash-external
-        run: |
-          echo "::set-output name=hash-external::$(sha256sum cmake/ExternalProjects.cmake | cut '-d ' -f 1)"
-      - uses: actions/cache@v2
-        with:
-          path: '~/.conan'
-          key: ${{ runner.os }}-${{ steps.get-conan-version.outputs.conan-version }}-${{ steps.hash-external.outputs.hash-external }}
-          restore-keys: |
-            ${{ runner.os }}-${{ steps.get-conan-version.outputs.conan-version }}-
-            ${{ runner.os }}-
-      # --- Build dependencies
-      - name: "Build dependencies to be shared by all sanitiser runs"
-        run: inv dev.cmake -b Debug
+      - name: "Build docs"
+        run: inv docs
 
   formatting:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
-    env:
-      HOST_TYPE: ci
-      REDIS_QUEUE_HOST: redis
-      REDIS_STATE_HOST: redis
     container:
-      image: faasm/faabric:0.2.3
+      image: faasm/faabric:0.3.2
     defaults:
       run:
         working-directory: /code/faabric
-    services:
-      redis:
-        image: redis
     steps:
       # --- Code update ---
       - name: "Fetch ref"
@@ -101,7 +81,8 @@ jobs:
       TSAN_OPTIONS: "verbosity=1:halt_on_error=1:suppressions=/code/faabric/thread-sanitizer-ignorelist.txt:history_size=7"
       UBSAN_OPTIONS: "print_stacktrace=1:halt_on_error=1"
     container:
-      image: faasm/faabric:0.2.3
+      image: faasm/faabric:0.3.2
+      options: --privileged
     defaults:
       run:
         working-directory: /code/faabric
@@ -109,36 +90,15 @@ jobs:
       redis:
         image: redis
     steps:
-      # --- Code update ---
-      - name: "Fetch ref"
-        run: git fetch origin ${GITHUB_REF}:ci-branch
-      - name: "Check out branch"
-        run: git checkout --force ci-branch
-      # --- Set-up ---
+      - uses: faasm/conan-cache-action@v1
+        with:
+          directory: /code/faabric
       - name: "Ping redis"
         run: redis-cli -h redis ping
-      # --- Cache based on Conan version and ExternalProjects cmake source
-      - name: Get Conan version
-        id: get-conan-version
-        run: |
-          echo "::set-output name=conan-version::$(conan --version | tr -d '[:alpha:] ')"
-      - name: "Hash ExternalProjects"
-        id: hash-external
-        run: |
-          echo "::set-output name=hash-external::$(sha256sum cmake/ExternalProjects.cmake | cut '-d ' -f 1)"
-      - uses: actions/cache@v2
-        with:
-          path: '~/.conan'
-          key: ${{ runner.os }}-${{ steps.get-conan-version.outputs.conan-version }}-${{ steps.hash-external.outputs.hash-external }}
-          restore-keys: |
-            ${{ runner.os }}-${{ steps.get-conan-version.outputs.conan-version }}-
-            ${{ runner.os }}-
-      # --- Tests build - need a debug build for actually running tests ---
       - name: "Run cmake for tests"
         run: inv dev.cmake --build=Debug --sanitiser ${{ matrix.sanitiser }}
       - name: "Build tests"
         run: inv dev.cc faabric_tests
-      # --- Tests ---
       - name: "Run tests"
         run: ./bin/faabric_tests
         working-directory: /build/faabric/static
@@ -147,35 +107,16 @@ jobs:
     if: github.event.pull_request.draft == false
     needs: [conan-cache]
     runs-on: ubuntu-latest
+    env:
+      CONAN_CACHE_MOUNT_SOURCE: ~/.conan/
     steps:
       # --- Code update ---
       - name: "Check out code"
         uses: actions/checkout@v2
-        # --- Cache based on Conan version and ExternalProjects cmake source
-      - name: "Get Conan version"
-        id: get-conan-version
-        run: |
-          docker-compose run --rm cli conan --version 2>/tmp/conan-ver-log | tee /tmp/conan-ver
-          grep 'Conan version' /tmp/conan-ver || exit 1
-          sudo chown -R $(id -u):$(id -g) ~/.conan
-          echo "::set-output name=conan-version::$(grep 'Conan version' /tmp/conan-ver | tr -d '[:alpha:] ')"
-        env:
-          CONAN_CACHE_MOUNT_SOURCE: ~/.conan/
-      - name: "Get Conan Version - Show Log"
-        if: always()
-        run: cat /tmp/conan-ver-log
-      - name: "Hash ExternalProjects"
-        id: hash-external
-        run: |
-          echo "::set-output name=hash-external::$(sha256sum cmake/ExternalProjects.cmake | cut '-d ' -f 1)"
-      - uses: actions/cache@v2
+      - name: "Conan cache"
+        uses: faasm/conan-cache-action@v1
         with:
-          path: '~/.conan'
-          key: ${{ runner.os }}-${{ steps.get-conan-version.outputs.conan-version }}-${{ steps.hash-external.outputs.hash-external }}
-          restore-keys: |
-            ${{ runner.os }}-${{ steps.get-conan-version.outputs.conan-version }}-
-            ${{ runner.os }}-
-      # --- Build and test ---
+          directory: ${{ github.workspace }}
       - name: "Build distributed tests"
         run: ./dist-test/build.sh
       - name: "Run the distributed tests"
@@ -190,7 +131,7 @@ jobs:
       REDIS_QUEUE_HOST: redis
       REDIS_STATE_HOST: redis
     container:
-      image: faasm/faabric:0.2.3
+      image: faasm/faabric:0.3.2
     defaults:
       run:
         working-directory: /code/faabric
@@ -198,29 +139,10 @@ jobs:
       redis:
         image: redis
     steps:
-      # --- Code update ---
-      - name: "Fetch ref"
-        run: git fetch origin ${GITHUB_REF}:ci-branch
-      - name: "Check out branch"
-        run: git checkout --force ci-branch
-      # --- Cache based on Conan version and ExternalProjects cmake source
-      - name: "Get Conan version"
-        id: get-conan-version
-        run: |
-          echo "::set-output name=conan-version::$(conan --version | tr -d '[:alpha:] ')"
-      - name: "Hash ExternalProjects"
-        id: hash-external
-        run: |
-          echo "::set-output name=hash-external::$(sha256sum cmake/ExternalProjects.cmake | cut '-d ' -f 1)"
-      - uses: actions/cache@v2
+      - uses: faasm/conan-cache-action@v1
         with:
-          path: '~/.conan'
-          key: release-${{ runner.os }}-${{ steps.get-conan-version.outputs.conan-version }}-${{ steps.hash-external.outputs.hash-external }}
-          restore-keys: |
-            release-${{ runner.os }}-${{ steps.get-conan-version.outputs.conan-version }}-${{ steps.hash-external.outputs.hash-external }}
-            release-${{ runner.os }}-${{ steps.get-conan-version.outputs.conan-version }}-
-            release-${{ runner.os }}-
-      # --- Examples ---
+          build-type: "release"
+          directory: /code/faabric
       - name: "Run cmake shared"
         run: inv dev.cmake --shared --build=Release
       - name: "Build Faabric shared library"

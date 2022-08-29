@@ -18,6 +18,8 @@ namespace tests {
 // the same port for each case, so we need to switch it every time.
 static int port = 8080;
 
+#define ASYNC_EXEC_SLEEP_TIME 2000
+
 class EndpointApiTestExecutor final : public Executor
 {
   public:
@@ -45,7 +47,9 @@ class EndpointApiTestExecutor final : public Executor
               "Endpoint API returning {} for {}", returnVal, msg.id()));
         } else if (msg.isasync()) {
             returnVal = 0;
-            SLEEP_MS(3000);
+
+            SLEEP_MS(ASYNC_EXEC_SLEEP_TIME);
+
             msg.set_outputdata(
               fmt::format("Finished async message {}", msg.id()));
         } else {
@@ -89,7 +93,7 @@ TEST_CASE_METHOD(EndpointApiTestFixture,
     faabric::endpoint::Endpoint endpoint(
       port, 2, std::make_shared<faabric::endpoint::FaabricEndpointHandler>());
 
-    endpoint.start(false);
+    endpoint.start(faabric::endpoint::EndpointMode::BG_THREAD);
 
     // Wait for the server to start
     SLEEP_MS(2000);
@@ -131,8 +135,7 @@ TEST_CASE_METHOD(EndpointApiTestFixture,
           "Task {} threw exception. What: Endpoint API error\n", msg.id());
     }
 
-    std::pair<int, std::string> result =
-      submitGetRequestToUrl(LOCALHOST, port, body);
+    std::pair<int, std::string> result = postToUrl(LOCALHOST, port, body);
     REQUIRE(result.first == expectedReturnCode);
     REQUIRE(result.second == expectedResponseBody);
 
@@ -147,7 +150,7 @@ TEST_CASE_METHOD(EndpointApiTestFixture,
     faabric::endpoint::Endpoint endpoint(
       port, 2, std::make_shared<faabric::endpoint::FaabricEndpointHandler>());
 
-    endpoint.start(false);
+    endpoint.start(faabric::endpoint::EndpointMode::BG_THREAD);
 
     // Wait for the server to start
     SLEEP_MS(2000);
@@ -157,8 +160,7 @@ TEST_CASE_METHOD(EndpointApiTestFixture,
     msg.set_isasync(true);
     std::string body = faabric::util::messageToJson(msg);
 
-    std::pair<int, std::string> result =
-      submitGetRequestToUrl(LOCALHOST, port, body);
+    std::pair<int, std::string> result = postToUrl(LOCALHOST, port, body);
 
     REQUIRE(result.first == 200);
     REQUIRE(result.second == std::to_string(msg.id()));
@@ -173,18 +175,23 @@ TEST_CASE_METHOD(EndpointApiTestFixture,
     std::string statusBody = faabric::util::messageToJson(statusMsg);
 
     std::pair<int, std::string> statusResult =
-      submitGetRequestToUrl(LOCALHOST, port, statusBody);
+      postToUrl(LOCALHOST, port, statusBody);
 
     REQUIRE(statusResult.first == 200);
     REQUIRE(statusResult.second == "RUNNING");
 
-    // Wait for the function to finish
-    SLEEP_MS(4000);
+    // Unfortunately awaiting the result here will erase it from the system
+    // state when it does return, hence it will no longer be available to get
+    // via the status request. Therefore we just have to sleep.
+    SLEEP_MS(ASYNC_EXEC_SLEEP_TIME + 2000);
 
     std::pair<int, std::string> statusResultAfter =
-      submitGetRequestToUrl(LOCALHOST, port, statusBody);
+      postToUrl(LOCALHOST, port, statusBody);
 
+    // Check we got a response, and that it's not still running
     REQUIRE(statusResultAfter.first == 200);
+    REQUIRE(statusResultAfter.second != "RUNNING");
+
     faabric::Message resultMsg =
       faabric::util::jsonToMessage(statusResultAfter.second);
     REQUIRE(resultMsg.returnvalue() == 0);

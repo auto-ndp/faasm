@@ -38,7 +38,9 @@ ExecutorFunction getDistTestExecutorCallback(const faabric::Message& msg)
 
 DistTestExecutor::DistTestExecutor(faabric::Message& msg)
   : Executor(msg)
-{}
+{
+    setUpDummyMemory(dummyMemorySize);
+}
 
 DistTestExecutor::~DistTestExecutor() {}
 
@@ -60,24 +62,24 @@ void DistTestExecutor::reset(faabric::Message& msg)
                  faabric::util::funcToString(msg, false));
 }
 
-void DistTestExecutor::restore(faabric::Message& msg)
+std::span<uint8_t> DistTestExecutor::getMemoryView()
 {
-    SPDLOG_DEBUG("Dist test executor restoring for {}",
-                 faabric::util::funcToString(msg, false));
-
-    faabric::snapshot::SnapshotRegistry& reg =
-      faabric::snapshot::getSnapshotRegistry();
-
-    auto snap = reg.getSnapshot(msg.snapshotkey());
-
-    setUpDummyMemory(snap->getSize());
-
-    snap->mapToMemory({ dummyMemory.get(), dummyMemorySize });
+    if (dummyMemory.get() == nullptr) {
+        SPDLOG_ERROR("Dist test executor using memory view on null memory");
+        throw std::runtime_error("DistTestExecutor null memory");
+    }
+    return { dummyMemory.get(), dummyMemorySize };
 }
 
-faabric::util::MemoryView DistTestExecutor::getMemoryView()
+void DistTestExecutor::setMemorySize(size_t newSize)
 {
-    return faabric::util::MemoryView({ dummyMemory.get(), dummyMemorySize });
+    if (newSize != dummyMemorySize) {
+        SPDLOG_ERROR("DistTestExecutor cannot change memory size ({} != {})",
+                     newSize,
+                     dummyMemorySize);
+        throw std::runtime_error(
+          "DistTestExecutor does not support changing memory size");
+    }
 }
 
 std::span<uint8_t> DistTestExecutor::getDummyMemory()
@@ -87,11 +89,9 @@ std::span<uint8_t> DistTestExecutor::getDummyMemory()
 
 void DistTestExecutor::setUpDummyMemory(size_t memSize)
 {
-    if (dummyMemory.get() == nullptr) {
-        SPDLOG_DEBUG("Dist test executor initialising memory size {}", memSize);
-        dummyMemory = faabric::util::allocatePrivateMemory(memSize);
-        dummyMemorySize = memSize;
-    }
+    SPDLOG_DEBUG("Dist test executor initialising memory size {}", memSize);
+    dummyMemory = faabric::util::allocatePrivateMemory(memSize);
+    dummyMemorySize = memSize;
 }
 
 std::shared_ptr<Executor> DistTestExecutorFactory::createExecutor(

@@ -37,7 +37,7 @@ class StateChunk
     long offset;
     size_t length;
 
-    // Note - this pointer will always refer to chunks of the underlying
+    // This pointer will always refer to chunks of the underlying
     // state, so does not need to be deleted
     uint8_t* data;
 };
@@ -104,10 +104,6 @@ class StateKeyValue
     size_t getSharedMemorySize() const;
 
     void pushFull();
-
-    virtual void lockGlobal() = 0;
-
-    virtual void unlockGlobal() = 0;
 
   protected:
     std::shared_mutex valueMutex;

@@ -50,14 +50,14 @@ int main()
     faabric::runner::FaabricMain m(fac);
     m.startBackground();
 
-    // Start endpoint (will also have multiple threads)
+    // Start endpoint, will block until it receives a signal
     SPDLOG_INFO("Starting endpoint");
     const auto& config = faabric::util::getSystemConfig();
     faabric::endpoint::Endpoint endpoint(
       config.endpointPort,
       config.endpointNumThreads,
       std::make_shared<faabric::endpoint::FaabricEndpointHandler>());
-    endpoint.start();
+    endpoint.start(faabric::endpoint::SIGNAL);
 
     SPDLOG_INFO("Shutting down endpoint");
     m.shutdown();

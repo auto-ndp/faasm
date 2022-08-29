@@ -36,11 +36,15 @@ void SystemConfig::initialise()
     overrideCpuCount = this->getSystemConfIntParam("OVERRIDE_CPU_COUNT", "0");
     noTopologyHints = getEnvVar("NO_TOPOLOGY_HINTS", "off");
     isStorageNode = this->getSystemConfIntParam("IS_STORAGE_NODE", "0");
+    noSingleHostOptimisations =
+      this->getSystemConfIntParam("NO_SINGLE_HOST", "0");
 
     // Worker-related timeouts (all in seconds)
     globalMessageTimeout =
       this->getSystemConfIntParam("GLOBAL_MESSAGE_TIMEOUT", "60000");
     boundTimeout = this->getSystemConfIntParam("BOUND_TIMEOUT", "30000");
+    reaperIntervalSeconds =
+      this->getSystemConfIntParam("REAPER_INTERVAL_SECS", "30");
 
     // MPI
     defaultMpiWorldSize =
@@ -72,6 +76,10 @@ void SystemConfig::initialise()
       this->getSystemConfIntParam("SNAPSHOT_SERVER_THREADS", "2");
     pointToPointServerThreads =
       this->getSystemConfIntParam("POINT_TO_POINT_SERVER_THREADS", "2");
+
+    // Dirty tracking
+    dirtyTrackingMode = getEnvVar("DIRTY_TRACKING_MODE", "segfault");
+    diffingMode = getEnvVar("DIFFING_MODE", "xor");
 }
 
 int SystemConfig::getSystemConfIntParam(const char* name,

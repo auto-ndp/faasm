@@ -22,19 +22,15 @@ SnapshotServer::SnapshotServer()
       SNAPSHOT_INPROC_LABEL,
       getSystemConfig().snapshotServerThreads)
   , broker(faabric::transport::getPointToPointBroker())
+  , reg(faabric::snapshot::getSnapshotRegistry())
 {}
 
-void SnapshotServer::doAsyncRecv(int header,
-                                 const uint8_t* buffer,
-                                 size_t bufferSize)
+void SnapshotServer::doAsyncRecv(transport::Message& message)
 {
+    uint8_t header = message.getHeader();
     switch (header) {
         case faabric::snapshot::SnapshotCalls::DeleteSnapshot: {
-            this->recvDeleteSnapshot(buffer, bufferSize);
-            break;
-        }
-        case faabric::snapshot::SnapshotCalls::ThreadResult: {
-            this->recvThreadResult(buffer, bufferSize);
+            recvDeleteSnapshot(message.udata(), message.size());
             break;
         }
         default: {
@@ -44,15 +40,19 @@ void SnapshotServer::doAsyncRecv(int header,
     }
 }
 
-std::unique_ptr<google::protobuf::Message>
-SnapshotServer::doSyncRecv(int header, const uint8_t* buffer, size_t bufferSize)
+std::unique_ptr<google::protobuf::Message> SnapshotServer::doSyncRecv(
+  transport::Message& message)
 {
+    uint8_t header = message.getHeader();
     switch (header) {
         case faabric::snapshot::SnapshotCalls::PushSnapshot: {
-            return recvPushSnapshot(buffer, bufferSize);
+            return recvPushSnapshot(message.udata(), message.size());
         }
-        case faabric::snapshot::SnapshotCalls::PushSnapshotDiffs: {
-            return recvPushSnapshotDiffs(buffer, bufferSize);
+        case faabric::snapshot::SnapshotCalls::PushSnapshotUpdate: {
+            return recvPushSnapshotUpdate(message.udata(), message.size());
+        }
+        case faabric::snapshot::SnapshotCalls::ThreadResult: {
+            return recvThreadResult(message);
         }
         default: {
             throw std::runtime_error(
@@ -78,9 +78,6 @@ std::unique_ptr<google::protobuf::Message> SnapshotServer::recvPushSnapshot(
                  r->contents()->size(),
                  r->max_size());
 
-    faabric::snapshot::SnapshotRegistry& reg =
-      faabric::snapshot::getSnapshotRegistry();
-
     // Set up the snapshot
     size_t snapSize = r->contents()->size();
     std::string snapKey = r->key()->str();
@@ -99,35 +96,61 @@ std::unique_ptr<google::protobuf::Message> SnapshotServer::recvPushSnapshot(
     // Register snapshot
     reg.registerSnapshot(snapKey, snap);
 
+    snap->clearTrackedChanges();
+
     // Send response
     return std::make_unique<faabric::EmptyResponse>();
 }
 
-void SnapshotServer::recvThreadResult(const uint8_t* buffer, size_t bufferSize)
+std::unique_ptr<google::protobuf::Message> SnapshotServer::recvThreadResult(
+  faabric::transport::Message& message)
 {
     const ThreadResultRequest* r =
-      flatbuffers::GetRoot<ThreadResultRequest>(buffer);
+      flatbuffers::GetRoot<ThreadResultRequest>(message.udata());
 
-    SPDLOG_DEBUG("Receiving thread result {} for message {}",
+    SPDLOG_DEBUG("Receiving thread result {} for message {} with {} diffs",
                  r->return_value(),
-                 r->message_id());
+                 r->message_id(),
+                 r->diffs()->size());
 
+    if (r->diffs()->size() > 0) {
+        auto snap = reg.getSnapshot(r->key()->str());
+
+        // Convert diffs to snapshot diff objects
+        std::vector<SnapshotDiff> diffs;
+        diffs.reserve(r->diffs()->size());
+        for (const auto* diff : *r->diffs()) {
+            diffs.emplace_back(
+              static_cast<SnapshotDataType>(diff->data_type()),
+              static_cast<SnapshotMergeOperation>(diff->merge_op()),
+              diff->offset(),
+              std::span<const uint8_t>(diff->data()->Data(),
+                                       diff->data()->size()));
+        }
+
+        // Queue on the snapshot
+        snap->queueDiffs(diffs);
+    }
+
+    // Set the result locally
+    // Because we don't take ownership of the data in the diffs, we must also
+    // ensure that the underlying message is cached
     faabric::scheduler::Scheduler& sch = faabric::scheduler::getScheduler();
-    sch.setThreadResultLocally(r->message_id(), r->return_value());
+    sch.setThreadResultLocally(r->message_id(), r->return_value(), message);
+
+    return std::make_unique<faabric::EmptyResponse>();
 }
 
 std::unique_ptr<google::protobuf::Message>
-SnapshotServer::recvPushSnapshotDiffs(const uint8_t* buffer, size_t bufferSize)
+SnapshotServer::recvPushSnapshotUpdate(const uint8_t* buffer, size_t bufferSize)
 {
-    const SnapshotDiffPushRequest* r =
-      flatbuffers::GetRoot<SnapshotDiffPushRequest>(buffer);
+    const SnapshotUpdateRequest* r =
+      flatbuffers::GetRoot<SnapshotUpdateRequest>(buffer);
 
     SPDLOG_DEBUG(
-      "Applying {} diffs to snapshot {}", r->diffs()->size(), r->key()->str());
+      "Queueing {} diffs for snapshot {}", r->diffs()->size(), r->key()->str());
 
     // Get the snapshot
-    faabric::snapshot::SnapshotRegistry& reg =
-      faabric::snapshot::getSnapshotRegistry();
     auto snap = reg.getSnapshot(r->key()->str());
 
     // Convert diffs to snapshot diff objects
@@ -141,25 +164,24 @@ SnapshotServer::recvPushSnapshotDiffs(const uint8_t* buffer, size_t bufferSize)
           std::span<const uint8_t>(diff->data()->data(), diff->data()->size()));
     }
 
-    // Queue on the snapshot
-    snap->queueDiffs(diffs);
+    // Write diffs and set merge regions
+    SPDLOG_DEBUG("Writing queued diffs to snapshot {} ({} regions)",
+                 r->key()->str(),
+                 r->merge_regions()->size());
 
-    // Write diffs and set merge regions if necessary
-    if (r->force()) {
-        // Write queued diffs
-        snap->writeQueuedDiffs();
+    // Apply the diffs
+    snap->applyDiffs(diffs);
 
-        // Clear merge regions
-        snap->clearMergeRegions();
+    // Clear merge regions
+    snap->clearMergeRegions();
 
-        // Add merge regions from request
-        for (const auto* mr : *r->merge_regions()) {
-            snap->addMergeRegion(
-              mr->offset(),
-              mr->length(),
-              static_cast<SnapshotDataType>(mr->data_type()),
-              static_cast<SnapshotMergeOperation>(mr->merge_op()));
-        }
+    // Add merge regions from request
+    for (const auto* mr : *r->merge_regions()) {
+        snap->addMergeRegion(
+          mr->offset(),
+          mr->length(),
+          static_cast<SnapshotDataType>(mr->data_type()),
+          static_cast<SnapshotMergeOperation>(mr->merge_op()));
     }
 
     // Send response
@@ -172,9 +194,6 @@ void SnapshotServer::recvDeleteSnapshot(const uint8_t* buffer,
     const SnapshotDeleteRequest* r =
       flatbuffers::GetRoot<SnapshotDeleteRequest>(buffer);
     SPDLOG_INFO("Deleting shapshot {}", r->key()->c_str());
-
-    faabric::snapshot::SnapshotRegistry& reg =
-      faabric::snapshot::getSnapshotRegistry();
 
     // Delete the registry entry
     reg.deleteSnapshot(r->key()->str());

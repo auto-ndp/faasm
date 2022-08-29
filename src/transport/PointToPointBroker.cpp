@@ -8,14 +8,6 @@
 
 #define NO_LOCK_OWNER_IDX -1
 
-#define LOCK_TIMEOUT(mx, ms)                                                   \
-    auto timePoint =                                                           \
-      std::chrono::system_clock::now() + std::chrono::milliseconds(ms);        \
-    bool success = mx.try_lock_until(timePoint);                               \
-    if (!success) {                                                            \
-        throw std::runtime_error("Distributed coordination timeout");          \
-    }
-
 #define MAPPING_TIMEOUT_MS 20000
 
 namespace faabric::transport {
@@ -24,12 +16,12 @@ static std::unordered_map<int, std::shared_ptr<PointToPointGroup>> groups;
 
 static std::shared_mutex groupsMutex;
 
-// NOTE: Keeping 0MQ sockets in TLS is usually a bad idea, as they _must_ be
-// closed before the global context. However, in this case it's worth it
-// to cache the sockets across messages, as otherwise we'd be creating and
-// destroying a lot of them under high throughput. To ensure things are cleared
-// up, see the thread-local tidy-up message on this class and its usage in the
-// rest of the codebase.
+// Keeping 0MQ sockets in TLS is usually a bad idea, as they _must_ be closed
+// before the global context. However, in this case it's worth it to cache the
+// sockets across messages, as otherwise we'd be creating and destroying a lot
+// of them under high throughput. To ensure things are cleared up, see the
+// thread-local tidy-up message on this class and its usage in the rest of the
+// codebase.
 thread_local std::
   unordered_map<std::string, std::unique_ptr<AsyncInternalRecvMessageEndpoint>>
     recvEndpoints;
@@ -44,7 +36,7 @@ thread_local std::unordered_map<std::string,
 
 static std::shared_ptr<PointToPointClient> getClient(const std::string& host)
 {
-    // Note - this map is thread-local so no locking required
+    // This map is thread-local so no locking required
     if (clients.find(host) == clients.end()) {
         clients.insert(
           std::pair<std::string, std::shared_ptr<PointToPointClient>>(
@@ -238,7 +230,7 @@ void PointToPointGroup::lock(int groupIdx, bool recursive)
 
 void PointToPointGroup::localLock()
 {
-    LOCK_TIMEOUT(localMx, timeoutMs);
+    localMx.lock();
 }
 
 bool PointToPointGroup::localTryLock()
@@ -523,7 +515,7 @@ void PointToPointBroker::sendMessage(int groupId,
     if (host == conf.endpointHost) {
         std::string label = getPointToPointKey(groupId, sendIdx, recvIdx);
 
-        // Note - this map is thread-local so no locking required
+        // This map is thread-local so no locking required
         if (sendEndpoints.find(label) == sendEndpoints.end()) {
             sendEndpoints[label] =
               std::make_unique<AsyncInternalSendMessageEndpoint>(label);
@@ -538,7 +530,7 @@ void PointToPointBroker::sendMessage(int groupId,
                      recvIdx,
                      sendEndpoints[label]->getAddress());
 
-        sendEndpoints[label]->send(buffer, bufferSize);
+        sendEndpoints[label]->send(NO_HEADER, buffer, bufferSize);
 
     } else {
         auto cli = getClient(host);
@@ -572,12 +564,10 @@ std::vector<uint8_t> PointToPointBroker::recvMessage(int groupId,
                      recvEndpoints[label]->getAddress());
     }
 
-    std::optional<Message> messageDataMaybe =
-      recvEndpoints[label]->recv().value();
-    Message messageData = messageDataMaybe.value();
+    Message message = recvEndpoints[label]->recv();
 
     // TODO - possible to avoid this copy?
-    return messageData.dataCopy();
+    return message.dataCopy();
 }
 
 void PointToPointBroker::clearGroup(int groupId)

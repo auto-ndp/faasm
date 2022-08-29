@@ -22,7 +22,7 @@ void FaabricEndpointHandler::onRequest(
         registered_with_tracy = true;
         tracy::SetThreadName("Pistache HTTP thread");
     }
-    SPDLOG_DEBUG("Faabric handler received request");
+    SPDLOG_TRACE("Faabric handler received request");
     ZoneScopedNS("HTTP onRequest", 4);
 
     // Very permissive CORS

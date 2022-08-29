@@ -13,12 +13,10 @@ class PointToPointServer final : public MessageEndpointServer
   private:
     PointToPointBroker& broker;
 
-    void doAsyncRecv(int header,
-                     const uint8_t* buffer,
-                     size_t bufferSize) override;
+    void doAsyncRecv(transport::Message& message) override;
 
-    std::unique_ptr<google::protobuf::Message>
-    doSyncRecv(int header, const uint8_t* buffer, size_t bufferSize) override;
+    std::unique_ptr<google::protobuf::Message> doSyncRecv(
+      transport::Message& message) override;
 
     void onWorkerStop() override;
 

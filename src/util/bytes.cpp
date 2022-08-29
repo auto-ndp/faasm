@@ -1,6 +1,9 @@
 #include <faabric/util/bytes.h>
+#include <faabric/util/logging.h>
+#include <faabric/util/timing.h>
 
 #include <sstream>
+#include <stack>
 #include <vector>
 
 namespace faabric::util {

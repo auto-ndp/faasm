@@ -5,6 +5,8 @@
 
 #include <faabric/snapshot/SnapshotRegistry.h>
 #include <faabric/util/bytes.h>
+#include <faabric/util/config.h>
+#include <faabric/util/dirty.h>
 #include <faabric/util/macros.h>
 #include <faabric/util/memory.h>
 #include <faabric/util/snapshot.h>
@@ -13,7 +15,9 @@ using namespace faabric::util;
 
 namespace tests {
 
-class SnapshotMergeTestFixture : public SnapshotTestFixture
+class SnapshotMergeTestFixture
+  : public SnapshotTestFixture
+  , public DirtyTrackingTestFixture
 {
   public:
     SnapshotMergeTestFixture() = default;
@@ -23,8 +27,7 @@ class SnapshotMergeTestFixture : public SnapshotTestFixture
   protected:
     std::string snapKey = "foobar123";
 
-    std::shared_ptr<SnapshotData> setUpSnapshot(int snapPages,
-                                                int sharedMemPages)
+    std::shared_ptr<SnapshotData> setUpSnapshot(int snapPages, int memPages)
 
     {
         auto snapData =
@@ -41,6 +44,8 @@ class SnapshotMergeTestFixture : public SnapshotTestFixture
         REQUIRE(actualDiffs.size() == expectedDiffs.size());
 
         for (int i = 0; i < actualDiffs.size(); i++) {
+            SPDLOG_TRACE("Checking {}th of {} diffs", i, actualDiffs.size());
+
             SnapshotDiff& actualDiff = actualDiffs.at(i);
             SnapshotDiff& expectedDiff = expectedDiffs.at(i);
 
@@ -72,10 +77,10 @@ TEST_CASE_METHOD(SnapshotMergeTestFixture,
     uint32_t offsetC = 10 * HOST_PAGE_SIZE;
 
     SnapshotDiff diffA(
-      SnapshotDataType::Raw, SnapshotMergeOperation::Overwrite, offsetA, dataA);
+      SnapshotDataType::Raw, SnapshotMergeOperation::Bytewise, offsetA, dataA);
 
     SnapshotDiff diffB(SnapshotDataType::Raw,
-                       SnapshotMergeOperation::Overwrite,
+                       SnapshotMergeOperation::Bytewise,
                        offsetB,
                        std::span<const uint8_t>(memB.get(), dataB.size()));
 
@@ -90,8 +95,8 @@ TEST_CASE_METHOD(SnapshotMergeTestFixture,
     REQUIRE(diffB.getDataType() == SnapshotDataType::Raw);
     REQUIRE(diffC.getDataType() == SnapshotDataType::Int);
 
-    REQUIRE(diffA.getOperation() == SnapshotMergeOperation::Overwrite);
-    REQUIRE(diffB.getOperation() == SnapshotMergeOperation::Overwrite);
+    REQUIRE(diffA.getOperation() == SnapshotMergeOperation::Bytewise);
+    REQUIRE(diffB.getOperation() == SnapshotMergeOperation::Bytewise);
     REQUIRE(diffC.getOperation() == SnapshotMergeOperation::Sum);
 
     REQUIRE(diffA.getDataCopy() == dataA);
@@ -140,20 +145,20 @@ TEST_CASE_METHOD(SnapshotMergeTestFixture,
     std::vector<uint8_t> actualSnapMem = snap->getDataCopy();
 
     // Set up shared memory
-    int sharedMemPages = 20;
-    size_t sharedMemSize = sharedMemPages * HOST_PAGE_SIZE;
-    MemoryRegion sharedMem = allocatePrivateMemory(sharedMemSize);
+    int memPages = 20;
+    size_t memSize = memPages * HOST_PAGE_SIZE;
+    MemoryRegion mem = allocatePrivateMemory(memSize);
 
     // Check it's zeroed
     std::vector<uint8_t> expectedInitial(snap->getSize(), 0);
-    std::vector<uint8_t> actualSharedMemBefore(
-      sharedMem.get(), sharedMem.get() + snap->getSize());
+    std::vector<uint8_t> actualSharedMemBefore(mem.get(),
+                                               mem.get() + snap->getSize());
     REQUIRE(actualSharedMemBefore == expectedInitial);
 
     // Map the snapshot and check again
-    snap->mapToMemory({ sharedMem.get(), snap->getSize() });
-    std::vector<uint8_t> actualSharedMemAfter(
-      sharedMem.get(), sharedMem.get() + snap->getSize());
+    snap->mapToMemory({ mem.get(), snap->getSize() });
+    std::vector<uint8_t> actualSharedMemAfter(mem.get(),
+                                              mem.get() + snap->getSize());
     REQUIRE(actualSharedMemAfter == actualSnapMem);
 }
 
@@ -161,6 +166,10 @@ TEST_CASE_METHOD(SnapshotMergeTestFixture,
                  "Test mapping editing and remapping memory",
                  "[snapshot][util]")
 {
+    SECTION("Soft PTEs") { setTrackingMode("softpte"); }
+
+    SECTION("Segfaults") { setTrackingMode("segfault"); }
+
     int snapPages = 4;
     size_t snapSize = snapPages * HOST_PAGE_SIZE;
     auto snap = std::make_shared<SnapshotData>(snapSize);
@@ -179,69 +188,24 @@ TEST_CASE_METHOD(SnapshotMergeTestFixture,
     std::vector<uint8_t> expectedSnapMem = snap->getDataCopy();
 
     // Set up two shared mem regions
-    MemoryRegion sharedMemA = allocatePrivateMemory(snapSize);
-    MemoryRegion sharedMemB = allocatePrivateMemory(snapSize);
+    MemoryRegion memA = allocatePrivateMemory(snapSize);
+    MemoryRegion memB = allocatePrivateMemory(snapSize);
 
     // Map the snapshot and both regions reflect the change
-    snap->mapToMemory({ sharedMemA.get(), snapSize });
-    snap->mapToMemory({ sharedMemB.get(), snapSize });
+    std::span<uint8_t> memViewA = { memA.get(), snapSize };
+    std::span<uint8_t> memViewB = { memB.get(), snapSize };
+    snap->mapToMemory(memViewA);
+    snap->mapToMemory(memViewB);
 
-    REQUIRE(std::vector(sharedMemA.get(), sharedMemA.get() + snapSize) ==
-            expectedSnapMem);
-    REQUIRE(std::vector(sharedMemB.get(), sharedMemB.get() + snapSize) ==
-            expectedSnapMem);
-
-    // Reset dirty tracking
-    faabric::util::resetDirtyTracking();
+    REQUIRE(std::vector(memA.get(), memA.get() + snapSize) == expectedSnapMem);
+    REQUIRE(std::vector(memB.get(), memB.get() + snapSize) == expectedSnapMem);
 
     // Make different edits to both mapped regions, check they are not
     // propagated back to the snapshot
-    std::memcpy(sharedMemA.get() + offsetA, dataA.data(), dataA.size());
-    std::memcpy(sharedMemB.get() + offsetB, dataB.data(), dataB.size());
+    std::memcpy(memA.get() + offsetA, dataA.data(), dataA.size());
+    std::memcpy(memB.get() + offsetB, dataB.data(), dataB.size());
 
     std::vector<uint8_t> actualSnapMem = snap->getDataCopy();
-    REQUIRE(actualSnapMem == expectedSnapMem);
-
-    // Set two separate merge regions to cover both changes
-    snap->addMergeRegion(offsetA,
-                         dataA.size(),
-                         SnapshotDataType::Raw,
-                         SnapshotMergeOperation::Overwrite);
-
-    snap->addMergeRegion(offsetB,
-                         dataB.size(),
-                         SnapshotDataType::Raw,
-                         SnapshotMergeOperation::Overwrite);
-
-    // Apply diffs from both snapshots
-    std::vector<SnapshotDiff> diffsA =
-      MemoryView({ sharedMemA.get(), snapSize }).diffWithSnapshot(snap);
-    std::vector<SnapshotDiff> diffsB =
-      MemoryView({ sharedMemB.get(), snapSize }).diffWithSnapshot(snap);
-
-    REQUIRE(diffsA.size() == 1);
-    SnapshotDiff& diffA = diffsA.front();
-    REQUIRE(diffA.getData().size() == dataA.size());
-    REQUIRE(diffA.getOffset() == offsetA);
-
-    REQUIRE(diffsB.size() == 1);
-    SnapshotDiff& diffB = diffsB.front();
-    REQUIRE(diffB.getData().size() == dataB.size());
-    REQUIRE(diffB.getOffset() == offsetB);
-
-    snap->queueDiffs(diffsA);
-    REQUIRE(snap->getQueuedDiffsCount() == diffsA.size());
-
-    snap->queueDiffs(diffsB);
-    REQUIRE(snap->getQueuedDiffsCount() == diffsA.size() + diffsB.size());
-
-    snap->writeQueuedDiffs();
-
-    // Make sure snapshot now includes both
-    std::memcpy(expectedSnapMem.data() + offsetA, dataA.data(), dataA.size());
-    std::memcpy(expectedSnapMem.data() + offsetB, dataB.data(), dataB.size());
-
-    actualSnapMem = snap->getDataCopy();
     REQUIRE(actualSnapMem == expectedSnapMem);
 }
 
@@ -272,8 +236,8 @@ TEST_CASE_METHOD(SnapshotMergeTestFixture,
     REQUIRE(originalData.size() == originalSize);
 
     // Map to some other region of memory large enough for the extended version
-    MemoryRegion sharedMem = allocatePrivateMemory(expandedSize);
-    snap->mapToMemory({ sharedMem.get(), originalSize });
+    MemoryRegion mem = allocatePrivateMemory(expandedSize);
+    snap->mapToMemory({ mem.get(), originalSize });
 
     // Add some data to the extended region. Check the snapshot extends to fit
     std::vector<uint8_t> dataC(300, 5);
@@ -290,12 +254,12 @@ TEST_CASE_METHOD(SnapshotMergeTestFixture,
     REQUIRE(snap->getSize() == expectedSizeB);
 
     // Remap to shared memory
-    snap->mapToMemory({ sharedMem.get(), snap->getSize() });
+    snap->mapToMemory({ mem.get(), snap->getSize() });
 
     // Check mapped region matches
     std::vector<uint8_t> actualData = snap->getDataCopy();
-    std::vector<uint8_t> actualSharedMem(sharedMem.get(),
-                                         sharedMem.get() + snap->getSize());
+    std::vector<uint8_t> actualSharedMem(mem.get(),
+                                         mem.get() + snap->getSize());
 
     REQUIRE(actualSharedMem.size() == actualData.size());
     REQUIRE(actualSharedMem == actualData);
@@ -331,18 +295,22 @@ TEST_CASE_METHOD(SnapshotMergeTestFixture,
     reg.registerSnapshot(snapKey, snap);
 
     // Map the snapshot to some memory
-    MemoryRegion sharedMem = allocatePrivateMemory(memSize);
-    snap->mapToMemory({ sharedMem.get(), memSize });
+    MemoryRegion mem = allocatePrivateMemory(memSize);
+    std::span<uint8_t> memView({ mem.get(), memSize });
+    snap->mapToMemory(memView);
 
     // Check mapping works
-    int* intA = (int*)(sharedMem.get() + intAOffset);
-    int* intB = (int*)(sharedMem.get() + intBOffset);
+    int* intA = (int*)(mem.get() + intAOffset);
+    int* intB = (int*)(mem.get() + intBOffset);
 
     REQUIRE(*intA == originalValueA);
     REQUIRE(*intB == originalValueB);
 
     // Reset dirty tracking to get a clean start
-    faabric::util::resetDirtyTracking();
+    std::shared_ptr<DirtyTracker> tracker = getDirtyTracker();
+    tracker->clearAll();
+    tracker->startTracking(memView);
+    tracker->startThreadLocalTracking(memView);
 
     // Set up the merge regions, deliberately do the one at higher offsets first
     // to check the ordering
@@ -362,12 +330,14 @@ TEST_CASE_METHOD(SnapshotMergeTestFixture,
 
     std::vector<uint8_t> otherData(100, 5);
     int otherOffset = (3 * HOST_PAGE_SIZE) + 5;
-    std::memcpy(
-      sharedMem.get() + otherOffset, otherData.data(), otherData.size());
+    std::memcpy(mem.get() + otherOffset, otherData.data(), otherData.size());
 
     // Get the snapshot diffs
+    tracker->stopTracking(memView);
+    tracker->stopThreadLocalTracking(memView);
+    auto dirtyRegions = tracker->getBothDirtyPages(memView);
     std::vector<SnapshotDiff> actualDiffs =
-      MemoryView({ sharedMem.get(), memSize }).diffWithSnapshot(snap);
+      snap->diffWithDirtyRegions(memView, dirtyRegions);
 
     // Check original hasn't changed
     const uint8_t* rawSnapData = snap->getDataPtr();
@@ -435,6 +405,8 @@ TEST_CASE_METHOD(SnapshotMergeTestFixture,
     int sumD = 1;
     uint32_t offsetD = snapSize - sizeof(int32_t);
 
+    std::vector<char> expectedDirtyPages = { 1, 1, 0, 0, 1 };
+
     std::shared_ptr<SnapshotData> snap =
       std::make_shared<SnapshotData>(snapPages * HOST_PAGE_SIZE);
 
@@ -448,13 +420,16 @@ TEST_CASE_METHOD(SnapshotMergeTestFixture,
     reg.registerSnapshot(snapKey, snap);
 
     // Map the snapshot to some memory
-    size_t sharedMemSize = snapPages * HOST_PAGE_SIZE;
-    MemoryRegion sharedMem = allocatePrivateMemory(sharedMemSize);
-
-    snap->mapToMemory({ sharedMem.get(), sharedMemSize });
+    size_t memSize = snapPages * HOST_PAGE_SIZE;
+    MemoryRegion mem = allocatePrivateMemory(memSize);
+    std::span<uint8_t> memView(mem.get(), memSize);
+    snap->mapToMemory(memView);
 
     // Reset dirty tracking
-    faabric::util::resetDirtyTracking();
+    std::shared_ptr<DirtyTracker> tracker = getDirtyTracker();
+    tracker->clearAll();
+    tracker->startTracking(memView);
+    tracker->startThreadLocalTracking(memView);
 
     // Set up the merge regions
     snap->addMergeRegion(offsetA,
@@ -474,12 +449,12 @@ TEST_CASE_METHOD(SnapshotMergeTestFixture,
       offsetD, sizeof(int), SnapshotDataType::Int, SnapshotMergeOperation::Sum);
 
     // Set final values
-    *(int*)(sharedMem.get() + offsetA) = finalA;
-    *(int*)(sharedMem.get() + offsetB) = finalB;
-    *(int*)(sharedMem.get() + offsetC) = finalC;
-    *(int*)(sharedMem.get() + offsetD) = finalD;
+    *(int*)(mem.get() + offsetA) = finalA;
+    *(int*)(mem.get() + offsetB) = finalB;
+    *(int*)(mem.get() + offsetC) = finalC;
+    *(int*)(mem.get() + offsetD) = finalD;
 
-    // Check the diffs
+    // Set up expectations
     std::vector<SnapshotDiff> expectedDiffs = {
         { SnapshotDataType::Int,
           SnapshotMergeOperation::Subtract,
@@ -499,8 +474,14 @@ TEST_CASE_METHOD(SnapshotMergeTestFixture,
           { BYTES(&sumD), sizeof(int32_t) } },
     };
 
+    tracker->stopTracking(memView);
+    tracker->stopThreadLocalTracking(memView);
+
+    auto dirtyRegions = tracker->getBothDirtyPages(memView);
+    REQUIRE(dirtyRegions == expectedDirtyPages);
+
     std::vector<SnapshotDiff> actualDiffs =
-      MemoryView({ sharedMem.get(), sharedMemSize }).diffWithSnapshot(snap);
+      snap->diffWithDirtyRegions(memView, dirtyRegions);
     REQUIRE(actualDiffs.size() == 4);
 
     checkDiffs(actualDiffs, expectedDiffs);
@@ -513,19 +494,27 @@ TEST_CASE_METHOD(SnapshotMergeTestFixture,
     std::string snapKey = "foobar123";
     int snapPages = 5;
 
-    uint32_t offset = HOST_PAGE_SIZE + (10 * sizeof(int32_t));
-
     std::shared_ptr<SnapshotData> snap =
       std::make_shared<SnapshotData>(snapPages * HOST_PAGE_SIZE);
+
+    size_t memSize = snapPages * HOST_PAGE_SIZE;
+    MemoryRegion mem = allocatePrivateMemory(memSize);
+    std::span<uint8_t> memView(mem.get(), memSize);
 
     std::vector<uint8_t> originalData;
     std::vector<uint8_t> updatedData;
     std::vector<uint8_t> expectedData;
 
+    std::vector<char> expectedDirtyPages(snapPages, 0);
+    uint32_t offset = HOST_PAGE_SIZE + (10 * sizeof(int32_t));
+    expectedDirtyPages[1] = 1;
+
     faabric::util::SnapshotDataType dataType =
       faabric::util::SnapshotDataType::Raw;
+    faabric::util::SnapshotDataType expectedDataType =
+      faabric::util::SnapshotDataType::Raw;
     faabric::util::SnapshotMergeOperation operation =
-      faabric::util::SnapshotMergeOperation::Overwrite;
+      faabric::util::SnapshotMergeOperation::Bytewise;
 
     size_t dataLength = 0;
     size_t regionLength = 0;
@@ -539,6 +528,7 @@ TEST_CASE_METHOD(SnapshotMergeTestFixture,
         int diffValue = 0;
 
         dataType = faabric::util::SnapshotDataType::Int;
+        expectedDataType = faabric::util::SnapshotDataType::Int;
         dataLength = sizeof(int32_t);
         regionLength = sizeof(int32_t);
 
@@ -599,6 +589,7 @@ TEST_CASE_METHOD(SnapshotMergeTestFixture,
         long diffValue = 0;
 
         dataType = faabric::util::SnapshotDataType::Long;
+        expectedDataType = faabric::util::SnapshotDataType::Long;
         dataLength = sizeof(long);
         regionLength = sizeof(long);
 
@@ -659,11 +650,12 @@ TEST_CASE_METHOD(SnapshotMergeTestFixture,
         float diffValue = 0.0;
 
         dataType = faabric::util::SnapshotDataType::Float;
+        expectedDataType = faabric::util::SnapshotDataType::Float;
         dataLength = sizeof(float);
         regionLength = sizeof(float);
 
-        // Note - imprecision in float arithmetic makes it difficult to test
-        // the floating point types here unless we use integer values.
+        // Imprecision in float arithmetic makes it difficult to test the
+        // floating point types here unless we use integer values.
         SECTION("Float sum")
         {
             originalValue = 513;
@@ -721,10 +713,11 @@ TEST_CASE_METHOD(SnapshotMergeTestFixture,
         double diffValue = 0.0;
 
         dataType = faabric::util::SnapshotDataType::Double;
+        expectedDataType = faabric::util::SnapshotDataType::Double;
         dataLength = sizeof(double);
         regionLength = sizeof(double);
 
-        // Note - imprecision in float arithmetic makes it difficult to test
+        // Imprecision in float arithmetic makes it difficult to test
         // the floating point types here unless we use integer values.
         SECTION("Double sum")
         {
@@ -783,16 +776,17 @@ TEST_CASE_METHOD(SnapshotMergeTestFixture,
         bool diffValue = false;
 
         dataType = faabric::util::SnapshotDataType::Bool;
+        expectedDataType = faabric::util::SnapshotDataType::Raw;
         dataLength = sizeof(bool);
         regionLength = sizeof(bool);
 
-        SECTION("Bool overwrite")
+        SECTION("Bool bytewise")
         {
             originalValue = true;
             finalValue = false;
             diffValue = false;
 
-            operation = faabric::util::SnapshotMergeOperation::Overwrite;
+            operation = faabric::util::SnapshotMergeOperation::Bytewise;
         }
 
         originalData = faabric::util::valueToBytes<bool>(originalValue);
@@ -809,16 +803,16 @@ TEST_CASE_METHOD(SnapshotMergeTestFixture,
 
         dataType = faabric::util::SnapshotDataType::Raw;
 
-        SECTION("Overwrite")
+        SECTION("Bytewise")
         {
             regionLength = dataLength;
-            operation = faabric::util::SnapshotMergeOperation::Overwrite;
+            operation = faabric::util::SnapshotMergeOperation::Bytewise;
         }
 
-        SECTION("Overwrite unspecified length")
+        SECTION("Bytewise unspecified length")
         {
             regionLength = 0;
-            operation = faabric::util::SnapshotMergeOperation::Overwrite;
+            operation = faabric::util::SnapshotMergeOperation::Bytewise;
         }
 
         SECTION("Ignore")
@@ -838,24 +832,29 @@ TEST_CASE_METHOD(SnapshotMergeTestFixture,
     reg.registerSnapshot(snapKey, snap);
 
     // Map the snapshot to some memory
-    size_t sharedMemSize = snapPages * HOST_PAGE_SIZE;
-    MemoryRegion sharedMem = allocatePrivateMemory(sharedMemSize);
-
-    snap->mapToMemory({ sharedMem.get(), sharedMemSize });
+    snap->mapToMemory(memView);
 
     // Reset dirty tracking
-    faabric::util::resetDirtyTracking();
+    std::shared_ptr<DirtyTracker> tracker = getDirtyTracker();
+    tracker->clearAll();
+    tracker->startTracking(memView);
+    tracker->startThreadLocalTracking(memView);
 
     // Set up the merge region
     snap->addMergeRegion(offset, regionLength, dataType, operation);
 
     // Modify the value
-    std::memcpy(
-      sharedMem.get() + offset, updatedData.data(), updatedData.size());
+    std::memcpy(mem.get() + offset, updatedData.data(), updatedData.size());
 
     // Get the snapshot diffs
+    tracker->stopTracking(memView);
+    tracker->stopThreadLocalTracking(memView);
+
+    auto dirtyRegions = tracker->getBothDirtyPages(memView);
+    REQUIRE(dirtyRegions == expectedDirtyPages);
+
     std::vector<SnapshotDiff> actualDiffs =
-      MemoryView({ sharedMem.get(), sharedMemSize }).diffWithSnapshot(snap);
+      snap->diffWithDirtyRegions(memView, dirtyRegions);
 
     if (expectNoDiff) {
         REQUIRE(actualDiffs.empty());
@@ -863,7 +862,7 @@ TEST_CASE_METHOD(SnapshotMergeTestFixture,
         // Check diff
         REQUIRE(actualDiffs.size() == 1);
         std::vector<SnapshotDiff> expectedDiffs = {
-            { dataType,
+            { expectedDataType,
               operation,
               offset,
               { expectedData.data(), expectedData.size() } }
@@ -887,7 +886,7 @@ TEST_CASE_METHOD(SnapshotMergeTestFixture,
     faabric::util::SnapshotDataType dataType =
       faabric::util::SnapshotDataType::Raw;
     faabric::util::SnapshotMergeOperation operation =
-      faabric::util::SnapshotMergeOperation::Overwrite;
+      faabric::util::SnapshotMergeOperation::Bytewise;
     size_t dataLength = 0;
 
     std::string expectedMsg;
@@ -912,24 +911,31 @@ TEST_CASE_METHOD(SnapshotMergeTestFixture,
     reg.registerSnapshot(snapKey, snap);
 
     // Map the snapshot
-    size_t sharedMemSize = snapPages * HOST_PAGE_SIZE;
-    MemoryRegion sharedMem = allocatePrivateMemory(sharedMemSize);
-    snap->mapToMemory({ sharedMem.get(), sharedMemSize });
+    size_t memSize = snapPages * HOST_PAGE_SIZE;
+    MemoryRegion mem = allocatePrivateMemory(memSize);
+    std::span<uint8_t> memView(mem.get(), memSize);
+    snap->mapToMemory(memView);
 
     // Reset dirty tracking
-    faabric::util::resetDirtyTracking();
+    std::shared_ptr<DirtyTracker> tracker = getDirtyTracker();
+    tracker->clearAll();
+    tracker->startTracking(memView);
+    tracker->startThreadLocalTracking(memView);
 
     // Set up the merge region
     snap->addMergeRegion(offset, dataLength, dataType, operation);
 
     // Modify the value
     std::vector<uint8_t> bytes(dataLength, 3);
-    std::memcpy(sharedMem.get() + offset, bytes.data(), bytes.size());
+    std::memcpy(mem.get() + offset, bytes.data(), bytes.size());
 
     // Check getting diffs throws an exception
+    tracker->stopTracking(memView);
+    tracker->stopThreadLocalTracking(memView);
+    auto dirtyRegions = tracker->getBothDirtyPages(memView);
     bool failed = false;
     try {
-        MemoryView({ sharedMem.get(), sharedMemSize }).diffWithSnapshot(snap);
+        snap->diffWithDirtyRegions(memView, dirtyRegions);
     } catch (std::runtime_error& ex) {
         failed = true;
         REQUIRE(ex.what() == expectedMsg);
@@ -958,7 +964,8 @@ TEST_CASE_METHOD(SnapshotMergeTestFixture,
     faabric::util::isPageAligned((const void*)snap->getDataPtr());
 
     // Reset dirty tracking
-    faabric::util::resetDirtyTracking();
+    std::shared_ptr<DirtyTracker> tracker = getDirtyTracker();
+    tracker->clearAll();
 
     // Update the snapshot
     std::vector<uint8_t> dataA = { 0, 1, 2, 3 };
@@ -970,25 +977,18 @@ TEST_CASE_METHOD(SnapshotMergeTestFixture,
     snap->copyInData(dataB, offsetB);
 
     // Check we get the expected diffs
-    std::vector<SnapshotDiff> expectedDiffs =
-      MemoryView({ snap->getDataPtr(), snap->getSize() }).getDirtyRegions();
+    std::vector<SnapshotDiff> expectedDiffs = snap->getTrackedChanges();
 
     REQUIRE(expectedDiffs.size() == 2);
 
     SnapshotDiff& diffA = expectedDiffs.at(0);
     SnapshotDiff& diffB = expectedDiffs.at(1);
 
-    REQUIRE(diffA.getData().size() == HOST_PAGE_SIZE);
-    REQUIRE(diffB.getData().size() == HOST_PAGE_SIZE);
+    REQUIRE(diffA.getData().size() == dataA.size());
+    REQUIRE(diffB.getData().size() == dataB.size());
 
-    std::vector<uint8_t> actualA = { diffA.getData().begin(),
-                                     diffA.getData().begin() + dataA.size() };
-    std::vector<uint8_t> actualB = {
-        diffB.getData().begin() + 1, diffB.getData().begin() + 1 + dataB.size()
-    };
-
-    REQUIRE(actualA == dataA);
-    REQUIRE(actualB == dataB);
+    REQUIRE(diffA.getDataCopy() == dataA);
+    REQUIRE(diffB.getDataCopy() == dataB);
 }
 
 TEST_CASE_METHOD(SnapshotMergeTestFixture,
@@ -996,51 +996,58 @@ TEST_CASE_METHOD(SnapshotMergeTestFixture,
                  "[snapshot][util]")
 {
     int snapPages = 3;
-    size_t sharedMemSize = snapPages * HOST_PAGE_SIZE;
+    size_t memSize = snapPages * HOST_PAGE_SIZE;
 
     std::shared_ptr<SnapshotData> snap =
       std::make_shared<SnapshotData>(snapPages * HOST_PAGE_SIZE);
     reg.registerSnapshot(snapKey, snap);
 
     // Map the snapshot
-    MemoryRegion sharedMem = allocatePrivateMemory(sharedMemSize);
-    snap->mapToMemory({ sharedMem.get(), sharedMemSize });
+    MemoryRegion mem = allocatePrivateMemory(memSize);
+    std::span<uint8_t> memView(mem.get(), memSize);
+    snap->mapToMemory(memView);
 
     // Reset dirty tracking
-    faabric::util::resetDirtyTracking();
+    std::shared_ptr<DirtyTracker> tracker = getDirtyTracker();
+    tracker->clearAll();
+    tracker->startTracking(memView);
+    tracker->startThreadLocalTracking(memView);
+
+    std::vector<char> expectedDirtyPages(snapPages, 0);
 
     // Add some tightly-packed changes
     uint32_t offsetA = 0;
     std::vector<uint8_t> dataA(10, 1);
-    std::memcpy(sharedMem.get() + offsetA, dataA.data(), dataA.size());
+    std::memcpy(mem.get() + offsetA, dataA.data(), dataA.size());
+    expectedDirtyPages[0] = 1;
 
     uint32_t offsetB = dataA.size() + 1;
     std::vector<uint8_t> dataB(2, 1);
-    std::memcpy(sharedMem.get() + offsetB, dataB.data(), dataB.size());
+    std::memcpy(mem.get() + offsetB, dataB.data(), dataB.size());
 
     uint32_t offsetC = offsetB + 3;
     std::vector<uint8_t> dataC(1, 1);
-    std::memcpy(sharedMem.get() + offsetC, dataC.data(), dataC.size());
+    std::memcpy(mem.get() + offsetC, dataC.data(), dataC.size());
 
     uint32_t offsetD = offsetC + 2;
     std::vector<uint8_t> dataD(1, 1);
-    std::memcpy(sharedMem.get() + offsetD, dataD.data(), dataD.size());
+    std::memcpy(mem.get() + offsetD, dataD.data(), dataD.size());
 
     std::vector<SnapshotDiff> expectedDiffs = {
         { SnapshotDataType::Raw,
-          SnapshotMergeOperation::Overwrite,
+          SnapshotMergeOperation::Bytewise,
           offsetA,
           { dataA.data(), dataA.size() } },
         { SnapshotDataType::Raw,
-          SnapshotMergeOperation::Overwrite,
+          SnapshotMergeOperation::Bytewise,
           offsetB,
           { dataB.data(), dataB.size() } },
         { SnapshotDataType::Raw,
-          SnapshotMergeOperation::Overwrite,
+          SnapshotMergeOperation::Bytewise,
           offsetC,
           { dataC.data(), dataC.size() } },
         { SnapshotDataType::Raw,
-          SnapshotMergeOperation::Overwrite,
+          SnapshotMergeOperation::Bytewise,
           offsetD,
           { dataD.data(), dataD.size() } },
     };
@@ -1049,44 +1056,43 @@ TEST_CASE_METHOD(SnapshotMergeTestFixture,
     snap->addMergeRegion(0,
                          offsetD + dataD.size() + 20,
                          SnapshotDataType::Raw,
-                         SnapshotMergeOperation::Overwrite);
+                         SnapshotMergeOperation::Bytewise);
 
     // Check number of diffs
+    tracker->stopTracking(memView);
+    tracker->stopThreadLocalTracking(memView);
+
+    auto dirtyRegions = tracker->getBothDirtyPages(memView);
+    REQUIRE(dirtyRegions == expectedDirtyPages);
+
     std::vector<SnapshotDiff> actualDiffs =
-      MemoryView({ sharedMem.get(), sharedMemSize }).diffWithSnapshot(snap);
+      snap->diffWithDirtyRegions(memView, dirtyRegions);
 
     checkDiffs(actualDiffs, expectedDiffs);
 }
 
-TEST_CASE_METHOD(SnapshotMergeTestFixture,
-                 "Test filling gaps in regions with overwrite",
-                 "[snapshot][util]")
+void doFillGapsChecks(SnapshotMergeOperation op)
 {
     int snapPages = 3;
     size_t snapSize = snapPages * HOST_PAGE_SIZE;
+    auto snap = std::make_shared<SnapshotData>(snapSize);
 
-    std::shared_ptr<SnapshotData> snap =
-      std::make_shared<SnapshotData>(snapSize);
-
-    std::map<uint32_t, SnapshotMergeRegion> expectedRegions;
+    std::vector<SnapshotMergeRegion> expectedRegions;
 
     SECTION("No existing regions")
     {
-        expectedRegions[0] = {
-            0, 0, SnapshotDataType::Raw, SnapshotMergeOperation::Overwrite
-        };
+        expectedRegions.emplace_back(0, 0, SnapshotDataType::Raw, op);
     }
 
     SECTION("One region at start")
     {
         snap->addMergeRegion(
-          0, 100, SnapshotDataType::Raw, SnapshotMergeOperation::Overwrite);
-        expectedRegions[0] = {
-            0, 100, SnapshotDataType::Raw, SnapshotMergeOperation::Overwrite
-        };
-        expectedRegions[100] = {
-            100, 0, SnapshotDataType::Raw, SnapshotMergeOperation::Overwrite
-        };
+          0, 100, SnapshotDataType::Raw, SnapshotMergeOperation::Bytewise);
+
+        expectedRegions.emplace_back(
+          0, 100, SnapshotDataType::Raw, SnapshotMergeOperation::Bytewise);
+
+        expectedRegions.emplace_back(100, 0, SnapshotDataType::Raw, op);
     }
 
     SECTION("One region at end")
@@ -1094,17 +1100,44 @@ TEST_CASE_METHOD(SnapshotMergeTestFixture,
         snap->addMergeRegion(snapSize - 100,
                              100,
                              SnapshotDataType::Raw,
-                             SnapshotMergeOperation::Overwrite);
+                             SnapshotMergeOperation::Bytewise);
 
-        expectedRegions[0] = { 0,
-                               snapSize - 100,
-                               SnapshotDataType::Raw,
-                               SnapshotMergeOperation::Overwrite };
+        expectedRegions.emplace_back(
+          0, snapSize - 100, SnapshotDataType::Raw, op);
 
-        expectedRegions[snapSize - 100] = { (uint32_t)snapSize - 100,
-                                            100,
-                                            SnapshotDataType::Raw,
-                                            SnapshotMergeOperation::Overwrite };
+        expectedRegions.emplace_back((uint32_t)snapSize - 100,
+                                     100,
+                                     SnapshotDataType::Raw,
+                                     SnapshotMergeOperation::Bytewise);
+    }
+
+    SECTION("Adjacent regions")
+    {
+        snap->addMergeRegion(HOST_PAGE_SIZE,
+                             sizeof(int),
+                             SnapshotDataType::Int,
+                             SnapshotMergeOperation::Sum);
+
+        snap->addMergeRegion(HOST_PAGE_SIZE + sizeof(int),
+                             sizeof(int),
+                             SnapshotDataType::Int,
+                             SnapshotMergeOperation::Sum);
+
+        expectedRegions.emplace_back(
+          0, HOST_PAGE_SIZE, SnapshotDataType::Raw, op);
+
+        expectedRegions.emplace_back(HOST_PAGE_SIZE,
+                                     sizeof(int),
+                                     SnapshotDataType::Int,
+                                     SnapshotMergeOperation::Sum);
+
+        expectedRegions.emplace_back(HOST_PAGE_SIZE + sizeof(int),
+                                     sizeof(int),
+                                     SnapshotDataType::Int,
+                                     SnapshotMergeOperation::Sum);
+
+        expectedRegions.emplace_back(
+          HOST_PAGE_SIZE + 2 * sizeof(int), 0, SnapshotDataType::Raw, op);
     }
 
     SECTION("Multiple regions")
@@ -1121,65 +1154,114 @@ TEST_CASE_METHOD(SnapshotMergeTestFixture,
         snap->addMergeRegion(HOST_PAGE_SIZE + 200,
                              HOST_PAGE_SIZE,
                              SnapshotDataType::Raw,
-                             SnapshotMergeOperation::Overwrite);
+                             SnapshotMergeOperation::Bytewise);
 
-        expectedRegions[0] = {
-            0, 100, SnapshotDataType::Raw, SnapshotMergeOperation::Overwrite
-        };
+        expectedRegions.emplace_back(0, 100, SnapshotDataType::Raw, op);
 
-        expectedRegions[100] = {
-            100, sizeof(int), SnapshotDataType::Int, SnapshotMergeOperation::Sum
-        };
+        expectedRegions.emplace_back(
+          100, sizeof(int), SnapshotDataType::Int, SnapshotMergeOperation::Sum);
 
-        expectedRegions[100 + sizeof(int)] = {
-            100 + sizeof(int),
-            HOST_PAGE_SIZE - (100 + sizeof(int)),
-            SnapshotDataType::Raw,
-            SnapshotMergeOperation::Overwrite
-        };
+        expectedRegions.emplace_back(100 + sizeof(int),
+                                     HOST_PAGE_SIZE - (100 + sizeof(int)),
+                                     SnapshotDataType::Raw,
+                                     op);
 
-        expectedRegions[HOST_PAGE_SIZE] = { (uint32_t)HOST_PAGE_SIZE,
-                                            sizeof(double),
-                                            SnapshotDataType::Double,
-                                            SnapshotMergeOperation::Product };
+        expectedRegions.emplace_back((uint32_t)HOST_PAGE_SIZE,
+                                     sizeof(double),
+                                     SnapshotDataType::Double,
+                                     SnapshotMergeOperation::Product);
 
-        expectedRegions[HOST_PAGE_SIZE + sizeof(double)] = {
-            (uint32_t)(HOST_PAGE_SIZE + sizeof(double)),
-            200 - sizeof(double),
-            SnapshotDataType::Raw,
-            SnapshotMergeOperation::Overwrite
-        };
+        expectedRegions.emplace_back(
+          (uint32_t)(HOST_PAGE_SIZE + sizeof(double)),
+          200 - sizeof(double),
+          SnapshotDataType::Raw,
+          op);
 
-        expectedRegions[HOST_PAGE_SIZE + 200] = {
-            (uint32_t)HOST_PAGE_SIZE + 200,
-            (uint32_t)HOST_PAGE_SIZE,
-            SnapshotDataType::Raw,
-            SnapshotMergeOperation::Overwrite
-        };
+        expectedRegions.emplace_back((uint32_t)HOST_PAGE_SIZE + 200,
+                                     (uint32_t)HOST_PAGE_SIZE,
+                                     SnapshotDataType::Raw,
+                                     SnapshotMergeOperation::Bytewise);
 
-        expectedRegions[(2 * HOST_PAGE_SIZE) + 200] = {
-            (uint32_t)(2 * HOST_PAGE_SIZE) + 200,
-            0,
-            SnapshotDataType::Raw,
-            SnapshotMergeOperation::Overwrite
-        };
+        expectedRegions.emplace_back(
+          (uint32_t)(2 * HOST_PAGE_SIZE) + 200, 0, SnapshotDataType::Raw, op);
     }
 
-    snap->fillGapsWithOverwriteRegions();
+    snap->fillGapsWithBytewiseRegions();
 
-    std::map<uint32_t, SnapshotMergeRegion> actualRegions =
-      snap->getMergeRegions();
+    std::vector<SnapshotMergeRegion> actualRegions = snap->getMergeRegions();
+
+    // Sort regions to ensure consistent comparison
+    std::sort(actualRegions.begin(), actualRegions.end());
 
     REQUIRE(actualRegions.size() == expectedRegions.size());
-    for (auto [expectedOffset, expectedRegion] : expectedRegions) {
-        REQUIRE(actualRegions.find(expectedOffset) != actualRegions.end());
-
-        SnapshotMergeRegion actualRegion = actualRegions[expectedOffset];
-        REQUIRE(actualRegion.offset == expectedRegion.offset);
-        REQUIRE(actualRegion.dataType == expectedRegion.dataType);
-        REQUIRE(actualRegion.length == expectedRegion.length);
-        REQUIRE(actualRegion.operation == expectedRegion.operation);
+    for (int i = 0; i < actualRegions.size(); i++) {
+        SnapshotMergeRegion expectedRegion = expectedRegions[i];
+        SnapshotMergeRegion actualRegion = actualRegions[i];
+        REQUIRE(actualRegion == expectedRegion);
     }
+}
+
+TEST_CASE_METHOD(SnapshotMergeTestFixture,
+                 "Test filling gaps in regions",
+                 "[snapshot][util]")
+{
+    SystemConfig& conf = getSystemConfig();
+    SECTION("Bytewise")
+    {
+        conf.diffingMode = "bytewise";
+        doFillGapsChecks(SnapshotMergeOperation::Bytewise);
+    }
+
+    SECTION("XOR")
+    {
+        conf.diffingMode = "xor";
+        doFillGapsChecks(SnapshotMergeOperation::XOR);
+    }
+
+    SECTION("Unsupported")
+    {
+        conf.diffingMode = "foobar";
+
+        int snapPages = 3;
+        size_t snapSize = snapPages * HOST_PAGE_SIZE;
+        auto snap = std::make_shared<SnapshotData>(snapSize);
+
+        bool failed = false;
+        try {
+            snap->fillGapsWithBytewiseRegions();
+        } catch (std::runtime_error& ex) {
+            std::string expected = "Unsupported diffing mode";
+            REQUIRE(ex.what() == expected);
+            failed = true;
+        }
+
+        REQUIRE(failed);
+    }
+}
+
+TEST_CASE("Test sorting snapshot merge regions", "[snapshot][util]")
+{
+    std::vector<SnapshotMergeRegion> regions;
+
+    regions.emplace_back(
+      10, 20, SnapshotDataType::Double, SnapshotMergeOperation::Sum);
+    regions.emplace_back(
+      50, 20, SnapshotDataType::Double, SnapshotMergeOperation::Sum);
+    regions.emplace_back(
+      5, 20, SnapshotDataType::Raw, SnapshotMergeOperation::Bytewise);
+    regions.emplace_back(
+      30, 20, SnapshotDataType::Float, SnapshotMergeOperation::Max);
+
+    std::sort(regions.begin(), regions.end());
+
+    std::vector<SnapshotMergeRegion> expected = {
+        { 5, 20, SnapshotDataType::Raw, SnapshotMergeOperation::Bytewise },
+        { 10, 20, SnapshotDataType::Double, SnapshotMergeOperation::Sum },
+        { 30, 20, SnapshotDataType::Float, SnapshotMergeOperation::Max },
+        { 50, 20, SnapshotDataType::Double, SnapshotMergeOperation::Sum },
+    };
+
+    REQUIRE(regions == expected);
 }
 
 TEST_CASE_METHOD(SnapshotMergeTestFixture,
@@ -1187,30 +1269,36 @@ TEST_CASE_METHOD(SnapshotMergeTestFixture,
                  "[snapshot][util]")
 {
     int snapPages = 6;
-    size_t sharedMemSize = snapPages * HOST_PAGE_SIZE;
+    size_t memSize = snapPages * HOST_PAGE_SIZE;
 
     std::shared_ptr<SnapshotData> snap =
       std::make_shared<SnapshotData>(snapPages * HOST_PAGE_SIZE);
     reg.registerSnapshot(snapKey, snap);
 
     // Map the snapshot
-    MemoryRegion sharedMem = allocatePrivateMemory(sharedMemSize);
-    snap->mapToMemory({ sharedMem.get(), sharedMemSize });
+    MemoryRegion mem = allocatePrivateMemory(memSize);
+    std::span<uint8_t> memView(mem.get(), memSize);
+    snap->mapToMemory(memView);
 
     // Reset dirty tracking
-    faabric::util::resetDirtyTracking();
+    std::shared_ptr<DirtyTracker> tracker = getDirtyTracker();
+    tracker->clearAll();
+    tracker->startTracking(memView);
+    tracker->startThreadLocalTracking(memView);
+
+    std::vector<char> expectedDirtyPages(snapPages, 0);
 
     // Add a couple of merge regions on each page, which should be skipped as
     // they won't overlap any changes
     for (int i = 0; i < snapPages; i++) {
-        // Overwrite
-        int skippedOverwriteOffset = i * HOST_PAGE_SIZE;
-        snap->addMergeRegion(skippedOverwriteOffset,
+        // Bytewise region at bottom of page
+        int skippedBytewiseOffset = i * HOST_PAGE_SIZE;
+        snap->addMergeRegion(skippedBytewiseOffset,
                              10,
                              faabric::util::SnapshotDataType::Raw,
-                             faabric::util::SnapshotMergeOperation::Overwrite);
+                             faabric::util::SnapshotMergeOperation::Bytewise);
 
-        // Sum
+        // Sum region near top of page
         int skippedSumOffset =
           ((i + 1) * HOST_PAGE_SIZE) - (2 * sizeof(int32_t));
         snap->addMergeRegion(skippedSumOffset,
@@ -1219,72 +1307,93 @@ TEST_CASE_METHOD(SnapshotMergeTestFixture,
                              faabric::util::SnapshotMergeOperation::Sum);
     }
 
-    // Add an overwrite region that should take effect
-    uint32_t overwriteAOffset = (2 * HOST_PAGE_SIZE) + 20;
-    snap->addMergeRegion(overwriteAOffset,
+    // Add a bytewise region above the one at the very bottom, and some
+    // modified data that should be caught by it
+    uint32_t bytewiseAOffset = (2 * HOST_PAGE_SIZE) + 20;
+    snap->addMergeRegion(bytewiseAOffset,
                          20,
                          faabric::util::SnapshotDataType::Raw,
-                         faabric::util::SnapshotMergeOperation::Overwrite);
-    std::vector<uint8_t> overwriteData(10, 1);
-    std::memcpy(sharedMem.get() + overwriteAOffset,
-                overwriteData.data(),
-                overwriteData.size());
+                         faabric::util::SnapshotMergeOperation::Bytewise);
 
-    // Add a sum region and data that should also take effect
+    std::vector<uint8_t> bytewiseData(10, 1);
+    SPDLOG_DEBUG(
+      "Mix test writing {} bytes at {}", bytewiseData.size(), bytewiseAOffset);
+    std::memcpy(
+      mem.get() + bytewiseAOffset, bytewiseData.data(), bytewiseData.size());
+    expectedDirtyPages[2] = 1;
+
+    // Add a sum region and modified data that should also cause a diff
     uint32_t sumOffset = (4 * HOST_PAGE_SIZE) + 100;
     int sumValue = 333;
     int sumOriginal = 111;
     int sumExpected = 222;
+
     snap->addMergeRegion(sumOffset,
                          sizeof(int32_t),
                          faabric::util::SnapshotDataType::Int,
                          faabric::util::SnapshotMergeOperation::Sum);
+
+    SPDLOG_DEBUG("Mix test writing int at {}", sumOffset);
     snap->copyInData({ BYTES(&sumOriginal), sizeof(int) }, sumOffset);
-    *(int*)(sharedMem.get() + sumOffset) = sumValue;
+    *(int*)(mem.get() + sumOffset) = sumValue;
+    expectedDirtyPages[4] = 1;
 
     // Check diffs
     std::vector<SnapshotDiff> expectedDiffs = {
         { faabric::util::SnapshotDataType::Raw,
-          faabric::util::SnapshotMergeOperation::Overwrite,
-          overwriteAOffset,
-          { BYTES(overwriteData.data()), overwriteData.size() } },
+          faabric::util::SnapshotMergeOperation::Bytewise,
+          bytewiseAOffset,
+          { BYTES(bytewiseData.data()), bytewiseData.size() } },
         { faabric::util::SnapshotDataType::Int,
           faabric::util::SnapshotMergeOperation::Sum,
           sumOffset,
           { BYTES(&sumExpected), sizeof(int32_t) } },
     };
 
+    tracker->stopTracking(memView);
+    tracker->stopThreadLocalTracking(memView);
+
+    auto dirtyRegions = tracker->getBothDirtyPages(memView);
+    REQUIRE(dirtyRegions == expectedDirtyPages);
+
     std::vector<SnapshotDiff> actualDiffs =
-      MemoryView({ sharedMem.get(), sharedMemSize }).diffWithSnapshot(snap);
+      snap->diffWithDirtyRegions(memView, dirtyRegions);
 
     checkDiffs(actualDiffs, expectedDiffs);
 }
 
 TEST_CASE_METHOD(SnapshotMergeTestFixture,
-                 "Test merge regions past end of original memory",
+                 "Test diffing memory larger than snapshot",
                  "[snapshot][util]")
 {
     int snapPages = 6;
-    int sharedMemPages = 10;
+    int memPages = 10;
+
     size_t snapSize = snapPages * HOST_PAGE_SIZE;
-    size_t sharedMemSize = sharedMemPages * HOST_PAGE_SIZE;
+    size_t memSize = memPages * HOST_PAGE_SIZE;
 
     std::shared_ptr<SnapshotData> snap =
       std::make_shared<SnapshotData>(snapSize);
     reg.registerSnapshot(snapKey, snap);
 
     // Map the snapshot
-    MemoryRegion sharedMem = allocatePrivateMemory(sharedMemSize);
-    snap->mapToMemory({ sharedMem.get(), snapSize });
-    faabric::util::resetDirtyTracking();
+    MemoryRegion mem = allocatePrivateMemory(memSize);
+    std::span<uint8_t> memView(mem.get(), memSize);
 
-    uint32_t changeStartPage = 0;
+    // Map only the size of the snapshot
+    snap->mapToMemory({ mem.get(), snapSize });
+
+    std::shared_ptr<DirtyTracker> tracker = getDirtyTracker();
+    tracker->clearAll();
+    tracker->startTracking(memView);
+    tracker->startThreadLocalTracking(memView);
+
     uint32_t changeOffset = 0;
     uint32_t mergeRegionStart = snapSize;
     size_t changeLength = 123;
 
-    uint32_t expectedDiffStart = 0;
-    uint32_t expectedDiffSize = 0;
+    std::vector<uint8_t> overshootData((memPages - snapPages) * HOST_PAGE_SIZE,
+                                       0);
 
     // When memory has changed at or past the end of the original data, the diff
     // will start at the end of the original data and round up to the next page
@@ -1292,69 +1401,114 @@ TEST_CASE_METHOD(SnapshotMergeTestFixture,
     // beginning of the change and continue into the page boundary past the
     // original data.
 
-    SECTION("Change at end of original data, overlapping merge region")
+    std::vector<SnapshotDiff> expectedDiffs;
+
+    // The diffs won't take ownership over the data, so we need to make sure it
+    // doesn't go out of scope
+    std::vector<uint8_t> expectedDataA;
+    std::vector<uint8_t> expectedDataB;
+
+    std::vector<uint8_t> zeroedPage(HOST_PAGE_SIZE, 0);
+    std::vector<uint8_t> diffData(changeLength, 2);
+
+    SECTION("Change on first page past end of original data, overlapping merge "
+            "region")
     {
-        changeStartPage = snapSize;
-        changeOffset = changeStartPage + 100;
+        changeOffset = snapSize + 100;
         mergeRegionStart = snapSize;
-        expectedDiffStart = changeStartPage;
-        expectedDiffSize = HOST_PAGE_SIZE;
+
+        diffData = std::vector<uint8_t>(100, 2);
+        expectedDataA = overshootData;
+        std::memset(expectedDataA.data() + 100, 2, 100);
+
+        // Diff should just be the whole of the updated memory
+        expectedDiffs = { { faabric::util::SnapshotDataType::Raw,
+                            faabric::util::SnapshotMergeOperation::Bytewise,
+                            (uint32_t)snapSize,
+                            expectedDataA } };
     }
 
     SECTION("Change and merge region aligned at end of original data")
     {
-        changeStartPage = snapSize;
-        changeOffset = changeStartPage;
+        changeOffset = snapSize;
         mergeRegionStart = snapSize;
-        expectedDiffStart = changeStartPage;
-        expectedDiffSize = HOST_PAGE_SIZE;
+
+        diffData = std::vector<uint8_t>(100, 2);
+        expectedDataA = overshootData;
+        std::memset(expectedDataA.data(), 2, 100);
+
+        // Diff should just be the whole of the updated memory
+        expectedDiffs = { { faabric::util::SnapshotDataType::Raw,
+                            faabric::util::SnapshotMergeOperation::Bytewise,
+                            (uint32_t)snapSize,
+                            expectedDataA } };
     }
 
-    SECTION("Change after end of original data, overlapping merge region")
+    SECTION("Change and merge region after end of original data")
     {
-        changeStartPage = (snapPages + 2) * HOST_PAGE_SIZE;
-        changeOffset = changeStartPage + 100;
-        mergeRegionStart = changeStartPage;
-        expectedDiffStart = changeStartPage;
-        expectedDiffSize = HOST_PAGE_SIZE;
+        uint32_t start = (snapPages + 2) * HOST_PAGE_SIZE;
+        changeOffset = start + 100;
+        mergeRegionStart = start;
+
+        diffData = std::vector<uint8_t>(100, 2);
+        expectedDataA = overshootData;
+        std::memset(expectedDataA.data() + (2 * HOST_PAGE_SIZE) + 100, 2, 100);
+
+        // Diff should be the whole region of updated memory
+        expectedDiffs = { { faabric::util::SnapshotDataType::Raw,
+                            faabric::util::SnapshotMergeOperation::Bytewise,
+                            (uint32_t)snapSize,
+                            expectedDataA } };
     }
 
-    SECTION("Merge region and change crossing end of original data")
+    SECTION("Merge region and change both crossing end of original data")
     {
-        // Merge region starts before diff
-        changeStartPage = (snapPages - 1) * HOST_PAGE_SIZE;
-        changeOffset = changeStartPage + 100;
+        // Start change one page below the end
+        uint32_t start = (snapPages - 1) * HOST_PAGE_SIZE;
+        changeOffset = start + 100;
+
+        // Add a merge region two pages below
         mergeRegionStart = (snapPages - 2) * HOST_PAGE_SIZE;
 
-        // Change goes from inside original data to overshoot the end
-        changeLength = 2 * HOST_PAGE_SIZE;
+        // Change will capture the modified bytes within the original region,
+        // and the overshoot
+        size_t dataSize = 2 * HOST_PAGE_SIZE;
+        diffData = std::vector<uint8_t>(dataSize, 2);
 
-        // Diff will cover from the start of the change to round up to the
-        // nearest page in the overshoot region.
-        expectedDiffStart = changeOffset;
-        expectedDiffSize = changeLength + (HOST_PAGE_SIZE - 100);
+        size_t overlapSize = HOST_PAGE_SIZE - 100;
+        size_t overshootSize = dataSize - overlapSize;
+
+        // One diff will cover the overlap with last part of original data, and
+        // another will be the rest of the data
+        expectedDataA = std::vector<uint8_t>(HOST_PAGE_SIZE - 100, 2);
+        expectedDataB = overshootData;
+        std::memset(expectedDataB.data(), 2, overshootSize);
+
+        expectedDiffs = { { faabric::util::SnapshotDataType::Raw,
+                            faabric::util::SnapshotMergeOperation::Bytewise,
+                            (uint32_t)snapSize,
+                            expectedDataB },
+                          { faabric::util::SnapshotDataType::Raw,
+                            faabric::util::SnapshotMergeOperation::Bytewise,
+                            changeOffset,
+                            expectedDataA } };
     }
 
-    std::vector<uint8_t> diffData(changeLength, 2);
-    std::memcpy(
-      sharedMem.get() + changeOffset, diffData.data(), diffData.size());
+    // Copy in the changed data
+    std::memcpy(mem.get() + changeOffset, diffData.data(), diffData.size());
 
     // Add a merge region
     snap->addMergeRegion(mergeRegionStart,
                          0,
                          faabric::util::SnapshotDataType::Raw,
-                         faabric::util::SnapshotMergeOperation::Overwrite);
+                         faabric::util::SnapshotMergeOperation::Bytewise);
+
+    tracker->stopTracking(memView);
+    tracker->stopThreadLocalTracking(memView);
+    auto dirtyRegions = tracker->getBothDirtyPages(memView);
 
     std::vector<SnapshotDiff> actualDiffs =
-      MemoryView({ sharedMem.get(), sharedMemSize }).diffWithSnapshot(snap);
-
-    // Set up expected diff
-    std::vector<SnapshotDiff> expectedDiffs = {
-        { faabric::util::SnapshotDataType::Raw,
-          faabric::util::SnapshotMergeOperation::Overwrite,
-          expectedDiffStart,
-          { sharedMem.get() + expectedDiffStart, expectedDiffSize } },
-    };
+      snap->diffWithDirtyRegions(memView, dirtyRegions);
 
     checkDiffs(actualDiffs, expectedDiffs);
 }
@@ -1415,7 +1569,9 @@ TEST_CASE("Test snapshot data constructors", "[snapshot][util]")
     REQUIRE(actualConst == data);
 }
 
-TEST_CASE("Test snapshot mapped memory diffs", "[snapshot][util]")
+TEST_CASE_METHOD(DirtyTrackingTestFixture,
+                 "Test snapshot mapped memory diffs",
+                 "[snapshot][util]")
 {
     int nSnapPages = 5;
     size_t snapSize = nSnapPages * HOST_PAGE_SIZE;
@@ -1434,71 +1590,81 @@ TEST_CASE("Test snapshot mapped memory diffs", "[snapshot][util]")
     snap->addMergeRegion(offsetA,
                          dataA.size(),
                          SnapshotDataType::Raw,
-                         SnapshotMergeOperation::Overwrite);
+                         SnapshotMergeOperation::Bytewise);
 
     snap->addMergeRegion(offsetB,
                          dataB.size(),
                          SnapshotDataType::Raw,
-                         SnapshotMergeOperation::Overwrite);
+                         SnapshotMergeOperation::Bytewise);
 
     snap->addMergeRegion(offsetC,
                          dataC.size(),
                          SnapshotDataType::Raw,
-                         SnapshotMergeOperation::Overwrite);
+                         SnapshotMergeOperation::Bytewise);
 
-    // Write data to snapshot
+    // Write some initial data to snapshot
     snap->copyInData(dataA);
 
     // Map some memory
     MemoryRegion memA = allocatePrivateMemory(snapSize);
-    snap->mapToMemory({ memA.get(), snapSize });
+    std::span<uint8_t> memViewA(memA.get(), snapSize);
+    snap->mapToMemory(memViewA);
 
-    faabric::util::resetDirtyTracking();
+    // Clear tracking
+    std::shared_ptr<DirtyTracker> tracker = getDirtyTracker();
+    tracker->clearAll();
+    snap->clearTrackedChanges();
 
     std::vector<uint8_t> actualSnap = snap->getDataCopy();
-    std::vector<uint8_t> actualA(memA.get(), memA.get() + snapSize);
-    REQUIRE(actualSnap == actualA);
+    std::vector<uint8_t> actualMemA(memA.get(), memA.get() + snapSize);
+    REQUIRE(actualSnap == actualMemA);
 
-    // Write data to snapshot
+    // Start dirty tracking
+    tracker->startTracking(memViewA);
+    tracker->startThreadLocalTracking(memViewA);
+
+    // Write some data to the snapshot
     snap->copyInData(dataB, offsetB);
 
-    // Write data to memory
+    // Write data to the mapped memory
     std::memcpy(memA.get() + offsetC, dataC.data(), dataC.size());
 
-    // Check diffs from memory vs snapshot
-    std::vector<SnapshotDiff> actualDiffs =
-      MemoryView({ memA.get(), snapSize }).diffWithSnapshot(snap);
-    REQUIRE(actualDiffs.size() == 1);
+    // Check diff of snapshot with memory only includes the change made to
+    // the memory itself
+    tracker->stopTracking(memViewA);
+    tracker->stopThreadLocalTracking(memViewA);
+    auto dirtyRegions = tracker->getBothDirtyPages(memViewA);
 
-    SnapshotDiff& actualDiff = actualDiffs.at(0);
-    REQUIRE(actualDiff.getData().size() == dataC.size());
-    REQUIRE(actualDiff.getOffset() == offsetC);
+    {
+        std::vector<SnapshotDiff> actualDiffs =
+          snap->diffWithDirtyRegions(memViewA, dirtyRegions);
+        REQUIRE(actualDiffs.size() == 1);
 
-    // Apply diffs from memory to the snapshot
-    snap->queueDiffs(actualDiffs);
-    snap->writeQueuedDiffs();
+        SnapshotDiff& actualDiff = actualDiffs.at(0);
+        REQUIRE(actualDiff.getData().size() == dataC.size());
+        REQUIRE(actualDiff.getOffset() == offsetC);
 
-    // Check snapshot now shows modified page
-    std::vector<SnapshotDiff> snapDirtyRegions =
-      MemoryView({ snap->getDataPtr(), snap->getSize() }).getDirtyRegions();
+        // Apply diffs from memory to the snapshot
+        snap->applyDiffs(actualDiffs);
+    }
 
-    REQUIRE(snapDirtyRegions.size() == 1);
-    SnapshotDiff& snapDirtyRegion = snapDirtyRegions.at(0);
-    REQUIRE(snapDirtyRegion.getOffset() == HOST_PAGE_SIZE);
+    // Check snapshot now shows both diffs
+    std::vector<SnapshotDiff> snapDirtyRegions = snap->getTrackedChanges();
+
+    REQUIRE(snapDirtyRegions.size() == 2);
+
+    SnapshotDiff& diffB = snapDirtyRegions.at(0);
+    SnapshotDiff& diffC = snapDirtyRegions.at(1);
+
+    REQUIRE(diffB.getOffset() == offsetB);
+    REQUIRE(diffC.getOffset() == offsetC);
 
     // Check modified data includes both updates
-    std::vector<uint8_t> dirtyRegionData = snapDirtyRegion.getDataCopy();
-    REQUIRE(dirtyRegionData.size() == HOST_PAGE_SIZE);
+    std::vector<uint8_t> diffDataB = diffB.getDataCopy();
+    std::vector<uint8_t> diffDataC = diffC.getDataCopy();
 
-    std::vector<uint8_t> expectedDirtyRegionData(HOST_PAGE_SIZE, 0);
-    std::memcpy(expectedDirtyRegionData.data() + (offsetB - HOST_PAGE_SIZE),
-                dataB.data(),
-                dataB.size());
-    std::memcpy(expectedDirtyRegionData.data() + (offsetC - HOST_PAGE_SIZE),
-                dataC.data(),
-                dataC.size());
-
-    REQUIRE(dirtyRegionData == expectedDirtyRegionData);
+    REQUIRE(diffDataB == dataB);
+    REQUIRE(diffDataC == dataC);
 
     // Map more memory from the snapshot, check it contains all updates
     MemoryRegion memB = allocatePrivateMemory(snapSize);
@@ -1515,5 +1681,401 @@ TEST_CASE("Test snapshot mapped memory diffs", "[snapshot][util]")
     snap->mapToMemory({ memA.get(), snapSize });
     std::vector<uint8_t> remappedMemA(memB.get(), memB.get() + snapSize);
     REQUIRE(remappedMemA == expectedFinal);
+}
+
+TEST_CASE("Test diffing byte array regions", "[util][snapshot]")
+{
+    std::vector<uint8_t> a;
+    std::vector<uint8_t> b;
+    std::vector<std::pair<uint32_t, uint32_t>> expected;
+
+    uint32_t startOffset = 0;
+    uint32_t endOffset = 0;
+    SECTION("Equal")
+    {
+        a = { 0, 1, 2, 3 };
+        b = { 0, 1, 2, 3 };
+        startOffset = 0;
+        endOffset = b.size();
+    }
+
+    SECTION("Empty") {}
+
+    SECTION("Not equal")
+    {
+        a = { 0, 0, 2, 2, 3, 3, 4, 4, 5, 5 };
+        b = { 0, 1, 1, 2, 3, 6, 6, 6, 5, 5 };
+        startOffset = 0;
+        endOffset = b.size();
+        expected = {
+            { 1, 2 },
+            { 5, 3 },
+        };
+    }
+
+    SECTION("Not equal subsections")
+    {
+        a = { 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0 };
+        b = { 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 0, 0 };
+        startOffset = 3;
+        endOffset = 10;
+        expected = {
+            { 3, 2 },
+            { 6, 1 },
+            { 8, 2 },
+        };
+    }
+
+    SECTION("Single length")
+    {
+        a = { 0, 1, 2, 3, 4 };
+        b = { 0, 1, 3, 3, 4 };
+        startOffset = 0;
+        endOffset = b.size();
+        expected = { { 2, 1 } };
+    }
+
+    SECTION("Difference at start")
+    {
+        a = { 0, 1, 2, 3, 4, 5, 6 };
+        b = { 1, 2, 3, 3, 3, 4, 6 };
+        startOffset = 0;
+        endOffset = b.size();
+        expected = { { 0, 3 }, { 4, 2 } };
+    }
+
+    SECTION("Difference at end")
+    {
+        a = { 0, 1, 2, 3, 4, 5, 6 };
+        b = { 0, 1, 1, 3, 3, 4, 5 };
+        startOffset = 0;
+        endOffset = b.size();
+        expected = { { 2, 1 }, { 4, 3 } };
+    }
+
+    SECTION("Not equal multiple chunks")
+    {
+        size_t arraySize = 4 * ARRAY_COMP_CHUNK_SIZE;
+        a = std::vector<uint8_t>(arraySize, 1);
+        b = std::vector<uint8_t>(arraySize, 1);
+        startOffset = 3;
+        endOffset = arraySize;
+
+        uint32_t offsetOneA = startOffset + ARRAY_COMP_CHUNK_SIZE + 2;
+        uint32_t offsetOneB = startOffset + ARRAY_COMP_CHUNK_SIZE + 10;
+        uint32_t offsetTwo = startOffset + 2 * ARRAY_COMP_CHUNK_SIZE + 1;
+
+        std::vector<uint8_t> diffChunkOneA = { 0, 0, 0 };
+        std::vector<uint8_t> diffChunkOneB = { 3, 3, 3, 3, 3 };
+        std::vector<uint8_t> diffChunkTwo = { 4, 4, 4, 4, 4, 4 };
+
+        std::copy(
+          diffChunkOneA.begin(), diffChunkOneA.end(), b.data() + offsetOneA);
+        std::copy(
+          diffChunkOneB.begin(), diffChunkOneB.end(), b.data() + offsetOneB);
+        std::copy(
+          diffChunkTwo.begin(), diffChunkTwo.end(), b.data() + offsetTwo);
+
+        expected = {
+            { offsetOneA, diffChunkOneA.size() },
+            { offsetOneB, diffChunkOneB.size() },
+            { offsetTwo, diffChunkTwo.size() },
+        };
+    }
+
+    SECTION("Not equal crossing chunks")
+    {
+        size_t arraySize = 3 * ARRAY_COMP_CHUNK_SIZE;
+        a = std::vector<uint8_t>(arraySize, 1);
+        b = std::vector<uint8_t>(arraySize, 1);
+        startOffset = 0;
+        endOffset = arraySize;
+
+        uint32_t offset = ARRAY_COMP_CHUNK_SIZE - 5;
+        std::vector<uint8_t> diffChunk(20, 2);
+
+        std::copy(diffChunk.begin(), diffChunk.end(), b.data() + offset);
+
+        expected = {
+            { offset, diffChunk.size() },
+        };
+    }
+
+    SECTION("Not equal chunk boundaries")
+    {
+        size_t arraySize = 3 * ARRAY_COMP_CHUNK_SIZE;
+        a = std::vector<uint8_t>(arraySize, 1);
+        b = std::vector<uint8_t>(arraySize, 1);
+        startOffset = 0;
+        endOffset = arraySize;
+
+        size_t diffSize = 20;
+        uint32_t offset = ARRAY_COMP_CHUNK_SIZE - diffSize;
+        std::vector<uint8_t> diffChunk(diffSize, 2);
+
+        std::copy(diffChunk.begin(), diffChunk.end(), b.data() + offset);
+
+        expected = {
+            { offset, diffChunk.size() },
+        };
+    }
+
+    std::vector<SnapshotDiff> actual;
+    diffArrayRegions(actual, startOffset, endOffset, a, b);
+
+    // Convert execpted into diffs
+    std::vector<SnapshotDiff> expectedDiffs;
+    for (auto p : expected) {
+        expectedDiffs.emplace_back(
+          SnapshotDataType::Raw,
+          SnapshotMergeOperation::Bytewise,
+          p.first,
+          std::span<uint8_t>(b.data() + p.first,
+                             b.data() + p.first + p.second));
+    }
+
+    REQUIRE(actual.size() == expected.size());
+    for (int i = 0; i < actual.size(); i++) {
+        REQUIRE(actual.at(i).getOffset() == expectedDiffs.at(i).getOffset());
+        REQUIRE(actual.at(i).getDataCopy() ==
+                expectedDiffs.at(i).getDataCopy());
+        REQUIRE(actual.at(i).getDataType() ==
+                expectedDiffs.at(i).getDataType());
+        REQUIRE(actual.at(i).getOperation() ==
+                expectedDiffs.at(i).getOperation());
+    }
+}
+
+TEST_CASE("Test snapshot merge region equality", "[snapshot][util]")
+{
+    SECTION("Equal")
+    {
+        SnapshotMergeRegion a(
+          10, 12, SnapshotDataType::Double, SnapshotMergeOperation::Ignore);
+        SnapshotMergeRegion b(
+          10, 12, SnapshotDataType::Double, SnapshotMergeOperation::Ignore);
+        REQUIRE(a == b);
+    }
+
+    SECTION("Offset unequal")
+    {
+        SnapshotMergeRegion a(
+          123, 12, SnapshotDataType::Double, SnapshotMergeOperation::Ignore);
+        SnapshotMergeRegion b(
+          10, 12, SnapshotDataType::Double, SnapshotMergeOperation::Ignore);
+        REQUIRE(a != b);
+    }
+
+    SECTION("Length unequal")
+    {
+        SnapshotMergeRegion a(
+          10, 22, SnapshotDataType::Double, SnapshotMergeOperation::Ignore);
+        SnapshotMergeRegion b(
+          10, 12, SnapshotDataType::Double, SnapshotMergeOperation::Ignore);
+        REQUIRE(a != b);
+    }
+
+    SECTION("Data type unequal")
+    {
+        SnapshotMergeRegion a(
+          10, 22, SnapshotDataType::Double, SnapshotMergeOperation::Ignore);
+        SnapshotMergeRegion b(
+          10, 22, SnapshotDataType::Bool, SnapshotMergeOperation::Ignore);
+        REQUIRE(a != b);
+    }
+
+    SECTION("Operation unequal")
+    {
+        SnapshotMergeRegion a(
+          10, 22, SnapshotDataType::Double, SnapshotMergeOperation::Ignore);
+        SnapshotMergeRegion b(
+          10, 22, SnapshotDataType::Double, SnapshotMergeOperation::Sum);
+        REQUIRE(a != b);
+    }
+    SECTION("Default constructors equal")
+    {
+        SnapshotMergeRegion a;
+        SnapshotMergeRegion b;
+        REQUIRE(a == b);
+    }
+}
+
+TEST_CASE_METHOD(SnapshotMergeTestFixture,
+                 "Test diffing snapshot memory with none tracking",
+                 "[snapshot][util]")
+{
+    setTrackingMode("none");
+
+    SECTION("XOR diffs") { conf.diffingMode = "xor"; }
+
+    SECTION("Bytewise diffs") { conf.diffingMode = "bytewise"; }
+
+    // Create snapshot
+    int snapPages = 4;
+    size_t snapSize = snapPages * HOST_PAGE_SIZE;
+
+    std::shared_ptr<SnapshotData> snap =
+      std::make_shared<SnapshotData>(snapSize);
+    reg.registerSnapshot(snapKey, snap);
+
+    // Map some memory
+    MemoryRegion mem = allocatePrivateMemory(snapSize);
+    std::span<uint8_t> memView(mem.get(), snapSize);
+    snap->mapToMemory(memView);
+
+    // Reset dirty tracking
+    std::shared_ptr<DirtyTracker> tracker = getDirtyTracker();
+    REQUIRE(tracker->getType() == "none");
+    tracker->clearAll();
+
+    // Start tracking
+    tracker->startTracking(memView);
+    tracker->startThreadLocalTracking(memView);
+
+    // Update the memory
+    std::vector<uint8_t> dataA = { 1, 2, 3, 4 };
+    std::vector<uint8_t> dataB = { 3, 4, 5 };
+    uint32_t offsetA = 0;
+    uint32_t offsetB = 2 * HOST_PAGE_SIZE + 1;
+
+    std::memcpy(mem.get() + offsetA, dataA.data(), dataA.size());
+    std::memcpy(mem.get() + offsetB, dataB.data(), dataB.size());
+
+    // Stop tracking
+    tracker->stopTracking(memView);
+    tracker->stopThreadLocalTracking(memView);
+
+    // Get diffs
+    std::vector<char> expectedDirtyPages(snapPages, 1);
+    std::vector<char> dirtyPages = tracker->getBothDirtyPages(memView);
+    REQUIRE(dirtyPages == expectedDirtyPages);
+
+    // Diff with snapshot
+    snap->fillGapsWithBytewiseRegions();
+    std::vector<SnapshotMergeRegion> actualRegions = snap->getMergeRegions();
+    REQUIRE(actualRegions.size() == 1);
+    REQUIRE(actualRegions.at(0).offset == 0);
+    REQUIRE(actualRegions.at(0).length == 0);
+
+    std::vector<faabric::util::SnapshotDiff> actual =
+      snap->diffWithDirtyRegions(memView, dirtyPages);
+
+    if (conf.diffingMode == "bytewise") {
+        REQUIRE(actual.size() == 2);
+        SnapshotDiff diffA = actual.at(0);
+        SnapshotDiff diffB = actual.at(1);
+
+        REQUIRE(diffA.getOffset() == offsetA);
+        REQUIRE(diffB.getOffset() == offsetB);
+
+        REQUIRE(diffA.getDataCopy() == dataA);
+        REQUIRE(diffB.getDataCopy() == dataB);
+    } else if (conf.diffingMode == "xor") {
+        REQUIRE(actual.size() == snapPages);
+
+        std::vector<uint8_t> blankPage(HOST_PAGE_SIZE, 0);
+
+        SnapshotDiff diffPage1 = actual.at(0);
+        SnapshotDiff diffPage2 = actual.at(1);
+        SnapshotDiff diffPage3 = actual.at(2);
+        SnapshotDiff diffPage4 = actual.at(3);
+
+        REQUIRE(diffPage1.getOffset() == 0);
+        REQUIRE(diffPage2.getOffset() == HOST_PAGE_SIZE);
+        REQUIRE(diffPage3.getOffset() == HOST_PAGE_SIZE * 2);
+        REQUIRE(diffPage4.getOffset() == HOST_PAGE_SIZE * 3);
+
+        // Pages with no diffs will just be zeroes
+        REQUIRE(diffPage2.getDataCopy() == blankPage);
+        REQUIRE(diffPage4.getDataCopy() == blankPage);
+
+        // Other pages will have diffs in place
+        std::vector<uint8_t> expectedA = blankPage;
+        std::vector<uint8_t> expectedB = blankPage;
+        std::copy(dataA.begin(), dataA.end(), expectedA.begin());
+        std::copy(dataB.begin(), dataB.end(), expectedB.begin() + 1);
+
+        REQUIRE(diffPage1.getDataCopy() == expectedA);
+        REQUIRE(diffPage3.getDataCopy() == expectedB);
+
+    } else {
+        FAIL();
+    }
+}
+
+TEST_CASE_METHOD(DirtyTrackingTestFixture, "Test XOR diffs", "[util][snapshot]")
+{
+    int nSnapPages = 5;
+    size_t snapSize = nSnapPages * HOST_PAGE_SIZE;
+
+    auto snap = std::make_shared<SnapshotData>(snapSize);
+
+    std::vector<char> expectedDirtyPages(nSnapPages, 0);
+    std::vector<uint8_t> expectedSnapData(snapSize, 0);
+
+    std::vector<uint8_t> dataA(150, 3);
+    std::vector<uint8_t> dataB(200, 4);
+
+    uint32_t offsetA = 0;
+    uint32_t offsetB = 2 * HOST_PAGE_SIZE + 100;
+    expectedDirtyPages[0] = 1;
+    expectedDirtyPages[2] = 1;
+
+    // Add merge regions
+    snap->addMergeRegion(offsetA,
+                         dataA.size(),
+                         SnapshotDataType::Raw,
+                         SnapshotMergeOperation::XOR);
+
+    snap->addMergeRegion(offsetB,
+                         dataB.size(),
+                         SnapshotDataType::Raw,
+                         SnapshotMergeOperation::XOR);
+
+    // Map some memory
+    MemoryRegion mem = allocatePrivateMemory(snapSize);
+    std::span<uint8_t> memView(mem.get(), snapSize);
+    snap->mapToMemory(memView);
+
+    // Clear tracking
+    std::shared_ptr<DirtyTracker> tracker = getDirtyTracker();
+    tracker->clearAll();
+    snap->clearTrackedChanges();
+
+    // Start tracking
+    tracker->startTracking(memView);
+    tracker->startThreadLocalTracking(memView);
+
+    // Copy in data
+    std::memcpy(mem.get() + offsetA, dataA.data(), dataA.size());
+    std::memcpy(mem.get() + offsetB, dataB.data(), dataB.size());
+
+    std::memcpy(expectedSnapData.data() + offsetA, dataA.data(), dataA.size());
+    std::memcpy(expectedSnapData.data() + offsetB, dataB.data(), dataB.size());
+
+    // Stop tracking
+    tracker->stopTracking(memView);
+    tracker->stopThreadLocalTracking(memView);
+
+    // Get diffs
+    std::vector<char> dirtyPages = tracker->getBothDirtyPages(memView);
+    REQUIRE(dirtyPages == expectedDirtyPages);
+
+    // Diff with snapshot
+    std::vector<faabric::util::SnapshotDiff> actual =
+      snap->diffWithDirtyRegions(memView, dirtyPages);
+
+    REQUIRE(actual.size() == 2);
+    SnapshotDiff diffA = actual.at(0);
+    SnapshotDiff diffB = actual.at(1);
+
+    REQUIRE(diffA.getOffset() == offsetA);
+    REQUIRE(diffB.getOffset() == offsetB);
+
+    // Apply the diffs to the snapshot
+    snap->applyDiffs(actual);
+
+    // Check snapshot data is now as expected
+    REQUIRE(snap->getDataCopy() == expectedSnapData);
 }
 }

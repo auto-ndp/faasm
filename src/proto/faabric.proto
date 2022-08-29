@@ -25,6 +25,7 @@ message BatchExecuteRequest {
         FUNCTIONS = 0;
         THREADS = 1;
         PROCESSES = 2;
+        MIGRATION = 3;
     }
 
     BatchExecuteType type = 2;
@@ -37,6 +38,10 @@ message BatchExecuteRequest {
     // Arbitrary context for this batch
     int32 subType = 6;
     bytes contextData = 7;
+
+    // Flag set by the scheduler when this batch is all executing on a single
+    // host
+    bool singleHost = 8;
 }
 
 message HostResources {
@@ -46,7 +51,8 @@ message HostResources {
 
 message UnregisterRequest {
     string host = 1;
-    Message function = 2;
+    string user = 2;
+    string function = 3;
 }
 
 message FunctionStatusResponse {
@@ -151,19 +157,16 @@ message Message {
 
     string cmdline = 34;
 
-    // SGX
-    bool isSgx = 35;
-
-    string sgxSid = 36;
-    string sgxNonce = 37;
-    string sgxTag = 38;
-    bytes sgxPolicy = 39;
-    bytes sgxResult = 40;
-
     // Exec-graph utils
-    bool recordExecGraph = 41;
-    map<string, int32> intExecGraphDetails = 42;
-    map<string, string> execGraphDetails = 43;
+    bool recordExecGraph = 35;
+    map<string, int32> intExecGraphDetails = 36;
+    map<string, string> execGraphDetails = 37;
+
+    // Function migration
+    int32 migrationCheckPeriod = 38;
+
+    // Scheduling
+    string topologyHint = 39;
 
     bool isStorage = 90;
     bool isOutputMemoryDelta = 91;
@@ -253,4 +256,21 @@ message PointToPointMappings {
     }
 
     repeated PointToPointMapping mappings = 3;
+}
+
+// ---------------------------------------------
+// FUNCTION MIGRATIONS
+// ---------------------------------------------
+
+message PendingMigrations {
+    int32 appId = 1;
+    int32 groupId = 2;
+
+    message PendingMigration {
+        Message msg = 1;
+        string srcHost = 2;
+        string dstHost = 3;
+    }
+
+    repeated PendingMigration migrations = 3;
 }

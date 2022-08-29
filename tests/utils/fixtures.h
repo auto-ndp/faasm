@@ -2,7 +2,9 @@
 
 #include <sys/mman.h>
 
+#include <faabric/proto/faabric.pb.h>
 #include <faabric/redis/Redis.h>
+#include <faabric/scheduler/ExecutorContext.h>
 #include <faabric/scheduler/ExecutorFactory.h>
 #include <faabric/scheduler/MpiWorld.h>
 #include <faabric/scheduler/MpiWorldRegistry.h>
@@ -13,9 +15,12 @@
 #include <faabric/transport/PointToPointBroker.h>
 #include <faabric/transport/PointToPointClient.h>
 #include <faabric/transport/PointToPointServer.h>
+#include <faabric/util/dirty.h>
+#include <faabric/util/func.h>
 #include <faabric/util/latch.h>
 #include <faabric/util/memory.h>
 #include <faabric/util/network.h>
+#include <faabric/util/scheduling.h>
 #include <faabric/util/testing.h>
 
 #include "DummyExecutorFactory.h"
@@ -61,14 +66,25 @@ class StateTestFixture
     }
 };
 
-class SchedulerTestFixture
+class CachedDecisionTestFixture
+{
+  public:
+    CachedDecisionTestFixture()
+      : decisionCache(faabric::util::getSchedulingDecisionCache())
+    {}
+
+    ~CachedDecisionTestFixture() { decisionCache.clear(); }
+
+  protected:
+    faabric::util::DecisionCache& decisionCache;
+};
+
+class SchedulerTestFixture : public CachedDecisionTestFixture
 {
   public:
     SchedulerTestFixture()
       : sch(faabric::scheduler::getScheduler())
     {
-        faabric::util::resetDirtyTracking();
-
         faabric::util::setMockMode(false);
         faabric::util::setTestMode(true);
 
@@ -90,8 +106,42 @@ class SchedulerTestFixture
         sch.shutdown();
         sch.addHostToGlobalSet();
 
-        faabric::util::resetDirtyTracking();
+        faabric::util::getDirtyTracker()->clearAll();
     };
+
+    // Helper method to set the available hosts and slots per host prior to
+    // making a scheduling decision
+    void setHostResources(std::vector<std::string> hosts,
+                          std::vector<int> slotsPerHost,
+                          std::vector<int> usedPerHost)
+    {
+        if (hosts.size() != slotsPerHost.size() ||
+            hosts.size() != usedPerHost.size()) {
+            SPDLOG_ERROR("Must provide one value for slots and used per host");
+            throw std::runtime_error(
+              "Not providing one value per slot and used per host");
+        }
+
+        sch.clearRecordedMessages();
+        faabric::scheduler::clearMockRequests();
+
+        for (int i = 0; i < hosts.size(); i++) {
+            faabric::HostResources resources;
+            resources.set_slots(slotsPerHost.at(i));
+            resources.set_usedslots(usedPerHost.at(i));
+
+            sch.addHostToGlobalSet(hosts.at(i));
+
+            // If setting resources for the master host, update the scheduler.
+            // Otherwise, queue the resource response
+            if (i == 0) {
+                sch.setThisHostResources(resources);
+            } else {
+                faabric::scheduler::queueResourceResponse(hosts.at(i),
+                                                          resources);
+            }
+        }
+    }
 
   protected:
     faabric::scheduler::Scheduler& sch;
@@ -103,14 +153,13 @@ class SnapshotTestFixture
     SnapshotTestFixture()
       : reg(faabric::snapshot::getSnapshotRegistry())
     {
-        faabric::util::resetDirtyTracking();
         reg.clear();
     }
 
     ~SnapshotTestFixture()
     {
-        faabric::util::resetDirtyTracking();
         reg.clear();
+        faabric::util::getDirtyTracker()->clearAll();
     }
 
     std::shared_ptr<faabric::util::SnapshotData> setUpSnapshot(
@@ -261,8 +310,8 @@ class PointToPointTestFixture
 
     ~PointToPointTestFixture()
     {
-        // Note - here we reset the thread-local cache for the test thread. If
-        // other threads are used in the tests, they too must do this.
+        // Here we reset the thread-local cache for the test thread. If other
+        // threads are used in the tests, they too must do this.
         broker.resetThreadLocalCache();
 
         faabric::transport::clearSentMessages();
@@ -293,19 +342,60 @@ class PointToPointClientServerFixture
     faabric::transport::PointToPointServer server;
 };
 
+class ExecutorContextTestFixture
+{
+  public:
+    ExecutorContextTestFixture() {}
+
+    ~ExecutorContextTestFixture()
+    {
+        faabric::scheduler::ExecutorContext::unset();
+    }
+
+    /**
+     * Creates a batch request and sets up the associated context
+     */
+    std::shared_ptr<faabric::BatchExecuteRequest> setUpContext(
+      const std::string& user,
+      const std::string& func,
+      int nMsgs = 1)
+    {
+        auto req = faabric::util::batchExecFactory(user, func, nMsgs);
+
+        setUpContext(req);
+
+        return req;
+    }
+
+    /**
+     * Sets up context for the given batch request
+     */
+    void setUpContext(std::shared_ptr<faabric::BatchExecuteRequest> req)
+    {
+        faabric::scheduler::ExecutorContext::set(nullptr, req, 0);
+    }
+};
+
+#define TEST_EXECUTOR_DEFAULT_MEMORY_SIZE (10 * faabric::util::HOST_PAGE_SIZE)
+
 class TestExecutor final : public faabric::scheduler::Executor
 {
   public:
     TestExecutor(faabric::MessageInBatch msg);
 
     faabric::util::MemoryRegion dummyMemory = nullptr;
-    size_t dummyMemorySize = 0;
+    size_t dummyMemorySize = TEST_EXECUTOR_DEFAULT_MEMORY_SIZE;
+    size_t maxMemorySize = 0;
 
     void reset(faabric::Message& msg) override;
 
-    void restore(faabric::Message& msg) override;
+    void restore(const std::string& snapshotKey) override;
 
-    faabric::util::MemoryView getMemoryView() override;
+    std::span<uint8_t> getMemoryView() override;
+
+    void setUpDummyMemory(size_t memSize);
+
+    size_t getMaxMemorySize() override;
 
     int32_t executeTask(
       int threadPoolIdx,
@@ -318,5 +408,28 @@ class TestExecutorFactory : public faabric::scheduler::ExecutorFactory
   protected:
     std::shared_ptr<faabric::scheduler::Executor> createExecutor(
       faabric::MessageInBatch msg) override;
+};
+
+class DirtyTrackingTestFixture : public ConfTestFixture
+{
+  public:
+    DirtyTrackingTestFixture()
+    {
+        conf.reset();
+        faabric::util::resetDirtyTracker();
+    };
+
+    ~DirtyTrackingTestFixture()
+    {
+        faabric::util::getDirtyTracker()->clearAll();
+        conf.reset();
+        faabric::util::resetDirtyTracker();
+    }
+
+    void setTrackingMode(const std::string& mode)
+    {
+        conf.dirtyTrackingMode = mode;
+        faabric::util::resetDirtyTracker();
+    }
 };
 }

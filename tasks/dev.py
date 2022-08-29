@@ -15,7 +15,14 @@ from invoke import task
 
 @task
 def cmake(
-    ctx, clean=False, shared=False, build="Debug", sanitiser="None", prof=False, tracy=False
+    ctx,
+    clean=False,
+    shared=False,
+    build="Debug",
+    sanitiser="None",
+    prof=False,
+    cpu=None,
+    tracy=False
 ):
     """
     Configures the build
@@ -45,6 +52,7 @@ def cmake(
         "-DFAABRIC_USE_SANITISER={}".format(sanitiser),
         "-DFAABRIC_SELF_TRACING={}".format("ON" if prof else "OFF"),
         "-DFAABRIC_TRACY_TRACING={}".format("ON" if tracy else "OFF"),
+        "-DFAABRIC_TARGET_CPU={}".format(cpu) if cpu else "",
         PROJ_ROOT,
     ]
 

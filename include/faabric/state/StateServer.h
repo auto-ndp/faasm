@@ -13,12 +13,12 @@ class StateServer final : public faabric::transport::MessageEndpointServer
   private:
     State& state;
 
-    void doAsyncRecv(int header,
-                     const uint8_t* buffer,
-                     size_t bufferSize) override;
+    void logOperation(const std::string& op);
 
-    std::unique_ptr<google::protobuf::Message>
-    doSyncRecv(int header, const uint8_t* buffer, size_t bufferSize) override;
+    void doAsyncRecv(transport::Message& message) override;
+
+    std::unique_ptr<google::protobuf::Message> doSyncRecv(
+      transport::Message& message) override;
 
     // Sync methods
 
@@ -43,12 +43,6 @@ class StateServer final : public faabric::transport::MessageEndpointServer
       size_t bufferSize);
 
     std::unique_ptr<google::protobuf::Message> recvDelete(const uint8_t* buffer,
-                                                          size_t bufferSize);
-
-    std::unique_ptr<google::protobuf::Message> recvLock(const uint8_t* buffer,
-                                                        size_t bufferSize);
-
-    std::unique_ptr<google::protobuf::Message> recvUnlock(const uint8_t* buffer,
                                                           size_t bufferSize);
 };
 }

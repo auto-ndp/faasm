@@ -6,6 +6,7 @@ faabric_lib(util
     clock.cpp
     crash.cpp
     delta.cpp
+    dirty.cpp
     environment.cpp
     exec_graph.cpp
     files.cpp
@@ -17,6 +18,7 @@ faabric_lib(util
     logging.cpp
     memory.cpp
     network.cpp
+    PeriodicBackgroundThread.cpp
     queue.cpp
     random.cpp
     scheduling.cpp

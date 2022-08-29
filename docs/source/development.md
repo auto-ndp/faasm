@@ -68,6 +68,11 @@ pip install -r requirements.txt
 inv dev.cc faabric
 ```
 
+## Debugging
+
+Note that Faabric provides its own `.gdbinit` file which will ensure segfaults
+(used in dirty tracking) aren't caught by gdb by default.
+
 ## Testing
 
 We have some standard tests using [Catch2](https://github.com/catchorg/Catch2)
@@ -95,10 +100,10 @@ In another terminal, (re)start the server:
 
 ```bash
 # Start
-./dist-tests/dev_server.sh
+./dist-test/dev_server.sh
 
 # Restart
-./dist-tests/dev_server.sh restart
+./dist-test/dev_server.sh restart
 ```
 
 Back in the CLI, you can then run the tests:
@@ -122,14 +127,13 @@ docker-compose stop
 ./dist-test/run.sh
 ```
 
-## Releasing
+## Creating a new tag
 
 Create a new branch, then find and replace the current version with the relevant
 bumped version. It should appear in:
 
 - `VERSION`
 - `.env`
-- `.github/workflows/sanitisers.yml`.
 - `.github/workflows/tests.yml`.
 - `mpi-native/mpi-native.env`
 
@@ -150,10 +154,17 @@ If you want to overwrite a tag, you can run:
 inv git.tag --force
 ```
 
+After the new tag has been merged in, and in order to keep a clean commit
+history, you may re-tag the code again:
+
+```bash
+inv git.tag --force
+```
+
 ### Building images manually
 
-Containers are built with Github Actions, so you should only need to build them
-yourself when diagnosing issues.
+Containers are built with Github Actions, when a new tag is pushed, so you
+should only need to build them yourself when diagnosing issues.
 
 To build the main container, run:
 
@@ -170,3 +181,35 @@ inv container.push
 inv container.build --push
 ```
 
+## Publishing a release
+
+To publish a release in Github, make sure you are in the main branch, and have
+just tagged the code (see previous section).
+
+Then, you can create a release on [Github](https://github.com/faasm/faabric/releases)
+and publish it from the command line. If it is the first time you are creating
+a release you will have to configure a Github access token (see below).
+
+First, generate a draft release:
+
+```bash
+inv git.release_create
+```
+
+Then, after verifying that the release looks fine, you may publish it:
+
+```bash
+inv git.release_publish
+```
+
+### Configuring a Github access token
+
+Follow the instructions on [how to create a personal access token](
+https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token).
+Then, create a config file for faabric in the main directory named
+`faabric.ini` with the following contents:
+
+```toml
+[Github]
+access_token = <paste your personal access token>
+```

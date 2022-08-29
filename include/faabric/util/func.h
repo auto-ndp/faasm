@@ -7,6 +7,14 @@
 
 namespace faabric::util {
 
+class FunctionMigratedException : public faabric::util::FaabricException
+{
+  public:
+    explicit FunctionMigratedException(std::string message)
+      : FaabricException(std::move(message))
+    {}
+};
+
 std::string funcToString(const faabric::Message& msg, bool includeId);
 
 std::string funcToString(
@@ -37,4 +45,11 @@ std::string statusKeyFromMessageId(unsigned int mid);
 std::vector<uint8_t> messageToBytes(const faabric::Message& msg);
 
 std::vector<std::string> getArgvForMessage(const faabric::Message& msg);
+
+/*
+ * Gets the key for the main thread snapshot for the given message. Result will
+ * be the same on all hosts.
+ */
+std::string getMainThreadSnapshotKey(const faabric::Message& msg);
+
 }

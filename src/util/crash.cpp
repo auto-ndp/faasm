@@ -25,6 +25,15 @@ void crashHandler(int sig, siginfo_t* siginfo, void* contextR) noexcept
     ucontext_t* context = static_cast<ucontext_t*>(contextR);
     UNUSED(context);
     UNUSED(siginfo);
+    faabric::util::handleCrash(sig);
+}
+
+namespace faabric::util {
+
+void handleCrash(int sig)
+{
+    std::array<void*, 32> stackPtrs;
+    size_t filledStacks = backtrace(stackPtrs.data(), stackPtrs.size());
     if (sig != TEST_SIGNAL) {
         write(STDERR_FILENO, ABORT_MSG.data(), ABORT_MSG.size());
     }
@@ -35,8 +44,6 @@ void crashHandler(int sig, siginfo_t* siginfo, void* contextR) noexcept
         exit(1);
     }
 }
-
-namespace faabric::util {
 
 void printStackTrace(void* contextR)
 {
@@ -58,16 +65,27 @@ void printStackTrace(void* contextR)
     }
 }
 
-void setUpCrashHandler()
+void setUpCrashHandler(int sig)
 {
     // cmdline is null-separated, so argv[0] == argv0
     std::string argv0 = faabric::util::readFileToString("/proc/self/cmdline");
     absl::InitializeSymbolizer(argv0.data());
-    fputs("Testing crash handler backtrace:\n", stderr);
-    fflush(stderr);
-    siginfo_t dummy_siginfo = {};
-    crashHandler(TEST_SIGNAL, &dummy_siginfo, nullptr);
-    SPDLOG_INFO("Installing crash handler");
+    std::vector<int> sigs;
+    if (sig >= 0) {
+        sigs = { sig };
+    } else {
+        fputs("Testing crash handler backtrace:\n", stderr);
+        fflush(stderr);
+        siginfo_t dummy_siginfo = {};
+        crashHandler(TEST_SIGNAL, &dummy_siginfo, nullptr);
+        SPDLOG_INFO("Installing crash handler");
+
+        // We don't handle SIGSEGV here because segfault handling is
+        // necessary for dirty tracking and if this handler gets initialised
+        // after the one for dirty tracking it thinks legitimate dirty tracking
+        // segfaults are crashes
+        sigs = { SIGSEGV, SIGABRT, SIGILL, SIGFPE };
+    }
     constexpr size_t sigstack_size = 16384;
     void* sigstack = mmap(nullptr,
                           sigstack_size,
@@ -92,7 +110,7 @@ void setUpCrashHandler()
     action.sa_handler = nullptr;
     action.sa_sigaction = &crashHandler;
     sigemptyset(&action.sa_mask);
-    for (auto signo : { SIGSEGV, SIGABRT, SIGILL, SIGFPE }) {
+    for (auto signo : sigs) {
         if (sigaction(signo, &action, nullptr) < 0) {
             SPDLOG_WARN("Couldn't install handler for signal {}", signo);
         } else {

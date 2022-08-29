@@ -14,8 +14,6 @@ DummyExecutor::DummyExecutor(faabric::MessageInBatch msg)
   : Executor(std::move(msg))
 {}
 
-DummyExecutor::~DummyExecutor() {}
-
 int32_t DummyExecutor::executeTask(
   int threadPoolIdx,
   int msgIdx,

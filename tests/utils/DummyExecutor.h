@@ -9,8 +9,6 @@ class DummyExecutor final : public Executor
   public:
     DummyExecutor(faabric::MessageInBatch msg);
 
-    ~DummyExecutor() override;
-
   protected:
     int32_t executeTask(
       int threadPoolIdx,

@@ -373,7 +373,7 @@ TEST_CASE("Test set operations", "[redis]")
     std::string setA = "set_a";
     std::string setB = "set_b";
 
-    // NOTE - we need to check Redis can store odd strings like IPs
+    // We need to check Redis can store odd strings like IPs
     std::string valueA = "12.45.67.89";
     std::string valueB = "val_b";
     std::string valueC = "192.168.3.4";
@@ -518,7 +518,7 @@ TEST_CASE("Test dequeue after enqueue", "[redis]")
 
     SECTION("Nonzero timeout") { timeout = 500; }
 
-    std::thread t([&redisQueue, &success, &timeout] {
+    std::jthread t([&redisQueue, &success, &timeout] {
         std::string res = redisQueue.dequeue("foobar", timeout);
         success = res == "baz";
     });
@@ -537,7 +537,7 @@ TEST_CASE("Test enqueue after blocking dequeue")
 
     // Start thread blocking on dequeue
     bool success = false;
-    std::thread t([&success] {
+    std::jthread t([&success] {
         Redis& rq = Redis::getQueue();
         std::string res = rq.dequeue("foobar");
         success = res == "baz";

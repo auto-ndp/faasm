@@ -10,6 +10,13 @@
 #include <pistache/http.h>
 
 namespace faabric::endpoint {
+
+enum class EndpointMode
+{
+    SIGNAL,
+    BG_THREAD
+};
+
 namespace detail {
 struct EndpointState;
 }
@@ -42,7 +49,7 @@ class Endpoint
              int threadCount,
              std::shared_ptr<HttpRequestHandler> requestHandlerIn);
 
-    void start(bool awaitSignal = true);
+    void start(EndpointMode mode = EndpointMode::SIGNAL);
 
     void stop();
 

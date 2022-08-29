@@ -26,15 +26,10 @@ class DummyServer final : public MessageEndpointServer
     std::atomic<int> messageCount = 0;
 
   private:
-    void doAsyncRecv(int header,
-                     const uint8_t* buffer,
-                     size_t bufferSize) override
-    {
-        messageCount++;
-    }
+    void doAsyncRecv(transport::Message& message) override { messageCount++; }
 
-    std::unique_ptr<google::protobuf::Message>
-    doSyncRecv(int header, const uint8_t* buffer, size_t bufferSize) override
+    std::unique_ptr<google::protobuf::Message> doSyncRecv(
+      transport::Message& message) override
     {
         messageCount++;
 
@@ -50,20 +45,18 @@ class EchoServer final : public MessageEndpointServer
     {}
 
   protected:
-    void doAsyncRecv(int header,
-                     const uint8_t* buffer,
-                     size_t bufferSize) override
+    void doAsyncRecv(transport::Message& message) override
     {
         throw std::runtime_error("Echo server not expecting async recv");
     }
 
-    std::unique_ptr<google::protobuf::Message>
-    doSyncRecv(int header, const uint8_t* buffer, size_t bufferSize) override
+    std::unique_ptr<google::protobuf::Message> doSyncRecv(
+      transport::Message& message) override
     {
-        SPDLOG_TRACE("Echo server received {} bytes", bufferSize);
+        SPDLOG_TRACE("Echo server received {} bytes", message.size());
 
         auto response = std::make_unique<faabric::StatePart>();
-        response->set_data(buffer, bufferSize);
+        response->set_data(message.udata(), message.size());
 
         return response;
     }
@@ -79,17 +72,15 @@ class SleepServer final : public MessageEndpointServer
     {}
 
   protected:
-    void doAsyncRecv(int header,
-                     const uint8_t* buffer,
-                     size_t bufferSize) override
+    void doAsyncRecv(transport::Message& message) override
     {
         throw std::runtime_error("Sleep server not expecting async recv");
     }
 
-    std::unique_ptr<google::protobuf::Message>
-    doSyncRecv(int header, const uint8_t* buffer, size_t bufferSize) override
+    std::unique_ptr<google::protobuf::Message> doSyncRecv(
+      transport::Message& message) override
     {
-        int* sleepTimeMs = (int*)buffer;
+        int* sleepTimeMs = (int*)message.udata();
         SPDLOG_DEBUG("Sleep server sleeping for {}ms", *sleepTimeMs);
         SLEEP_MS(*sleepTimeMs);
 
@@ -108,15 +99,13 @@ class BlockServer final : public MessageEndpointServer
     {}
 
   protected:
-    void doAsyncRecv(int header,
-                     const uint8_t* buffer,
-                     size_t bufferSize) override
+    void doAsyncRecv(transport::Message& message) override
     {
         throw std::runtime_error("Lock server not expecting async recv");
     }
 
-    std::unique_ptr<google::protobuf::Message>
-    doSyncRecv(int header, const uint8_t* buffer, size_t bufferSize) override
+    std::unique_ptr<google::protobuf::Message> doSyncRecv(
+      transport::Message& message) override
     {
         // Wait on the latch, requires multiple threads executing in parallel to
         // get a response.
@@ -124,7 +113,7 @@ class BlockServer final : public MessageEndpointServer
 
         // Echo input data
         auto response = std::make_unique<faabric::StatePart>();
-        response->set_data(buffer, bufferSize);
+        response->set_data(message.udata(), message.size());
         return response;
     }
 
@@ -184,12 +173,12 @@ TEST_CASE("Test multiple clients talking to one server", "[transport]")
     EchoServer server;
     server.start();
 
-    std::vector<std::thread> clientThreads;
+    std::vector<std::jthread> clientThreads;
     int numClients = 10;
     int numMessages = 1000;
 
     for (int i = 0; i < numClients; i++) {
-        clientThreads.emplace_back(std::thread([i, numMessages] {
+        clientThreads.emplace_back(std::jthread([i, numMessages] {
             // Prepare client
             MessageEndpointClient cli(
               LOCALHOST, TEST_PORT_ASYNC, TEST_PORT_SYNC);
@@ -253,8 +242,8 @@ TEST_CASE("Test client timeout on requests to valid server", "[transport]")
     if (expectFailure) {
         bool failed = false;
 
-        // Note - here we must wait until the server has finished handling the
-        // request, even though it's failed
+        // Here we must wait until the server has finished handling the request,
+        // even though it's failed
         server.setRequestLatch();
 
         // Make the call and check it fails
@@ -285,7 +274,7 @@ TEST_CASE("Test blocking requests in multi-threaded server", "[transport]")
     bool successes[2] = { false, false };
 
     // Create two background threads to make the blocking requests
-    std::thread tA([&successes] {
+    std::jthread tA([&successes] {
         MessageEndpointClient cli(LOCALHOST, TEST_PORT_ASYNC, TEST_PORT_SYNC);
 
         std::string expectedMsg = "Background thread A";
@@ -304,7 +293,7 @@ TEST_CASE("Test blocking requests in multi-threaded server", "[transport]")
         }
     });
 
-    std::thread tB([&successes] {
+    std::jthread tB([&successes] {
         MessageEndpointClient cli(LOCALHOST, TEST_PORT_ASYNC, TEST_PORT_SYNC);
 
         std::string expectedMsg = "Background thread B";
@@ -334,6 +323,39 @@ TEST_CASE("Test blocking requests in multi-threaded server", "[transport]")
 
     REQUIRE(successes[0]);
     REQUIRE(successes[1]);
+
+    server.stop();
+}
+
+TEST_CASE("Test server keeps listening after socket timeout", "[transport]")
+{
+    // Short timeout
+    int timeoutMs = 100;
+
+    DummyServer server;
+    server.start(timeoutMs);
+
+    REQUIRE(server.messageCount == 0);
+    MessageEndpointClient cli(LOCALHOST, TEST_PORT_ASYNC, TEST_PORT_SYNC);
+
+    // Send a message
+    std::string body = "body";
+    const uint8_t* bodyMsg = BYTES_CONST(body.c_str());
+
+    server.setRequestLatch();
+    cli.asyncSend(0, bodyMsg, body.size());
+    server.awaitRequestLatch();
+
+    REQUIRE(server.messageCount == 1);
+
+    // Sleep for longer than the timeout
+    SLEEP_MS(5 * timeoutMs);
+
+    server.setRequestLatch();
+    cli.asyncSend(0, bodyMsg, body.size());
+    server.awaitRequestLatch();
+
+    REQUIRE(server.messageCount == 2);
 
     server.stop();
 }

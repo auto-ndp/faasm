@@ -8,12 +8,22 @@
 #include <string>
 #include <vector>
 
+#include <faabric/util/dirty.h>
 #include <faabric/util/logging.h>
 #include <faabric/util/macros.h>
 #include <faabric/util/memory.h>
 
 namespace faabric::util {
 
+// This paramter controls the step size in the array comparison function. The
+// function will normally be comparing 4kB pages, and when it detects a change
+// within a chunk, it will byte-wise compare that chunk
+#define ARRAY_COMP_CHUNK_SIZE 128
+
+/**
+ * Defines the permitted datatypes for snapshot diffs. Each has a predefined
+ * length, except for the raw option which is used for generic streams of bytes.
+ */
 enum SnapshotDataType
 {
     Raw,
@@ -24,17 +34,32 @@ enum SnapshotDataType
     Double
 };
 
+/**
+ * Defines the operation to perform when merging the diff with the original
+ * snapshot.
+ *
+ * WARNING: this enum forms part of the API with executing applications, so make
+ * sure they are updated accordingly when it's changed.
+ */
 enum SnapshotMergeOperation
 {
-    Overwrite,
+    Bytewise,
     Sum,
     Product,
     Subtract,
     Max,
     Min,
-    Ignore
+    Ignore,
+    XOR
 };
 
+/**
+ * Represents a modification to a snapshot (a.k.a. a dirty region). Specifies
+ * the modified data, as well as its offset within the snapshot.
+ *
+ * Each diff does not own the data, it just provides a span pointing at the
+ * original data.
+ */
 class SnapshotDiff
 {
   public:
@@ -57,18 +82,50 @@ class SnapshotDiff
 
   private:
     SnapshotDataType dataType = SnapshotDataType::Raw;
-    SnapshotMergeOperation operation = SnapshotMergeOperation::Overwrite;
+    SnapshotMergeOperation operation = SnapshotMergeOperation::Bytewise;
     uint32_t offset = 0;
-    std::vector<uint8_t> data;
+
+    std::span<const uint8_t> data;
 };
 
+/*
+ * Appends a list of snapshot diffs for any bytes differing between the two
+ * arrays.
+ *
+ * The function compares chunks of bytes at a time, if there are no differences,
+ * it skips to the next chunk. If one or more differences are detected in a
+ * chunk, it does a byte-wise comparison on that chunk.
+ *
+ * The performance of this will vary depending on how sparse the diffs are, and
+ * on the chunk size itself. A larger chunk size is optimal for very sparse
+ * changes, but it makes the byte-wise comparision more intensive (as we're
+ * byte-wise comparing more bytes).
+ */
+void diffArrayRegions(std::vector<SnapshotDiff>& diffs,
+                      uint32_t startOffset,
+                      uint32_t endOffset,
+                      std::span<const uint8_t> a,
+                      std::span<const uint8_t> b);
+
+/**
+ * Defines how diffs in the given snapshot region should be interpreted wrt the
+ * original snapshot.
+ *
+ * For example, it may specify that the change should be treated as an integer
+ * that needs to be summed (i.e. the diff is the current value minus the
+ * original), or just as a region of raw bytes that needs to be XORed with the
+ * original.
+ *
+ * A merge region specifies an offset, length, data type and operation, e.g. an
+ * integer to be summed at offset 100 with a length of 4.
+ */
 class SnapshotMergeRegion
 {
   public:
     uint32_t offset = 0;
     size_t length = 0;
     SnapshotDataType dataType = SnapshotDataType::Raw;
-    SnapshotMergeOperation operation = SnapshotMergeOperation::Overwrite;
+    SnapshotMergeOperation operation = SnapshotMergeOperation::Bytewise;
 
     SnapshotMergeRegion() = default;
 
@@ -79,16 +136,30 @@ class SnapshotMergeRegion
 
     void addDiffs(std::vector<SnapshotDiff>& diffs,
                   std::span<const uint8_t> originalData,
-                  std::span<const uint8_t> updatedData,
-                  std::pair<uint32_t, uint32_t> dirtyRange);
+                  std::span<uint8_t> updatedData,
+                  const std::vector<char>& dirtyRegions);
 
-  private:
-    void addOverwriteDiff(std::vector<SnapshotDiff>& diffs,
-                          std::span<const uint8_t> original,
-                          std::span<const uint8_t> updated,
-                          std::pair<uint32_t, uint32_t> dirtyRange);
+    /**
+     * This allows us to sort the merge regions which is important for diffing
+     * purposes.
+     */
+    bool operator<(const SnapshotMergeRegion& other) const
+    {
+        return (offset < other.offset);
+    }
+
+    bool operator==(const SnapshotMergeRegion& other) const
+    {
+        return offset == other.offset && length == other.length &&
+               dataType == other.dataType && operation == other.operation;
+    }
 };
 
+/*
+ * Calculates a diff value that can later be merged into the master copy of the
+ * given snapshot. It will be used on remote hosts to calculate the diffs that
+ * are to be sent back to the master host.
+ */
 template<typename T>
 inline bool calculateDiffValue(const uint8_t* original,
                                uint8_t* updated,
@@ -138,6 +209,10 @@ inline bool calculateDiffValue(const uint8_t* original,
     return true;
 }
 
+/*
+ * Applies a diff value to the master copy of a snapshot, where the diff has
+ * been calculated based on a change made to another copy of the same snapshot.
+ */
 template<typename T>
 inline T applyDiffValue(const uint8_t* original,
                         const uint8_t* diff,
@@ -202,26 +277,43 @@ class SnapshotData
     void addMergeRegion(uint32_t offset,
                         size_t length,
                         SnapshotDataType dataType,
-                        SnapshotMergeOperation operation,
-                        bool overwrite = false);
+                        SnapshotMergeOperation operation);
 
-    void fillGapsWithOverwriteRegions();
+    void fillGapsWithBytewiseRegions();
 
     void clearMergeRegions();
 
-    std::map<uint32_t, SnapshotMergeRegion> getMergeRegions();
+    std::vector<SnapshotMergeRegion> getMergeRegions();
 
     size_t getQueuedDiffsCount();
 
-    void queueDiffs(std::span<SnapshotDiff> diffs);
+    void applyDiffs(const std::vector<SnapshotDiff>& diffs);
 
-    void writeQueuedDiffs();
+    void applyDiff(const SnapshotDiff& diff);
+
+    void queueDiffs(const std::vector<SnapshotDiff>& diffs);
+
+    int writeQueuedDiffs();
 
     size_t getSize() const { return size; }
 
     size_t getMaxSize() const { return maxSize; }
 
     int getFd() const { return fd; }
+
+    // Returns a list of changes that have been made to the snapshot since the
+    // last time the list was cleared.
+    std::vector<SnapshotDiff> getTrackedChanges();
+
+    // Clears the list of tracked changes.
+    void clearTrackedChanges();
+
+    // Returns the list of changes in the given dirty regions versus their
+    // original value in the snapshot, based on the merge regions set on this
+    // snapshot.
+    std::vector<faabric::util::SnapshotDiff> diffWithDirtyRegions(
+      std::span<uint8_t> updated,
+      const std::vector<char>& dirtyRegions);
 
   private:
     size_t size = 0;
@@ -235,35 +327,19 @@ class SnapshotData
 
     std::vector<SnapshotDiff> queuedDiffs;
 
-    // Note - we care about the order of this map, as we iterate through it
-    // in order of offsets
-    std::map<uint32_t, SnapshotMergeRegion> mergeRegions;
+    std::vector<std::pair<uint32_t, uint32_t>> trackedChanges;
+
+    std::vector<SnapshotMergeRegion> mergeRegions;
 
     uint8_t* validatedOffsetPtr(uint32_t offset);
 
     void mapToMemory(uint8_t* target, bool shared);
 
     void writeData(std::span<const uint8_t> buffer, uint32_t offset = 0);
-};
 
-class MemoryView
-{
-  public:
-    // Note - this object is just a view of a section of memory, and does not
-    // own the underlying data
-    MemoryView() = default;
+    void xorData(std::span<const uint8_t> buffer, uint32_t offset = 0);
 
-    explicit MemoryView(std::span<const uint8_t> dataIn);
-
-    std::vector<SnapshotDiff> getDirtyRegions();
-
-    std::vector<SnapshotDiff> diffWithSnapshot(
-      std::shared_ptr<SnapshotData> snap);
-
-    std::span<const uint8_t> getData() { return data; }
-
-  private:
-    std::span<const uint8_t> data;
+    void checkWriteExtension(std::span<const uint8_t> buffer, uint32_t offset);
 };
 
 std::string snapshotDataTypeStr(SnapshotDataType dt);

@@ -13,6 +13,7 @@ RUN apt-get update \
     clang-tidy-13 \
     clang-tools-13 \
     cmake \
+    doxygen \
     g++-11 \
     git \
     libboost-filesystem-dev \
@@ -35,6 +36,9 @@ RUN apt-get update \
     ninja-build \
     && apt-get clean autoclean \
     && apt-get autoremove
+
+# Update pip
+RUN pip install -U pip
 
 RUN pip install cmake==3.22.1
 RUN pip install conan==1.44.0

@@ -6,6 +6,7 @@
 #include <unistd.h>
 
 #include <faabric/transport/MessageEndpoint.h>
+#include <faabric/util/gids.h>
 #include <faabric/util/latch.h>
 #include <faabric/util/macros.h>
 
@@ -26,12 +27,14 @@ TEST_CASE_METHOD(SchedulerTestFixture,
     AsyncRecvMessageEndpoint dst(TEST_PORT);
 
     // Send message
+    uint8_t dummyHeader = 8;
     std::string expectedMsg = "Hello world!";
     const uint8_t* msg = BYTES_CONST(expectedMsg.c_str());
-    src.send(msg, expectedMsg.size());
+    src.send(dummyHeader, msg, expectedMsg.size());
 
     // Receive message
-    faabric::transport::Message recvMsg = dst.recv().value();
+    faabric::transport::Message recvMsg = dst.recv();
+    REQUIRE(recvMsg.getHeader() == dummyHeader);
     REQUIRE(recvMsg.size() == expectedMsg.size());
     std::string actualMsg(recvMsg.data(), recvMsg.size());
     REQUIRE(actualMsg == expectedMsg);
@@ -47,21 +50,22 @@ TEST_CASE_METHOD(SchedulerTestFixture,
 
     auto latch = faabric::util::Latch::create(2);
 
-    std::thread recvThread([&latch, expectedMsg] {
+    std::jthread recvThread([&latch, expectedMsg] {
         // Make sure this only runs once the send has been done
         latch->wait();
 
         // Receive message
         AsyncRecvMessageEndpoint dst(TEST_PORT);
-        faabric::transport::Message recvMsg = dst.recv().value();
+        faabric::transport::Message recvMsg = dst.recv();
 
         assert(recvMsg.size() == expectedMsg.size());
         std::string actualMsg(recvMsg.data(), recvMsg.size());
         assert(actualMsg == expectedMsg);
     });
 
+    uint8_t dummyHeader = 8;
     const uint8_t* msg = BYTES_CONST(expectedMsg.c_str());
-    src.send(msg, expectedMsg.size());
+    src.send(dummyHeader, msg, expectedMsg.size());
     latch->wait();
 
     if (recvThread.joinable()) {
@@ -75,7 +79,7 @@ TEST_CASE_METHOD(SchedulerTestFixture, "Test await response", "[transport]")
     std::string expectedMsg = "Hello ";
     std::string expectedResponse = "world!";
 
-    std::thread senderThread([expectedMsg, expectedResponse] {
+    std::jthread senderThread([expectedMsg, expectedResponse] {
         // Open the source endpoint client
         SyncSendMessageEndpoint src(LOCALHOST, TEST_PORT);
 
@@ -85,7 +89,7 @@ TEST_CASE_METHOD(SchedulerTestFixture, "Test await response", "[transport]")
                                      expectedMsg.size());
 
         faabric::transport::Message recvMsg =
-          src.sendAwaitResponse(bytes.data(), bytes.size());
+          src.sendAwaitResponse(NO_HEADER, bytes.data(), bytes.size());
 
         // Block waiting for a response
         assert(recvMsg.size() == expectedResponse.size());
@@ -95,14 +99,14 @@ TEST_CASE_METHOD(SchedulerTestFixture, "Test await response", "[transport]")
 
     // Receive message
     SyncRecvMessageEndpoint dst(TEST_PORT);
-    faabric::transport::Message recvMsg = dst.recv().value();
+    faabric::transport::Message recvMsg = dst.recv();
     REQUIRE(recvMsg.size() == expectedMsg.size());
     std::string actualMsg(recvMsg.data(), recvMsg.size());
     REQUIRE(actualMsg == expectedMsg);
 
     // Send response
     const uint8_t* msg = BYTES_CONST(expectedResponse.c_str());
-    dst.sendResponse(msg, expectedResponse.size());
+    dst.sendResponse(NO_HEADER, msg, expectedResponse.size());
 
     // Wait for sender thread
     if (senderThread.joinable()) {
@@ -116,26 +120,28 @@ TEST_CASE_METHOD(SchedulerTestFixture,
 {
     int numMessages = 10000;
     std::string baseMsg = "Hello ";
+    uint8_t dummyHeader = 8;
 
-    std::thread senderThread([numMessages, baseMsg] {
+    std::jthread senderThread([numMessages, dummyHeader, baseMsg] {
         // Open the source endpoint client
         AsyncSendMessageEndpoint src(LOCALHOST, TEST_PORT);
         for (int i = 0; i < numMessages; i++) {
             std::string msgData = baseMsg + std::to_string(i);
             const uint8_t* msg = BYTES_CONST(msgData.c_str());
-            src.send(msg, msgData.size());
+            src.send(dummyHeader, msg, msgData.size());
         }
     });
 
     // Receive messages
     AsyncRecvMessageEndpoint dst(TEST_PORT);
     for (int i = 0; i < numMessages; i++) {
-        faabric::transport::Message recvMsg = dst.recv().value();
+        faabric::transport::Message recvMsg = dst.recv();
         // Check just a subset of the messages
-        // Note - this implicitly tests in-order message delivery
+        // This implicitly tests in-order message delivery
         if ((i % (numMessages / 10)) == 0) {
             std::string expectedMsg = baseMsg + std::to_string(i);
             REQUIRE(recvMsg.size() == expectedMsg.size());
+            REQUIRE(recvMsg.getHeader() == dummyHeader);
             std::string actualMsg(recvMsg.data(), recvMsg.size());
             REQUIRE(actualMsg == expectedMsg);
         }
@@ -154,26 +160,30 @@ TEST_CASE_METHOD(SchedulerTestFixture,
     int numMessages = 10000;
     int numSenders = 10;
     std::string expectedMsg = "Hello from client";
-    std::vector<std::thread> senderThreads;
+    std::vector<std::jthread> senderThreads;
     const uint8_t* msg = BYTES_CONST(expectedMsg.c_str());
 
+    uint8_t dummyHeader = 5;
+
     for (int j = 0; j < numSenders; j++) {
-        senderThreads.emplace_back(std::thread([msg, numMessages, expectedMsg] {
-            // Open the source endpoint client
-            AsyncSendMessageEndpoint src(LOCALHOST, TEST_PORT);
-            for (int i = 0; i < numMessages; i++) {
-                src.send(msg, expectedMsg.size());
-            }
-        }));
+        senderThreads.emplace_back(
+          std::jthread([msg, dummyHeader, numMessages, expectedMsg] {
+              // Open the source endpoint client
+              AsyncSendMessageEndpoint src(LOCALHOST, TEST_PORT);
+              for (int i = 0; i < numMessages; i++) {
+                  src.send(dummyHeader, msg, expectedMsg.size());
+              }
+          }));
     }
 
     // Receive messages
     AsyncRecvMessageEndpoint dst(TEST_PORT);
     for (int i = 0; i < numSenders * numMessages; i++) {
-        faabric::transport::Message recvMsg = dst.recv().value();
+        faabric::transport::Message recvMsg = dst.recv();
         // Check just a subset of the messages
         if ((i % numMessages) == 0) {
             REQUIRE(recvMsg.size() == expectedMsg.size());
+            REQUIRE(recvMsg.getHeader() == dummyHeader);
             std::string actualMsg(recvMsg.data(), recvMsg.size());
             REQUIRE(actualMsg == expectedMsg);
         }
@@ -231,27 +241,22 @@ TEST_CASE_METHOD(SchedulerTestFixture, "Test direct messaging", "[transport]")
     std::string expected = "Direct hello";
     const uint8_t* msg = BYTES_CONST(expected.c_str());
 
-    std::string inprocLabel = "direct-test";
+    std::string inprocLabel =
+      "direct-test-" + std::to_string(faabric::util::generateGid());
 
+    // Send the message
+    uint8_t dummyHeader = 7;
     AsyncDirectSendEndpoint sender(inprocLabel);
-    sender.send(msg, expected.size());
+    sender.send(dummyHeader, msg, expected.size());
 
     AsyncDirectRecvEndpoint receiver(inprocLabel);
 
     std::string actual;
-    SECTION("Recv with size")
-    {
-        faabric::transport::Message recvMsg =
-          receiver.recv(expected.size()).value();
-        actual = std::string(recvMsg.data(), recvMsg.size());
-    }
+    faabric::transport::Message recvMsg = receiver.recv();
 
-    SECTION("Recv no size")
-    {
-        faabric::transport::Message recvMsg = receiver.recv().value();
-        actual = std::string(recvMsg.data(), recvMsg.size());
-    }
+    REQUIRE(recvMsg.getHeader() == dummyHeader);
 
+    actual = std::string(recvMsg.data(), recvMsg.size());
     REQUIRE(actual == expected);
 }
 
@@ -261,36 +266,38 @@ TEST_CASE_METHOD(SchedulerTestFixture,
 {
     int nMessages = 1000;
     int nPairs = 3;
+    uint8_t dummyHeader = 2;
     std::string inprocLabel = "direct-test-";
 
     std::shared_ptr<faabric::util::Latch> startLatch =
       faabric::util::Latch::create(nPairs + 1);
 
-    std::vector<std::thread> senders;
-    std::vector<std::thread> receivers;
+    std::vector<std::jthread> senders;
+    std::vector<std::jthread> receivers;
 
     for (int i = 0; i < nPairs; i++) {
-        senders.emplace_back([i, nMessages, inprocLabel, &startLatch] {
-            std::string thisLabel = inprocLabel + std::to_string(i);
-            AsyncDirectSendEndpoint sender(thisLabel);
+        senders.emplace_back(
+          [i, dummyHeader, nMessages, inprocLabel, &startLatch] {
+              std::string thisLabel = inprocLabel + std::to_string(i);
+              AsyncDirectSendEndpoint sender(thisLabel);
 
-            for (int m = 0; m < nMessages; m++) {
-                std::string expected =
-                  "Direct hello " + std::to_string(i) + "_" + std::to_string(m);
-                const uint8_t* msg = BYTES_CONST(expected.c_str());
-                sender.send(msg, expected.size());
+              for (int m = 0; m < nMessages; m++) {
+                  std::string expected = "Direct hello " + std::to_string(i) +
+                                         "_" + std::to_string(m);
+                  const uint8_t* msg = BYTES_CONST(expected.c_str());
+                  sender.send(dummyHeader, msg, expected.size());
 
-                if (m % 100 == 0) {
-                    SLEEP_MS(10);
-                }
+                  if (m % 100 == 0) {
+                      SLEEP_MS(10);
+                  }
 
-                // Make main thread wait until messages are queued (to check no
-                // issue with connecting before binding)
-                if (m == 10) {
-                    startLatch->wait();
-                }
-            }
-        });
+                  // Make main thread wait until messages are queued (to check
+                  // no issue with connecting before binding)
+                  if (m == 10) {
+                      startLatch->wait();
+                  }
+              }
+          });
     }
 
     // Wait for queued messages
@@ -304,7 +311,7 @@ TEST_CASE_METHOD(SchedulerTestFixture,
 
             // Receive messages
             for (int m = 0; m < nMessages; m++) {
-                faabric::transport::Message recvMsg = receiver.recv().value();
+                faabric::transport::Message recvMsg = receiver.recv();
                 std::string actual(recvMsg.data(), recvMsg.size());
 
                 std::string expected =

@@ -41,9 +41,7 @@ void MessageEndpointClient::asyncSend(int header,
 {
     ZoneScopedNS("MessageEndpointClient::asyncSend@3", 6);
     ZoneValue(bufferSize);
-    asyncEndpoint.sendHeader(header);
-    TracyMessageL("Header sent");
-    asyncEndpoint.send(buffer, bufferSize);
+    asyncEndpoint.send(header, buffer, bufferSize);
 }
 
 void MessageEndpointClient::syncSend(int header,
@@ -69,10 +67,8 @@ void MessageEndpointClient::syncSend(int header,
 {
     ZoneScopedNS("MessageEndpointClient::syncSend@4", 6);
     ZoneValue(bufferSize);
-    syncEndpoint.sendHeader(header);
-    TracyMessageL("Header sent");
 
-    Message responseMsg = syncEndpoint.sendAwaitResponse(buffer, bufferSize);
+    Message responseMsg = syncEndpoint.sendAwaitResponse(header, buffer, bufferSize);
     TracyMessageL("Response sent");
 
     // Deserialise response

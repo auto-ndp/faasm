@@ -23,7 +23,7 @@ class MessageEndpointServerHandler
                                  const std::string& inprocLabelIn,
                                  int nThreadsIn);
 
-    void start(std::shared_ptr<faabric::util::Latch> latch);
+    void start(int timeoutMs = DEFAULT_SOCKET_TIMEOUT_MS);
 
     void join();
 
@@ -33,9 +33,9 @@ class MessageEndpointServerHandler
     const std::string inprocLabel;
     int nThreads;
 
-    std::thread receiverThread;
+    std::jthread receiverThread;
 
-    std::vector<std::thread> workerThreads;
+    std::vector<std::jthread> workerThreads;
 
     std::unique_ptr<SyncFanInMessageEndpoint> syncFanIn = nullptr;
     std::unique_ptr<SyncFanOutMessageEndpoint> syncFanOut = nullptr;
@@ -52,7 +52,7 @@ class MessageEndpointServer
                           const std::string& inprocLabelIn,
                           int nThreadsIn);
 
-    virtual void start();
+    virtual void start(int timeoutMs = DEFAULT_SOCKET_TIMEOUT_MS);
 
     virtual void stop();
 
@@ -65,12 +65,10 @@ class MessageEndpointServer
     int getNThreads();
 
   protected:
-    virtual void doAsyncRecv(int header,
-                             const uint8_t* buffer,
-                             size_t bufferSize) = 0;
+    virtual void doAsyncRecv(transport::Message& message) = 0;
 
-    virtual std::unique_ptr<google::protobuf::Message>
-    doSyncRecv(int header, const uint8_t* buffer, size_t bufferSize) = 0;
+    virtual std::unique_ptr<google::protobuf::Message> doSyncRecv(
+      transport::Message& message) = 0;
 
   private:
     friend class MessageEndpointServerHandler;

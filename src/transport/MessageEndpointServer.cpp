@@ -1,6 +1,8 @@
+#include <faabric/transport/Message.h>
 #include <faabric/transport/MessageEndpoint.h>
 #include <faabric/transport/MessageEndpointServer.h>
 #include <faabric/transport/common.h>
+#include <faabric/util/bytes.h>
 #include <faabric/util/latch.h>
 #include <faabric/util/logging.h>
 #include <faabric/util/macros.h>
@@ -14,8 +16,6 @@
 
 namespace faabric::transport {
 
-static const std::vector<uint8_t> shutdownHeader = { 0, 0, 1, 1 };
-
 MessageEndpointServerHandler::MessageEndpointServerHandler(
   MessageEndpointServer* serverIn,
   bool asyncIn,
@@ -27,8 +27,7 @@ MessageEndpointServerHandler::MessageEndpointServerHandler(
   , nThreads(nThreadsIn)
 {}
 
-void MessageEndpointServerHandler::start(
-  std::shared_ptr<faabric::util::Latch> latch)
+void MessageEndpointServerHandler::start(int timeoutMs)
 {
     // For both sync and async, we want to fan out the messages to multiple
     // worker threads.
@@ -37,165 +36,148 @@ void MessageEndpointServerHandler::start(
     // For push/ pull we receive on a pull socket, then proxy with another push
     // to multiple downstream pull sockets
     // In both cases, the downstream fan-out is done over inproc sockets.
-    receiverThread = std::thread([this, latch] {
+
+    // Latch to make sure we can control the order of the setup
+    std::shared_ptr<faabric::util::Latch> startupLatch =
+      faabric::util::Latch::create(nThreads + 2);
+
+    SPDLOG_TRACE("Setting up endpoint server {} with {} worker threads",
+                 inprocLabel,
+                 nThreads);
+
+    receiverThread = std::jthread([this, timeoutMs, startupLatch] {
         int port = async ? server->asyncPort : server->syncPort;
-
-        if (async) {
-            tracy::SetThreadName("Async Message Endpoint Server");
-            // Set up push/ pull pair
-            asyncFanIn = std::make_unique<AsyncFanInMessageEndpoint>(port);
-            asyncFanOut =
-              std::make_unique<AsyncFanOutMessageEndpoint>(inprocLabel);
-        } else {
-            tracy::SetThreadName("Sync Message Endpoint Server");
-            // Set up router/ dealer
-            syncFanIn = std::make_unique<SyncFanInMessageEndpoint>(port);
-            syncFanOut =
-              std::make_unique<SyncFanOutMessageEndpoint>(inprocLabel);
-        }
-
-        // Launch worker threads
-        for (int i = 0; i < nThreads; i++) {
-            workerThreads.emplace_back([this, i] {
-                std::vector<uint8_t> msgBuffer;
-                msgBuffer.reserve(8192);
-                // Here we want to isolate all ZeroMQ stuff in its own
-                // context, so we can do things after it's been destroyed
-                {
-                    std::unique_ptr<RecvMessageEndpoint> endpoint = nullptr;
-
-                    if (async) {
-                        // Async workers have a PULL socket
-                        endpoint = std::make_unique<AsyncRecvMessageEndpoint>(
-                          inprocLabel);
-                    } else {
-                        // Sync workers have an in-proc REP socket
-                        endpoint = std::make_unique<SyncRecvMessageEndpoint>(
-                          inprocLabel);
-                    }
-
-                    while (true) {
-                        // Receive header and body
-                        std::optional<Message> headerMessageMaybe =
-                          endpoint->recv();
-                        if (!headerMessageMaybe.has_value()) {
-                            SPDLOG_TRACE(
-                              "Server on {}, looping after no message",
-                              endpoint->getAddress());
-                            continue;
-                        }
-
-                        Message& headerMessage = headerMessageMaybe.value();
-
-                        if (headerMessage.size() == shutdownHeader.size()) {
-                            if (headerMessage.dataCopy() == shutdownHeader) {
-                                SPDLOG_TRACE(
-                                  "Server thread {} on {} got shutdown message",
-                                  i,
-                                  endpoint->getAddress());
-
-                                // Send an empty response if in sync mode
-                                // (otherwise upstream socket will hang)
-                                if (!async) {
-                                    std::vector<uint8_t> empty(4, 0);
-                                    static_cast<SyncRecvMessageEndpoint*>(
-                                      endpoint.get())
-                                      ->sendResponse(empty.data(),
-                                                     empty.size());
-                                }
-
-                                break;
-                            }
-                        }
-
-                        if (!headerMessage.more()) {
-                            throw std::runtime_error(
-                              "Header sent without SNDMORE flag");
-                        }
-
-                        std::optional<Message> bodyMaybe = endpoint->recv();
-                        if (!bodyMaybe.has_value()) {
-                            SPDLOG_ERROR("Server on port {}, got header, timed "
-                                         "out on body",
-                                         endpoint->getAddress());
-                            throw MessageTimeoutException(
-                              "Server, got header, timed out on body");
-                        }
-
-                        Message& body = bodyMaybe.value();
-                        if (body.more()) {
-                            throw std::runtime_error(
-                              "Body sent with SNDMORE flag");
-                        }
-
-                        assert(headerMessage.size() == sizeof(uint8_t));
-                        uint8_t header =
-                          static_cast<uint8_t>(*headerMessage.data());
-
-                        if (async) {
-                            // Server-specific async handling
-                            server->doAsyncRecv(
-                              header, body.udata(), body.size());
-                        } else {
-                            // Server-specific sync handling
-                            std::unique_ptr<google::protobuf::Message> resp =
-                              server->doSyncRecv(
-                                header, body.udata(), body.size());
-                            size_t respSize = resp->ByteSizeLong();
-
-                            msgBuffer.resize(respSize);
-                            if (!resp->SerializeToArray(msgBuffer.data(),
-                                                        msgBuffer.size())) {
-                                throw std::runtime_error(
-                                  "Error serialising message");
-                            }
-
-                            // Return the response
-                            static_cast<SyncRecvMessageEndpoint*>(
-                              endpoint.get())
-                              ->sendResponse(msgBuffer.data(),
-                                             msgBuffer.size());
-                        }
-
-                        // Wait on the request latch if necessary
-                        auto requestLatch = std::atomic_load_explicit(
-                          &server->requestLatch, std::memory_order_acquire);
-                        if (requestLatch != nullptr) {
-                            SPDLOG_TRACE(
-                              "Server thread waiting on worker latch");
-                            requestLatch->wait();
-                        }
-                    }
-                }
-
-                // Perform the tidy-up
-                server->onWorkerStop();
-
-                // Just before the thread dies, check if there's something
-                // waiting on the shutdown latch
-                auto shutdownLatch = std::atomic_load_explicit(
-                  &server->shutdownLatch, std::memory_order_acquire);
-                if (shutdownLatch != nullptr) {
-                    SPDLOG_TRACE("Server thread {} waiting on shutdown latch",
-                                 i);
-                    shutdownLatch->wait();
-                }
-            });
-        }
-
-        // Wait on the start-up latch passed in by the caller. This means that
-        // once the latch is freed, this handler is just about to start its
-        // proxy, so a short sleep should mean things are ready to go.
-        latch->wait();
 
         // Connect the relevant fan-in/ out sockets (these will run until
         // they receive a terminate message)
+        if (async) {
+            // Set up push/ pull pair
+            asyncFanIn = std::make_unique<AsyncFanInMessageEndpoint>(port);
+            asyncFanOut = std::make_unique<AsyncFanOutMessageEndpoint>(
+              inprocLabel, timeoutMs);
+        } else {
+            // Set up router/ dealer
+            syncFanIn = std::make_unique<SyncFanInMessageEndpoint>(port);
+            syncFanOut = std::make_unique<SyncFanOutMessageEndpoint>(
+              inprocLabel, timeoutMs);
+        }
+
+        SPDLOG_TRACE("Endpoint server {} receiver thread set up", inprocLabel);
+
+        // Wait until the workers are set up
+        startupLatch->wait();
+
+        SPDLOG_TRACE("Endpoint server {} connecting fan-out", inprocLabel);
+
+        // This will block the receiver thread until it's killed
         if (async) {
             asyncFanIn->attachFanOut(asyncFanOut->socket);
         } else {
             syncFanIn->attachFanOut(syncFanOut->socket);
         }
     });
+
+    for (int i = 0; i < nThreads; i++) {
+        workerThreads.emplace_back([this, i, timeoutMs, startupLatch] {
+            // Here we want to isolate all ZeroMQ stuff in its own
+            // context, so we can do things after it's been destroyed
+            {
+                std::unique_ptr<RecvMessageEndpoint> endpoint = nullptr;
+
+                if (async) {
+                    // Async workers have a PULL socket
+                    endpoint = std::make_unique<AsyncRecvMessageEndpoint>(
+                      inprocLabel, timeoutMs);
+                } else {
+                    // Sync workers have an in-proc REP socket
+                    endpoint = std::make_unique<SyncRecvMessageEndpoint>(
+                      inprocLabel, timeoutMs);
+                }
+
+                // Notify receiver that this worker is set up
+                SPDLOG_TRACE("Endpoint server {} worker {} endpoint created",
+                             inprocLabel,
+                             i);
+
+                startupLatch->wait();
+
+                while (true) {
+                    // Receive the message
+                    Message body = endpoint->recv();
+
+                    // Shut down if necessary
+                    if (body.getResponseCode() == MessageResponseCode::TERM) {
+                        break;
+                    }
+
+                    // On timeout we listen again
+                    if (body.getResponseCode() ==
+                        MessageResponseCode::TIMEOUT) {
+                        continue;
+                    }
+
+                    // Catch-all for other forms of unsuccessful message
+                    if (body.getResponseCode() !=
+                        MessageResponseCode::SUCCESS) {
+                        SPDLOG_ERROR("Unsuccessful message to server {}: {}",
+                                     inprocLabel,
+                                     body.getResponseCode());
+
+                        throw std::runtime_error(
+                          "Unsuccessful message to server");
+                    }
+
+                    if (async) {
+                        // Server-specific async handling
+                        server->doAsyncRecv(body);
+                    } else {
+                        // Server-specific sync handling
+                        std::unique_ptr<google::protobuf::Message> resp =
+                          server->doSyncRecv(body);
+
+                        size_t respSize = resp->ByteSizeLong();
+
+                        uint8_t buffer[respSize];
+                        if (!resp->SerializeToArray(buffer, respSize)) {
+                            throw std::runtime_error(
+                              "Error serialising message");
+                        }
+
+                        // Return the response
+                        static_cast<SyncRecvMessageEndpoint*>(endpoint.get())
+                          ->sendResponse(NO_HEADER, buffer, respSize);
+                    }
+
+                    // Wait on the request latch if necessary
+                    auto requestLatch = std::atomic_load_explicit(
+                      &server->requestLatch, std::memory_order_acquire);
+                    if (requestLatch != nullptr) {
+                        SPDLOG_TRACE("Server thread waiting on worker latch");
+                        requestLatch->wait();
+                    }
+                }
+            }
+
+            // Perform the tidy-up
+            server->onWorkerStop();
+
+            // Just before the thread dies, check if there's something
+            // waiting on the shutdown latch
+            auto shutdownLatch = std::atomic_load_explicit(
+              &server->shutdownLatch, std::memory_order_acquire);
+            if (shutdownLatch != nullptr) {
+                SPDLOG_TRACE("Server thread {} waiting on shutdown latch", i);
+                shutdownLatch->wait();
+            }
+        });
+    }
+
+    // Wait for the workers and receiver to be set up
+    startupLatch->wait();
+
+    SPDLOG_TRACE("Endpoint server {} finished setup with {} worker threads",
+                 inprocLabel,
+                 nThreads);
 }
 
 void MessageEndpointServerHandler::join()
@@ -241,18 +223,12 @@ MessageEndpointServer::MessageEndpointServer(int asyncPortIn,
  * We need to guarantee to callers of this function, that when it returns, the
  * server will be ready to use.
  */
-void MessageEndpointServer::start()
+void MessageEndpointServer::start(int timeoutMs)
 {
     started = true;
 
-    // This latch allows use to block on the handlers until _just_ before they
-    // start their proxies.
-    auto startLatch = faabric::util::Latch::create(3);
-
-    asyncHandler.start(startLatch);
-    syncHandler.start(startLatch);
-
-    startLatch->wait();
+    asyncHandler.start(timeoutMs);
+    syncHandler.start(timeoutMs);
 
     // Unfortunately we can't know precisely when the proxies have started,
     // hence have to add a sleep.
@@ -285,7 +261,8 @@ void MessageEndpointServer::stop()
                                    faabric::util::Latch::create(2),
                                    std::memory_order_release);
 
-        asyncShutdownSender.send(shutdownHeader.data(), shutdownHeader.size());
+        asyncShutdownSender.send(
+          SHUTDOWN_HEADER, shutdownPayload.data(), shutdownPayload.size());
 
         std::atomic_load_explicit(&shutdownLatch, std::memory_order_acquire)
           ->wait();
@@ -305,8 +282,8 @@ void MessageEndpointServer::stop()
                                    faabric::util::Latch::create(2),
                                    std::memory_order_release);
 
-        syncShutdownSender.sendAwaitResponse(shutdownHeader.data(),
-                                             shutdownHeader.size());
+        syncShutdownSender.sendAwaitResponse(
+          SHUTDOWN_HEADER, shutdownPayload.data(), shutdownPayload.size());
 
         std::atomic_load_explicit(&shutdownLatch, std::memory_order_acquire)
           ->wait();

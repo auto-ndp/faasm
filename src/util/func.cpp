@@ -28,10 +28,6 @@ std::string funcToString(const faabric::Message& msg, bool includeId)
         str += ":" + std::to_string(msg.id());
     }
 
-    if (msg.issgx()) {
-        str += ":sgx";
-    }
-
     return str;
 }
 
@@ -176,5 +172,14 @@ std::vector<std::string> getArgvForMessage(const faabric::Message& msg)
     argv.insert(argv.end(), extraArgs.begin(), extraArgs.end());
 
     return argv;
+}
+
+std::string getMainThreadSnapshotKey(const faabric::Message& msg)
+{
+    std::string funcStr = faabric::util::funcToString(msg, false);
+    assert(msg.appid() > 0);
+
+    std::string snapshotKey = funcStr + "_" + std::to_string(msg.appid());
+    return snapshotKey;
 }
 }

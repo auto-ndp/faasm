@@ -30,10 +30,12 @@ class SystemConfig
     int overrideCpuCount;
     std::string noTopologyHints;
     bool isStorageNode;
+    int noSingleHostOptimisations;
 
     // Worker-related timeouts
     int globalMessageTimeout;
     int boundTimeout;
+    int reaperIntervalSeconds;
 
     // MPI
     int defaultMpiWorldSize;
@@ -53,6 +55,10 @@ class SystemConfig
     int stateServerThreads;
     int snapshotServerThreads;
     int pointToPointServerThreads;
+
+    // Dirty tracking
+    std::string dirtyTrackingMode;
+    std::string diffingMode;
 
     SystemConfig();
 

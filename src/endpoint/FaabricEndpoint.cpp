@@ -223,7 +223,7 @@ struct SchedulerMonitoringTask
     }
 };
 
-void Endpoint::start(bool awaitSignal)
+void Endpoint::start(EndpointMode mode)
 {
     SPDLOG_INFO("Starting HTTP endpoint on {}, {} threads", port, threadCount);
     if (getpid() != gettid()) {
@@ -241,7 +241,7 @@ void Endpoint::start(bool awaitSignal)
       ->run();
 
     std::optional<asio::signal_set> signals;
-    if (awaitSignal) {
+    if (mode == EndpointMode::SIGNAL) {
         signals.emplace(state->ioc, SIGINT, SIGTERM, SIGQUIT);
         signals->async_wait([&](beast::error_code const& ec, int sig) {
             if (!ec) {
@@ -259,7 +259,7 @@ void Endpoint::start(bool awaitSignal)
     for (int i = 0; i < extraThreads; i++) {
         state->ioThreads.emplace_back(ioc_run);
     }
-    if (awaitSignal) {
+    if (mode == EndpointMode::SIGNAL) {
         ioc_run();
     }
 }

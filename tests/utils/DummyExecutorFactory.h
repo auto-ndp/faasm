@@ -15,6 +15,7 @@ class DummyExecutorFactory : public ExecutorFactory
     std::shared_ptr<Executor> createExecutor(
       faabric::MessageInBatch msg) override;
 
+  protected:
     void flushHost() override;
 
   private:
