@@ -9,10 +9,7 @@
 MODE="undetected"
 if [[ -z "$FAASM_DOCKER" ]]; then
 
-    THIS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-    if [ "$(ps -o comm= -p $$)" = "zsh" ]; then
-        THIS_DIR="$( cd "$( dirname "${ZSH_ARGZERO}" )" >/dev/null 2>&1 && pwd )"
-    fi
+    THIS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]:-${(%):-%x}}" )" >/dev/null 2>&1 && pwd )"
     PROJ_ROOT="${THIS_DIR}/.."
     VENV_PATH="${PROJ_ROOT}/venv-bm"
 
