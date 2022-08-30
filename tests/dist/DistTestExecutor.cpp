@@ -37,7 +37,7 @@ ExecutorFunction getDistTestExecutorCallback(const faabric::Message& msg)
 }
 
 DistTestExecutor::DistTestExecutor(faabric::Message& msg)
-  : Executor(msg)
+  : Executor(faabric::MessageInBatch(msg))
 {
     setUpDummyMemory(dummyMemorySize);
 }
@@ -95,7 +95,7 @@ void DistTestExecutor::setUpDummyMemory(size_t memSize)
 }
 
 std::shared_ptr<Executor> DistTestExecutorFactory::createExecutor(
-  faabric::Message& msg)
+  faabric::MessageInBatch msg)
 {
     return std::make_shared<DistTestExecutor>(msg);
 }

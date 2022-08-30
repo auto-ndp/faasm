@@ -40,9 +40,8 @@ class DistTestExecutor final : public faabric::scheduler::Executor
 
 class DistTestExecutorFactory : public faabric::scheduler::ExecutorFactory
 {
-  protected:
     std::shared_ptr<faabric::scheduler::Executor> createExecutor(
-      faabric::Message& msg) override;
+      faabric::MessageInBatch msg) override;
 };
 
 typedef int (*ExecutorFunction)(

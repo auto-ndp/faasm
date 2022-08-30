@@ -109,3 +109,5 @@ __pycache__/
 *.pyc
 venv/
 *.egg-info/
+
+conan-profile-user.txt

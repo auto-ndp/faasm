@@ -73,7 +73,11 @@ if(NOT (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64"))
     set(FAABRIC_ARCH_SUFFIX "-${CMAKE_SYSTEM_PROCESSOR}")
 endif()
 
-set(FAABRIC_CONAN_PROFILE "${CMAKE_CURRENT_LIST_DIR}/../conan-profile${FAABRIC_ARCH_SUFFIX}.txt" CACHE FILEPATH "Faabric conan profile path" FORCE)
+if(FAABRIC_CONAN_PROFILE_OVERRIDE)
+    set(FAABRIC_CONAN_PROFILE "${CMAKE_CURRENT_LIST_DIR}/../${FAABRIC_CONAN_PROFILE_OVERRIDE}" CACHE FILEPATH "Faabric conan profile path" FORCE)
+else()
+    set(FAABRIC_CONAN_PROFILE "${CMAKE_CURRENT_LIST_DIR}/../conan-profile${FAABRIC_ARCH_SUFFIX}.txt" CACHE FILEPATH "Faabric conan profile path" FORCE)
+endif()
 
 conan_cmake_install(PATH_OR_REFERENCE .
                     BUILD outdated

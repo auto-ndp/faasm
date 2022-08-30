@@ -82,8 +82,8 @@ int32_t TestExecutor::executeTask(
     bool isThread = reqOrig->type() == faabric::BatchExecuteRequest::THREADS;
 
     // Check we're being asked to execute the function we've bound to
-    assert(msg.user() == boundMessage.user());
-    assert(msg.function() == boundMessage.function());
+    assert(msg.user() == boundMessage->user());
+    assert(msg.function() == boundMessage->function());
 
     // Custom thread-check function
     if (msg.function() == "thread-check" && !isThread) {
