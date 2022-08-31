@@ -1,4 +1,3 @@
-#include "faabric/util/environment.h"
 #include <conf/FaasmConfig.h>
 #include <faaslet/Faaslet.h>
 #include <storage/FileLoader.h>
@@ -9,6 +8,7 @@
 #include <faabric/scheduler/ExecutorFactory.h>
 #include <faabric/transport/context.h>
 #include <faabric/util/config.h>
+#include <faabric/util/environment.h>
 #include <faabric/util/logging.h>
 #include <faabric/util/timing.h>
 
@@ -28,19 +28,10 @@ int doRunner(int argc, char* argv[])
     std::string function = argv[2];
 
     std::string inputData;
-    bool isSgx = false;
     bool hasInput = false;
     if (argc == 4) {
-        if (std::string(argv[3]) == "--sgx") {
-            isSgx = true;
-        } else {
-            inputData = argv[3];
-            hasInput = true;
-        }
-    } else if (argc == 5 && std::string(argv[4]) == "--sgx") {
         inputData = argv[3];
         hasInput = true;
-        isSgx = true;
     }
 
     std::shared_ptr<faabric::BatchExecuteRequest> req =
@@ -88,11 +79,6 @@ int doRunner(int argc, char* argv[])
         msg.set_inputdata(inputData);
 
         SPDLOG_INFO("Adding input data: {}", inputData);
-    }
-
-    if (isSgx) {
-        msg.set_issgx(true);
-        SPDLOG_INFO("Running function in SGX");
     }
 
     // Set up the system

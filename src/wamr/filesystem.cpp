@@ -77,7 +77,7 @@ static int32_t wasi_fd_fdstat_get(wasm_exec_env_t exec_env,
         return __WASI_EBADF;
     }
 
-    module->validateNativeAddress(statWasm, sizeof(__wasi_fdstat_t));
+    module->validateNativePointer(statWasm, sizeof(__wasi_fdstat_t));
 
     storage::FileDescriptor& fileDesc = fs.getFileDescriptor(fd);
     storage::Stat statNative = fileDesc.stat();
@@ -119,7 +119,7 @@ static int32_t doFileStat(uint32_t fd,
         return statNative.wasiErrno;
     }
 
-    module->validateNativeAddress(statWasm, sizeof(__wasi_filestat_t));
+    module->validateNativePointer(statWasm, sizeof(__wasi_filestat_t));
     statWasm->st_dev = statNative.st_dev;
     statWasm->st_ino = statNative.st_ino;
     statWasm->st_filetype = statNative.wasiFiletype;
@@ -171,7 +171,7 @@ static int32_t wasi_fd_prestat_get(wasm_exec_env_t exec_env,
         return __WASI_EBADF;
     }
 
-    module->validateNativeAddress(prestatWasm, sizeof(wasi_prestat_app_t));
+    module->validateNativePointer(prestatWasm, sizeof(wasi_prestat_app_t));
 
     storage::FileDescriptor& fileDesc =
       module->getFileSystem().getFileDescriptor(fd);
@@ -210,7 +210,7 @@ static int32_t wasi_fd_read(wasm_exec_env_t exec_env,
     }
 
     // Read from fd
-    module->validateNativeAddress(bytesRead, sizeof(int32_t));
+    module->validateNativePointer(bytesRead, sizeof(int32_t));
     *bytesRead =
       ::readv(fileDesc.getLinuxFd(), ioVecBuffNative.data(), ioVecCountWasm);
 
@@ -237,7 +237,7 @@ static int32_t wasi_fd_seek(wasm_exec_env_t exec_env,
     SPDLOG_DEBUG("S - fd_seek {} {} {}", fd, offset, whence);
 
     WAMRWasmModule* module = getExecutingWAMRModule();
-    module->validateNativeAddress(newOffset, sizeof(__wasi_filesize_t));
+    module->validateNativePointer(newOffset, sizeof(__wasi_filesize_t));
 
     storage::FileDescriptor& fileDesc =
       module->getFileSystem().getFileDescriptor(fd);
@@ -258,11 +258,12 @@ static int32_t wasi_fd_write(wasm_exec_env_t exec_env,
 
     SPDLOG_DEBUG("S - fd_write {} ({})", fd, path);
 
-    storage::FileDescriptor& fileDesc = fileSystem.getFileDescriptor(fd);
+    // Check pointers
+    module->validateNativePointer(reinterpret_cast<void*>(ioVecBuffWasm),
+                                  sizeof(iovec_app_t) * ioVecCountWasm);
+    module->validateNativePointer(bytesWritten, sizeof(int32_t));
 
     // Translate the app iovecs into native iovecs
-    module->validateNativeAddress(reinterpret_cast<void*>(ioVecBuffWasm),
-                                  sizeof(iovec_app_t) * ioVecCountWasm);
     std::vector<::iovec> ioVecBuffNative(ioVecCountWasm, (::iovec){});
     for (int i = 0; i < ioVecCountWasm; i++) {
         module->validateWasmOffset(ioVecBuffWasm[i].buffOffset,
@@ -275,14 +276,16 @@ static int32_t wasi_fd_write(wasm_exec_env_t exec_env,
         };
     }
 
-    // Write to fd
-    module->validateNativeAddress(bytesWritten, sizeof(int32_t));
-    *bytesWritten =
-      ::writev(fileDesc.getLinuxFd(), ioVecBuffNative.data(), ioVecCountWasm);
-    if (*bytesWritten < 0) {
+    // Do the write
+    storage::FileDescriptor& fileDesc = fileSystem.getFileDescriptor(fd);
+    ssize_t n = fileDesc.write(ioVecBuffNative, ioVecCountWasm);
+    if (n < 0) {
         SPDLOG_ERROR(
           "writev failed on fd {}: {}", fileDesc.getLinuxFd(), strerror(errno));
     }
+
+    // Write number of bytes to wasm
+    *bytesWritten = n;
 
     // Capture stdout if needed
     conf::FaasmConfig& conf = conf::getFaasmConfig();
@@ -311,7 +314,7 @@ static int32_t wasi_path_filestat_get(wasm_exec_env_t exec_env,
                                       __wasi_filestat_t* statWasm)
 {
     WAMRWasmModule* module = getExecutingWAMRModule();
-    module->validateNativeAddress(path, pathLen);
+    module->validateNativePointer(path, pathLen);
     const std::string pathStr(path, pathLen);
 
     SPDLOG_DEBUG("S - path_filestat_get {} ({})", fd, pathStr);
@@ -345,12 +348,12 @@ static int32_t wasi_path_open(wasm_exec_env_t exec_env,
 {
     WAMRWasmModule* module = getExecutingWAMRModule();
 
-    module->validateNativeAddress(path, pathLen);
+    module->validateNativePointer(path, pathLen);
     const std::string pathStr(path, pathLen);
 
     SPDLOG_DEBUG("S - path_open {} {} {}", fdNative, pathStr, pathLen);
 
-    module->validateNativeAddress(fdWasm, sizeof(int32_t));
+    module->validateNativePointer(fdWasm, sizeof(int32_t));
     *fdWasm = module->getFileSystem().openFileDescriptor(fdNative,
                                                          pathStr,
                                                          rightsBase,

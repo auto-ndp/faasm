@@ -25,14 +25,16 @@ class Faaslet final : public faabric::scheduler::Executor
       int msgIdx,
       std::shared_ptr<faabric::BatchExecuteRequest> req) override;
 
-    faabric::util::MemoryView getMemoryView() override;
-
-    void restore(faabric::Message& call) override;
-
     std::string getLocalResetSnapshotKey();
 
+    void shutdown() override;
+
   protected:
-    void postFinish() override;
+    std::span<uint8_t> getMemoryView() override;
+
+    void setMemorySize(size_t newSize) override;
+
+    size_t getMaxMemorySize() override;
 
     void softShutdown() override;
 

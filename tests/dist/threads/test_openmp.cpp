@@ -3,6 +3,9 @@
 #include "fixtures.h"
 
 #include <faabric/scheduler/Scheduler.h>
+#include <faabric/util/string_tools.h>
+
+#define PI_FUNCTION "pi_faasm"
 
 namespace tests {
 TEST_CASE_METHOD(DistTestsFixture,
@@ -11,8 +14,9 @@ TEST_CASE_METHOD(DistTestsFixture,
 {
     conf.overrideCpuCount = 6;
 
-    // Set this host up to have fewer slots than the number of threads
-    int nLocalSlots = 2;
+    // Set this host up to have fewer slots than the number of threads, noting
+    // that we take up one local slot with the main thread
+    int nLocalSlots = 3;
     faabric::HostResources res;
     res.set_slots(nLocalSlots);
     sch.setThisHostResources(res);
@@ -24,13 +28,15 @@ TEST_CASE_METHOD(DistTestsFixture,
 
     SECTION("Repeated reduce") { function = "repeated_reduce"; }
 
+    SECTION("Pi estimation") { function = PI_FUNCTION; }
+
     // Set up the message
     std::shared_ptr<faabric::BatchExecuteRequest> req =
       faabric::util::batchExecFactory("omp", function, 1);
     faabric::Message& msg = req->mutable_messages()->at(0);
 
     // Check other host is not registered initially
-    REQUIRE(sch.getFunctionRegisteredHosts(msg).empty());
+    REQUIRE(sch.getFunctionRegisteredHosts(msg.user(), msg.function()).empty());
 
     // Invoke the function
     sch.callFunctions(req);
@@ -45,6 +51,13 @@ TEST_CASE_METHOD(DistTestsFixture,
 
     // Check other host is registered
     std::set<std::string> expectedRegisteredHosts = { getDistTestWorkerIp() };
-    REQUIRE(sch.getFunctionRegisteredHosts(msg) == expectedRegisteredHosts);
+    REQUIRE(sch.getFunctionRegisteredHosts(msg.user(), msg.function()) ==
+            expectedRegisteredHosts);
+
+    // Check specific results
+    if (function == PI_FUNCTION) {
+        REQUIRE(
+          faabric::util::startsWith(result.outputdata(), "Pi estimate: 3.1"));
+    }
 }
 }

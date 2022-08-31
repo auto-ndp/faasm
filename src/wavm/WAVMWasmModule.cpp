@@ -429,7 +429,13 @@ void WAVMWasmModule::clone(const WAVMWasmModule& other,
 
         // Restore from snapshot
         if (!snapshotKey.empty()) {
-            restore(snapshotKey);
+            // Expand memory if necessary
+            auto data = reg.getSnapshot(snapshotKey);
+            setMemorySize(data->getSize());
+
+            // Map the snapshot into memory
+            uint8_t* memoryBase = getMemoryBase();
+            data->mapToMemory({ memoryBase, data->getSize() });
         }
 
         // Reset shared memory variables
@@ -523,7 +529,7 @@ void WAVMWasmModule::addModuleToGOT(IR::Module& mod, bool isMainModule)
     // This function is **critical** for dynamic linking to work properly,
     // but the underlying spec is still in flux so it may break. The wasm
     // dynamic linking docs can be found here:
-    // https://github.com/WebAssembly/tool-conventions/blob/master/DynamicLinking.md
+    // https://github.com/WebAssembly/tool-conventions/blob/main/DynamicLinking.md
     //
     // To handle dynamically loaded modules, we need to provide a "global
     // offset table (GOT)" which holds offsets to all the functions and data
@@ -1109,12 +1115,6 @@ int32_t WAVMWasmModule::executeFunction(faabric::Message& msg)
     // Ensure Python function file in place (if necessary)
     storage::SharedFiles::syncPythonFunctionFile(msg);
 
-    // Restore from snapshot before executing if necessary
-    if (!msg.snapshotkey().empty()) {
-        ZoneScopedN("WAVMWasmModule::executeFunction restore");
-        restore(msg.snapshotkey());
-    }
-
     int funcPtr = msg.funcptr();
     std::vector<IR::UntaggedValue> invokeArgs;
     Runtime::Function* funcInstance;
@@ -1155,8 +1155,8 @@ int32_t WAVMWasmModule::executeFunction(faabric::Message& msg)
                 }
                 case (1): {
                     // NOTE - when we've got a function pointer that takes a
-                    // single argument we assume the args, we assume it's a
-                    // chained thread invocation.
+	                // single argument we assume the message input data contains an
+	                // argument that is an integer to be passed to the function
                     if (msg.inputdata().empty()) {
                         invokeArgs = { 0 };
                     } else {
@@ -1196,7 +1196,7 @@ int32_t WAVMWasmModule::executeFunction(faabric::Message& msg)
     }
 
     // Call the function
-    WasmExecutionContext ctx(this, &msg);
+    WasmExecutionContext ctx(this);
     int returnValue = 0;
     try {
         ZoneScopedN("WAVMWasmModule::executeFunction WASM runtime call");
@@ -1370,9 +1370,8 @@ int32_t WAVMWasmModule::executeOMPThread(int threadPoolIdx,
     return returnValue.i32;
 }
 
-U32 WAVMWasmModule::mmapFile(U32 fd, U32 length)
+U32 WAVMWasmModule::mmapFile(U32 fd, size_t length)
 {
-
     // Create a new memory region
     U32 wasmPtr = mmapMemory(length);
     U32* targetPtr = &Runtime::memoryRef<U32>(defaultMemory, wasmPtr);
@@ -1396,194 +1395,54 @@ U32 WAVMWasmModule::mmapFile(U32 fd, U32 length)
     return wasmPtr;
 }
 
-U32 WAVMWasmModule::growMemory(U32 nBytes)
+bool WAVMWasmModule::doGrowMemory(uint32_t pageChange)
 {
-    U64 maxPages = getMemoryType(defaultMemory).size.max;
-
-    // Check if we just need the size
-    if (nBytes == 0) {
-        return getMemorySizeBytes();
-    }
-
-    faabric::util::FullLock lock(moduleMutex);
-
-    // Check if we can reclaim
+    size_t oldPages = Runtime::getMemoryNumPages(defaultMemory);
     size_t oldBytes = getMemorySizeBytes();
-    uint32_t newBytes = oldBytes + nBytes;
-
-    if (!isWasmPageAligned(newBytes)) {
-        SPDLOG_ERROR("Growing memory by {} is not wasm page aligned", nBytes);
-        throw std::runtime_error("Non-wasm-page-aligned memory growth");
-    }
-
-    Uptr oldPages = Runtime::getMemoryNumPages(defaultMemory);
-    Uptr newPages = getNumberOfWasmPagesForBytes(newBytes);
-
-    if (newPages > maxPages) {
-        SPDLOG_ERROR("mmap would exceed max of {} pages (requested {})",
-                     maxPages,
-                     newPages);
-        throw std::runtime_error("Mmap exceeding max");
-    }
-
     Uptr newMemPageBase;
-    Uptr pageChange = getNumberOfWasmPagesForBytes(nBytes);
     Runtime::GrowResult result =
       Runtime::growMemory(defaultMemory, pageChange, &newMemPageBase);
 
-    if (result != Runtime::GrowResult::success) {
+    bool success = result == Runtime::GrowResult::success;
+    if (!success) {
         if (result == Runtime::GrowResult::outOfMemory) {
-            SPDLOG_ERROR("Committing new pages failed (errno={} ({})) "
+            SPDLOG_ERROR("Committing new WAVM pages failed (errno={} ({})) "
                          "(growing by {} from current {})",
                          errno,
                          strerror(errno),
                          pageChange,
                          oldPages);
-            throw std::runtime_error("Unable to commit virtual pages");
-        }
-        if (result == Runtime::GrowResult::outOfMaxSize) {
-            SPDLOG_ERROR("No memory for mapping (growing by {} from {} pages)",
+        } else if (result == Runtime::GrowResult::outOfMaxSize) {
+            SPDLOG_ERROR("No WAVM memory for mapping (growing by {} from {} "
+                         "pages)",
                          pageChange,
                          oldPages);
-            throw std::runtime_error("Run out of memory to map");
-        }
-        if (result == Runtime::GrowResult::outOfQuota) {
+        } else if (result == Runtime::GrowResult::outOfQuota) {
             SPDLOG_ERROR(
-              "Memory resource quota exceeded (growing by {} from {})",
+              "WAVM memory resource quota exceeded (growing by {} from {})",
               pageChange,
               oldPages);
-            throw std::runtime_error("Memory resource quota exceeded");
+        } else {
+            SPDLOG_ERROR("Unknown WAVM memory mapping error (growing by {} "
+                         "from {}. Previous {})",
+                         pageChange,
+                         oldPages,
+                         newMemPageBase);
         }
-        SPDLOG_ERROR("Unknown memory mapping error (growing by {} from "
-                     "{}. Previous {})",
-                     pageChange,
-                     oldPages,
-                     newMemPageBase);
-        throw std::runtime_error("Unknown memory mapping error");
     }
 
-    SPDLOG_TRACE(
-      "MEM - Growing memory from {} to {} pages", oldPages, newPages);
-
-    // Get offset of bottom of new range
+    // WAVM-only sense check
     auto newMemBase = (U32)(newMemPageBase * WASM_BYTES_PER_PAGE);
-
-    // Set current break to top of the new memory
-    size_t newMemSize = getMemorySizeBytes();
-
     if (newMemBase != oldBytes) {
         SPDLOG_ERROR("Expected base of new region ({}) to be end of memory "
                      "before growth ({})",
                      newMemBase,
                      oldBytes);
 
-        throw std::runtime_error("Memory growth discrepancy");
+        throw std::runtime_error("WAVM memory growth discrepancy");
     }
 
-    if (newMemSize != newBytes) {
-        SPDLOG_ERROR(
-          "Expected new brk ({}) to be old memory plus new bytes ({})",
-          newMemSize,
-          newBytes);
-        throw std::runtime_error("Memory growth discrepancy");
-    }
-
-    return newMemBase;
-}
-
-uint32_t WAVMWasmModule::shrinkMemory(U32 nBytes)
-{
-
-    if (!isWasmPageAligned(nBytes)) {
-        SPDLOG_ERROR("Shrink size not page aligned {}", nBytes);
-        throw std::runtime_error("New break not page aligned");
-    }
-
-    faabric::util::FullLock lock(moduleMutex);
-
-    U32 oldBrk = getMemorySizeBytes();
-
-    if (nBytes > oldBrk) {
-        SPDLOG_ERROR(
-          "Shrinking by more than current brk ({} > {})", nBytes, oldBrk);
-        throw std::runtime_error("Shrinking by more than current brk");
-    }
-
-    // Note - we don't actually free the memory, we just change the brk
-    U32 newBrk = oldBrk - nBytes;
-    const size_t pageChange = getNumberOfWasmPagesForBytes(nBytes);
-
-    Uptr newNumPages{};
-    Runtime::GrowResult result =
-      Runtime::shrinkMemory(defaultMemory, pageChange, &newNumPages);
-
-    if (result != Runtime::GrowResult::success) {
-        if (result == Runtime::GrowResult::outOfMemory) {
-            SPDLOG_ERROR("Committing new pages failed (errno={} ({})) "
-                         "(shrinking by {})",
-                         errno,
-                         strerror(errno),
-                         pageChange);
-            throw std::runtime_error("Unable to commit virtual pages");
-        }
-        if (result == Runtime::GrowResult::outOfMaxSize) {
-            SPDLOG_ERROR("No memory for mapping (shrinking by {})", pageChange);
-            throw std::runtime_error("Run out of memory to map");
-        }
-        if (result == Runtime::GrowResult::outOfQuota) {
-            SPDLOG_ERROR("Memory resource quota exceeded (shrinking by {})",
-                         pageChange);
-            throw std::runtime_error("Memory resource quota exceeded");
-        }
-        SPDLOG_ERROR("Unknown memory mapping error (shrinking by {})",
-                     pageChange);
-        throw std::runtime_error("Unknown memory mapping error");
-    }
-
-    SPDLOG_TRACE("MEM - shrinking memory {} -> {}", oldBrk, newBrk);
-
-    return newNumPages * WASM_BYTES_PER_PAGE;
-}
-
-void WAVMWasmModule::unmapMemory(U32 offset, U32 nBytes)
-{
-    if (nBytes == 0) {
-        return;
-    }
-
-    // Munmap expects the offset itself to be page-aligned, but will round up
-    // the number of bytes
-    if (!isWasmPageAligned(offset)) {
-        SPDLOG_ERROR("Non-page aligned munmap address {}", offset);
-        throw std::runtime_error("Non-page aligned munmap address");
-    }
-
-    uint32_t pageAligned = roundUpToWasmPageAligned(nBytes);
-    U64 maxPages = getMemoryType(defaultMemory).size.max;
-    U64 maxSize = maxPages * WASM_BYTES_PER_PAGE;
-    U32 unmapTop = offset + pageAligned;
-
-    if (unmapTop > maxSize) {
-        SPDLOG_ERROR(
-          "Munmapping outside memory max ({} > {})", unmapTop, maxSize);
-        throw std::runtime_error("munmapping outside memory max");
-    }
-
-    if (unmapTop == getMemorySizeBytes()) {
-        SPDLOG_TRACE("MEM - munmapping top of memory by {}", pageAligned);
-        shrinkMemory(pageAligned);
-    } else {
-        SPDLOG_WARN("MEM - unable to reclaim unmapped memory {} at {}",
-                    pageAligned,
-                    offset);
-    }
-}
-
-U32 WAVMWasmModule::mmapMemory(U32 nBytes)
-{
-    // Note - the mmap interface allows non page-aligned values, and rounds up.
-    uint32_t pageAligned = roundUpToWasmPageAligned(nBytes);
-    return growMemory(pageAligned);
+    return success;
 }
 
 uint8_t* WAVMWasmModule::wasmPointerToNative(uint32_t wasmPtr)
@@ -1598,6 +1457,11 @@ size_t WAVMWasmModule::getMemorySizeBytes()
     Uptr numBytes = numPages * WASM_BYTES_PER_PAGE;
 
     return numBytes;
+}
+
+size_t WAVMWasmModule::getMaxMemoryPages()
+{
+    return getMemoryType(defaultMemory).size.max;
 }
 
 uint8_t* WAVMWasmModule::getMemoryBase()

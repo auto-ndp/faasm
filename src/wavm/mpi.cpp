@@ -1,24 +1,27 @@
-#include "WAVMWasmModule.h"
 #include "math.h"
 #include "syscalls.h"
-#include "wasm/WasmModule.h"
+
+#include <wasm/WasmModule.h>
+#include <wavm/WAVMWasmModule.h>
 
 #include <WAVM/Runtime/Intrinsics.h>
 #include <WAVM/Runtime/Runtime.h>
 
 #include <faabric/mpi/mpi.h>
+#include <faabric/scheduler/ExecutorContext.h>
 #include <faabric/scheduler/MpiContext.h>
 #include <faabric/scheduler/Scheduler.h>
 #include <faabric/util/gids.h>
 #include <faabric/util/logging.h>
 
+using namespace faabric::scheduler;
 using namespace WAVM;
 
 #define MPI_FUNC(str)                                                          \
-    SPDLOG_DEBUG("MPI-{} {}", executingContext.getRank(), str);
+    SPDLOG_TRACE("MPI-{} {}", executingContext.getRank(), str);
 
 #define MPI_FUNC_ARGS(formatStr, ...)                                          \
-    SPDLOG_DEBUG("MPI-{} " formatStr, executingContext.getRank(), __VA_ARGS__);
+    SPDLOG_TRACE("MPI-{} " formatStr, executingContext.getRank(), __VA_ARGS__);
 
 namespace wasm {
 static thread_local faabric::scheduler::MpiContext executingContext;
@@ -123,7 +126,7 @@ static thread_local std::unique_ptr<ContextWrapper> ctx = nullptr;
  */
 WAVM_DEFINE_INTRINSIC_FUNCTION(env, "MPI_Init", I32, MPI_Init, I32 a, I32 b)
 {
-    faabric::Message* call = getExecutingCall();
+    faabric::Message* call = &ExecutorContext::get()->getMsg();
 
     // Note - only want to initialise the world on rank zero (or when rank isn't
     // set yet)
@@ -410,7 +413,7 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
                                I32 datatype,
                                I32 countPtr)
 {
-    SPDLOG_DEBUG("S - MPI_Get_count {} {} {}", statusPtr, datatype, countPtr);
+    SPDLOG_TRACE("S - MPI_Get_count {} {} {}", statusPtr, datatype, countPtr);
 
     MPI_Status* status =
       &Runtime::memoryRef<MPI_Status>(ctx->memory, statusPtr);

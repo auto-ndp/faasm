@@ -20,13 +20,12 @@
 
 #include <stdexcept>
 
-#if (FAASM_SGX)
-#include <sgx/SGXWAMRWasmModule.h>
-#include <sgx/system.h>
-#else
+#ifndef FAASM_SGX_DISABLED_MODE
+#include <enclave/outside/EnclaveInterface.h>
+#include <enclave/outside/system.h>
+#endif
 #include <storage/FileLoader.h>
 #include <storage/FileSystem.h>
-#endif
 
 static thread_local bool threadIsIsolated = false;
 
@@ -68,18 +67,17 @@ Faaslet::Faaslet(faabric::MessageInBatch msg)
     // Instantiate the right wasm module for the chosen runtime
     if (isBuiltin(msg->function())) {
         module = std::make_unique<wasm::NDPBuiltinModule>();
-    } else if (conf.wasmVm == "wamr") {
-#if (FAASM_SGX)
-        // When SGX is enabled, we may still be running with vanilla WAMR
-        if (msg->issgx()) {
-            module = std::make_unique<wasm::SGXWAMRWasmModule>();
-        } else {
-            module = std::make_unique<wasm::WAMRWasmModule>(1);
-        }
+    if (conf.wasmVm == "sgx") {
+#ifndef FAASM_SGX_DISABLED_MODE
+        module = std::make_unique<wasm::EnclaveInterface>();
 #else
+        SPDLOG_ERROR(
+          "SGX WASM VM selected, but SGX support disabled in config");
+        throw std::runtime_error("SGX support disabled in config");
+#endif
+    } else if (conf.wasmVm == "wamr") {
         // Vanilla WAMR
         module = std::make_unique<wasm::WAMRWasmModule>(1);
-#endif
     } else if (conf.wasmVm == "wavm") {
         module = std::make_unique<wasm::WAVMWasmModule>(1);
     } else {
@@ -140,34 +138,24 @@ void Faaslet::softShutdown()
     this->module.reset(nullptr);
 }
 
-void Faaslet::postFinish()
+void Faaslet::shutdown()
 {
     if (ns != nullptr) {
         ns->removeCurrentThread();
         returnNetworkNamespace(ns);
     }
+
+    Executor::shutdown();
 }
 
-faabric::util::MemoryView Faaslet::getMemoryView()
+std::span<uint8_t> Faaslet::getMemoryView()
 {
     return module->getMemoryView();
 }
 
-void Faaslet::restore(faabric::Message& msg)
+void Faaslet::setMemorySize(size_t newSize)
 {
-    conf::FaasmConfig& conf = conf::getFaasmConfig();
-    const std::string snapshotKey = msg.snapshotkey();
-
-    // Restore from snapshot if necessary
-    if (conf.wasmVm == "wavm" && !isBuiltin(msg.function())) {
-        if (!snapshotKey.empty() && !msg.issgx()) {
-            SPDLOG_DEBUG("Restoring {} from snapshot {} before execution",
-                         id,
-                         snapshotKey);
-
-            module->restore(snapshotKey);
-        }
-    }
+    module->setMemorySize(newSize);
 }
 
 FaasletFactory::FaasletFactory()
@@ -176,6 +164,10 @@ FaasletFactory::FaasletFactory()
     if (conf.wasmVm == "wavm") {
         wasm::WAVMWasmModule::warmUp();
     }
+}
+size_t Faaslet::getMaxMemorySize()
+{
+    return MAX_WASM_MEM;
 }
 
 std::string Faaslet::getLocalResetSnapshotKey()

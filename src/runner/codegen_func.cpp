@@ -14,9 +14,7 @@
 
 using namespace boost::filesystem;
 
-void codegenForFunc(const std::string& user,
-                    const std::string& func,
-                    bool isSgx = false)
+void codegenForFunc(const std::string& user, const std::string& func)
 {
     codegen::MachineCodeGenerator& gen = codegen::getMachineCodeGenerator();
     storage::FileLoader& loader = storage::getFileLoader();
@@ -28,12 +26,10 @@ void codegenForFunc(const std::string& user,
         return;
     }
 
-    if (isSgx) {
-        msg.set_issgx(true);
-        SPDLOG_INFO("Generating SGX machine code for {}/{}", user, func);
-    } else {
-        SPDLOG_INFO("Generating machine code for {}/{}", user, func);
-    }
+    SPDLOG_INFO("Generating machine code for {}/{} (WASM VM: {})",
+                user,
+                func,
+                conf::getFaasmConfig().wasmVm);
 
     gen.codegenForFunction(msg);
 }
@@ -44,16 +40,19 @@ int main(int argc, char* argv[])
     runner::commonInit();
     storage::initFaasmS3();
 
+    conf::FaasmConfig& conf = conf::getFaasmConfig();
     if (argc == 3) {
         std::string user = argv[1];
         std::string func = argv[2];
 
-        SPDLOG_INFO("Running codegen for function {}/{}", user, func);
+        SPDLOG_INFO("Running codegen for function {}/{} (WASM VM: {})",
+                    user,
+                    func,
+                    conf.wasmVm);
         codegenForFunc(user, func);
     } else if (argc == 2) {
         std::string user = argv[1];
 
-        conf::FaasmConfig& conf = conf::getFaasmConfig();
         SPDLOG_INFO(
           "Running codegen for user {} on dir {}", user, conf.functionDir);
 
@@ -106,12 +105,6 @@ int main(int argc, char* argv[])
                 t.join();
             }
         }
-    } else if (argc == 4 && std::string(argv[3]) == "--sgx") {
-        std::string user = argv[1];
-        std::string func = argv[2];
-
-        SPDLOG_INFO("Running SGX codegen for function {}/{}", user, func);
-        codegenForFunc(user, func, true);
     } else {
         SPDLOG_ERROR("Must provide function user and optional function name");
         return 0;

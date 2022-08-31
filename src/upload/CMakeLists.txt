@@ -6,11 +6,9 @@ target_link_libraries(upload_lib PUBLIC
     faasm::common_deps
     faasm::codegen
     cpprestsdk::cpprestsdk
-    faasm::faaslet_lib
     faasm::wavmmodule
     faasm::wamrmodule
     faasm::system
-    faasm::sgx
 )
 
 add_executable(upload upload_server.cpp)

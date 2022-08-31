@@ -19,7 +19,6 @@ def invoke(
     input=None,
     py=False,
     asynch=False,
-    knative=True,
     poll=False,
     cmdline=None,
     mpi_world_size=None,
@@ -36,7 +35,6 @@ def invoke(
         input=input,
         py=py,
         asynch=asynch,
-        knative=knative,
         poll=poll,
         cmdline=cmdline,
         mpi_world_size=mpi_world_size,
@@ -74,7 +72,7 @@ def status(ctx, call_id=None):
 
 
 @task
-def exec_graph(ctx, call_id=None, headless=True, output_file=None):
+def exec_graph(ctx, call_id=None, headless=False, output_file=None):
     """
     Get the execution graph for the given call ID
     """

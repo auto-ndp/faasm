@@ -29,8 +29,12 @@ endif()
 
 conan_cmake_configure(
     REQUIRES
-        "catch2/2.13.9@#8793d3e6287d3684201418de556d98fe"
-        "mimalloc/2.0.6@#ca9e081f2a1d78eb2b70c6d2270b56d7"
+        catch2/2.13.7@#31c8cd08e3c957a9eac8cb1377cf5863
+	"mimalloc/2.0.6@#ca9e081f2a1d78eb2b70c6d2270b56d7"
+        # These two dependencies are only needed to perform remote attestation
+        # of SGX enclaves using Microsoft Azure's Attestation Service
+        "jwt-cpp/0.6.0@#cd6b5c1318b29f4becaf807b23f7bb44"
+        "picojson/cci.20210117@#2af3ad146959275c97a6957b87b9073f"
     GENERATORS
         cmake_find_package
         cmake_paths
@@ -51,6 +55,8 @@ include(${CMAKE_CURRENT_BINARY_DIR}/conan_paths.cmake)
 
 find_package(Catch2 REQUIRED)
 find_package(mimalloc REQUIRED)
+find_package(jwt-cpp REQUIRED)
+find_package(picojson REQUIRED)
 
 # 22/12/2021 - WARNING: we don't install AWS through Conan as the recipe proved
 # very unstable and failed frequently.
@@ -80,6 +86,10 @@ ExternalProject_Add(aws_ext
                      -DENABLE_UNITY_BUILD=ON
                      -DENABLE_TESTING=OFF
                      -DCMAKE_BUILD_TYPE=Release
+    LOG_CONFIGURE ON
+    LOG_INSTALL ON
+    LOG_BUILD ON
+    LOG_OUTPUT_ON_FAILURE ON
 )
 
 add_library(aws_ext_core STATIC IMPORTED)
@@ -107,7 +117,7 @@ add_library(AWS::s3 ALIAS aws_ext_s3_lib)
 # Tightly-coupled dependencies
 FetchContent_Declare(wamr_ext
     GIT_REPOSITORY "https://github.com/faasm/wasm-micro-runtime"
-    GIT_TAG "5ac9493230902dd6ffdcbef0eeb6d5cc20fa81df"
+    GIT_TAG "78274abbaa34a9b68af7d1fbe71e7b66d9d3ca02"
 )
 
 # WAMR and WAVM both link to LLVM
@@ -127,18 +137,3 @@ set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ${IPO_SUPPORTED})
 
 FetchContent_GetProperties(wamr_ext SOURCE_DIR WAMR_ROOT_DIR)
 message(STATUS WAMR_ROOT_DIR ${WAMR_ROOT_DIR})
-
-# SGX-specific dependencies
-if(FAASM_SGX_XRA)
-    FetchContent_Declare(xra_ext
-        GIT_REPOSITORY "https://github.com/J-Heinemann/eXtended-Remote-Attestation"
-        GIT_TAG "1252f429c478d8c9052b02fc54f9f7d6ecc33594"
-    )
-
-    FetchContent_MakeAvailable(xra_ext)
-
-    # Access to headers in XRA
-    FetchContent_GetProperties(xra_ext SOURCE_DIR FAASM_XRA_ROOT_DIR)
-    set(FAASM_XRA_INCLUDE_PATH ${FAASM_XRA_ROOT_DIR}/include)
-endif()
-

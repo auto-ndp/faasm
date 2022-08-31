@@ -14,12 +14,21 @@
 #include <faaslet/Faaslet.h>
 
 #include <conf/FaasmConfig.h>
+#ifndef FAASM_SGX_DISABLED_MODE
+#include <enclave/outside/EnclaveInterface.h>
+#endif
 #include <wamr/WAMRWasmModule.h>
 #include <wavm/WAVMWasmModule.h>
 
 using namespace faaslet;
 
 namespace tests {
+
+void execFunction(std::shared_ptr<faabric::BatchExecuteRequest> req,
+                  const std::string& expectedOutput)
+{
+    return execFunction(req->mutable_messages()->at(0), expectedOutput);
+}
 
 void execFunction(faabric::Message& call, const std::string& expectedOutput)
 {
@@ -49,6 +58,7 @@ void execWamrFunction(faabric::Message& call, const std::string& expectedOutput)
     conf::FaasmConfig& conf = conf::getFaasmConfig();
     std::string originalPreload = conf.pythonPreload;
     conf.pythonPreload = "off";
+    conf.wasmVm = "wamr";
 
     wasm::WAMRWasmModule module;
     module.bindToFunction(call);
@@ -110,13 +120,8 @@ void checkMultipleExecutions(faabric::Message& msg, int nExecs)
 }
 
 void execBatchWithPool(std::shared_ptr<faabric::BatchExecuteRequest> req,
-                       int nSlots,
-                       bool clean)
+                       int nSlots)
 {
-    if (clean) {
-        cleanSystem();
-    }
-
     faabric::util::SystemConfig& conf = faabric::util::getSystemConfig();
     conf::FaasmConfig& faasmConf = conf::getFaasmConfig();
     conf.boundTimeout = 1000;
@@ -130,7 +135,8 @@ void execBatchWithPool(std::shared_ptr<faabric::BatchExecuteRequest> req,
     m.startRunner();
 
     // Execute forcing local
-    sch.callFunctions(req, faabric::util::SchedulingTopologyHint::FORCE_LOCAL);
+    req->mutable_messages()->at(0).set_topologyhint("FORCE_LOCAL");
+    sch.callFunctions(req);
 
     usleep(1000 * 500);
 
@@ -148,12 +154,10 @@ void execBatchWithPool(std::shared_ptr<faabric::BatchExecuteRequest> req,
     m.shutdown();
 }
 
-void execFuncWithPool(faabric::Message& call, bool clean, int timeout)
+faabric::Message execFuncWithPool(faabric::Message& call,
+                                  bool clean,
+                                  int timeout)
 {
-    if (clean) {
-        cleanSystem();
-    }
-
     faabric::scheduler::Scheduler& sch = faabric::scheduler::getScheduler();
     sch.shutdown();
     sch.addHostToGlobalSet();
@@ -183,7 +187,7 @@ void execFuncWithPool(faabric::Message& call, bool clean, int timeout)
 
     m.shutdown();
 
-    cleanSystem();
+    return result;
 }
 
 void doWamrPoolExecution(faabric::Message& msg, int timeout = 1000)
@@ -198,6 +202,22 @@ void doWamrPoolExecution(faabric::Message& msg, int timeout = 1000)
     conf.wasmVm = originalVm;
 }
 
+faabric::Message execErrorFunction(faabric::Message& call)
+{
+    auto fac = std::make_shared<faaslet::FaasletFactory>();
+    faabric::runner::FaabricMain m(fac);
+    m.startRunner();
+
+    faabric::scheduler::Scheduler& sch = faabric::scheduler::getScheduler();
+    sch.callFunction(call);
+
+    faabric::Message result = sch.getFunctionResult(call.id(), 1);
+
+    m.shutdown();
+
+    return result;
+}
+
 void executeWithWamrPool(const std::string& user,
                          const std::string& func,
                          int timeout)
@@ -206,13 +226,45 @@ void executeWithWamrPool(const std::string& user,
     doWamrPoolExecution(call, timeout);
 }
 
-void executeWithSGX(const std::string& user,
-                    const std::string& func,
-                    int timeout)
+void execSgxFunction(faabric::Message& call, const std::string& expectedOutput)
 {
-    faabric::Message call = faabric::util::messageFactory(user, func);
-    call.set_issgx(true);
-    doWamrPoolExecution(call, timeout);
+#ifndef FAASM_SGX_DISABLED_MODE
+    conf::FaasmConfig& conf = conf::getFaasmConfig();
+    const std::string originalVm = conf.wasmVm;
+    conf.wasmVm = "sgx";
+
+    wasm::EnclaveInterface enclaveInterface;
+    enclaveInterface.bindToFunction(call);
+    int returnValue = enclaveInterface.executeFunction(call);
+
+    if (!expectedOutput.empty()) {
+        std::string actualOutput = call.outputdata();
+        REQUIRE(actualOutput == expectedOutput);
+    }
+
+    REQUIRE(returnValue == 0);
+    REQUIRE(call.returnvalue() == 0);
+
+    conf.wasmVm = originalVm;
+#else
+    SPDLOG_ERROR("Running SGX test but SGX is disabled");
+#endif
+}
+
+void execFuncWithSgxPool(faabric::Message& call, int timeout)
+{
+#ifndef FAASM_SGX_DISABLED_MODE
+    conf::FaasmConfig& conf = conf::getFaasmConfig();
+    const std::string originalVm = conf.wasmVm;
+    conf.wasmVm = "sgx";
+
+    // Don't clean so that the SGX configuration persists
+    execFuncWithPool(call, false, timeout);
+
+    conf.wasmVm = originalVm;
+#else
+    SPDLOG_ERROR("Running SGX test but SGX is disabled");
+#endif
 }
 
 void checkCallingFunctionGivesBoolOutput(const std::string& user,

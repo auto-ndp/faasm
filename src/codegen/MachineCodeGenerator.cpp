@@ -49,9 +49,10 @@ std::vector<uint8_t> MachineCodeGenerator::doCodegen(
   bool isSgx)
 {
     if (conf.wasmVm == "wamr") {
-        return wasm::wamrCodegen(bytes, target, isSgx);
+        return wasm::wamrCodegen(bytes, target, false);
+    } else if (conf.wasmVm == "sgx") {
+        return wasm::wamrCodegen(bytes, target, true);
     } else {
-        assert(isSgx == false);
         return wasm::wavmCodegen(bytes, target, fileName);
     }
 }
@@ -70,14 +71,13 @@ void MachineCodeGenerator::codegenForFunction(faabric::Message& msg)
         // Compare hashes
         std::vector<uint8_t> newHash = hashBytes(bytes);
         std::vector<uint8_t> oldHash;
-        if (conf.wasmVm == "wamr") {
+        if (conf.wasmVm == "wamr" || conf.wasmVm == "sgx") {
             oldHash = loader.loadFunctionWamrAotHash(msg, target);
         } else if (conf.wasmVm == "wavm" && msg.issgx()) {
-            SPDLOG_ERROR(
-              "Can't run SGX codegen for WAVM. Only WAMR is supported.");
-            throw std::runtime_error("SGX codegen for WAVM");
+            oldHash = loader.loadFunctionObjectHash(msg);
         } else {
-            oldHash = loader.loadFunctionObjectHash(msg, target);
+            SPDLOG_ERROR("Unrecognised WASM VM during codegen: {}", conf.wasmVm);
+        	throw std::runtime_error("Unrecognised WASM VM");
         }
 
         if ((!oldHash.empty()) && newHash == oldHash) {
@@ -88,25 +88,29 @@ void MachineCodeGenerator::codegenForFunction(faabric::Message& msg)
             } else {
                 UNUSED(loader.loadFunctionObjectFile(msg, target));
             }
-            SPDLOG_DEBUG("Skipping codegen for {}", funcStr);
+	        SPDLOG_DEBUG(
+	          "Skipping codegen for {} (WASM VM: {})", funcStr, conf.wasmVm);
             return;
         } else if (oldHash.empty()) {
-            SPDLOG_DEBUG("No old hash found for {}", funcStr);
+	        SPDLOG_DEBUG(
+	          "No old hash found for {} (WASM VM: {})", funcStr, conf.wasmVm);
         } else {
-            SPDLOG_DEBUG("Hashes differ for {}", funcStr);
+	        SPDLOG_DEBUG(
+	          "Hashes differ for {} (WASM VM: {})", funcStr, conf.wasmVm);
         }
 
         // Run the actual codegen
         std::vector<uint8_t> objBytes;
         try {
-            objBytes = doCodegen(bytes, target, funcStr, msg.issgx());
+            objBytes = doCodegen(bytes, target, funcStr);
         } catch (std::runtime_error& ex) {
-            SPDLOG_ERROR("Codegen failed for " + funcStr);
+	        SPDLOG_ERROR(
+	          "Codegen failed for {} (WASM VM: {})", funcStr, conf.wasmVm);
             throw ex;
         }
 
         // Upload the file contents and the hash
-        if (conf.wasmVm == "wamr") {
+    	if (conf.wasmVm == "wamr" || conf.wasmVm == "sgx") {
             loader.uploadFunctionWamrAotFile(msg, target, objBytes);
             loader.uploadFunctionWamrAotHash(msg, target, newHash);
         } else {
@@ -139,7 +143,7 @@ void MachineCodeGenerator::codegenForSharedObject(const std::string& inputPath)
         std::vector<uint8_t> objBytes = doCodegen(bytes, target, inputPath);
 
         // Do the upload
-        if (conf.wasmVm == "wamr") {
+    	if (conf.wasmVm == "wamr" || conf.wasmVm == "sgx") {
             throw std::runtime_error(
               "Codegen for shared objects not supported with WAMR");
         }

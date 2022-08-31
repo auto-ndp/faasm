@@ -13,6 +13,9 @@ else()
 endif()
 set(WAMR_BUILD_SPEC_TEST 0)
 
+# Top-level Faasm flag for WAMR
+add_definitions(-DWAMR_FAASM=1)
+
 # Set AOT mode and JIT for code generation
 set(WAMR_BUILD_AOT 1)
 set(WAMR_BUILD_JIT 1)
@@ -31,8 +34,10 @@ set(WAMR_BUILD_MULTI_MODULE 1)
 # management model
 set(WAMR_BUILD_BULK_MEMORY 0)
 
-# Explicitely set to 0. If set to 1, WAMR will allocate the module's instance
-# memory using `malloc` instead of `mmap` and calls to `mprotect` fail.
+# We must enable WAMR hardware bounds check here, otherwise WAMR uses malloc to
+# allocate memory, which is not page-aligned. This seems like a blunt instrument
+# to solve a smal problem, but this parameter is deeply embedded in the WAMR
+# code, and it's difficult to change it surgically.
 set(WAMR_DISABLE_HW_BOUND_CHECK 0)
 # This definition prevents a buffer underflow during code generation
 add_definitions(-DWASM_ENABLE_WAMR_COMPILER=1)
@@ -43,6 +48,17 @@ include (${WAMR_ROOT_DIR}/build-scripts/runtime_lib.cmake)
 # safe to disable as we actually don't run JITed code.
 remove_definitions("-DWASM_ENABLE_JIT=1")
 faasm_private_lib(wamrlib "${WAMR_RUNTIME_LIB_SOURCE}")
+
+# Disable WAMR warnings
+target_compile_options(wamrlib PRIVATE
+    -Wno-typedef-redefinition
+    -Wno-unused-command-line-argument
+    # We comment out some problematic LLVM code in WAMR. Commenting out triggers
+    # compilation warnings that we suppress
+    -Wno-ambiguous-reversed-operator
+    -Wno-unused-function
+    -Wno-deprecated-enum-enum-conversion
+)
 
 # -----------------------------
 # Faasm-specific configuration

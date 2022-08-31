@@ -3,7 +3,6 @@
 #include <storage/S3Wrapper.h>
 
 #include <faabric/endpoint/FaabricEndpoint.h>
-#include <faabric/endpoint/FaabricEndpointHandler.h>
 #include <faabric/runner/FaabricMain.h>
 #include <faabric/scheduler/ExecutorFactory.h>
 #include <faabric/transport/context.h>
@@ -32,7 +31,7 @@ int main()
           config.endpointPort,
           config.endpointNumThreads,
           std::make_shared<faabric::endpoint::FaabricEndpointHandler>());
-        endpoint.start();
+        endpoint.start(faabric::endpoint::EndpointMode::SIGNAL);
 
         SPDLOG_INFO("Shutting down");
         m.shutdown();

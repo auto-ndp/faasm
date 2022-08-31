@@ -1,6 +1,7 @@
 #include "syscalls.h"
 
 #include <faabric/proto/faabric.pb.h>
+#include <faabric/scheduler/ExecutorContext.h>
 #include <faabric/scheduler/Scheduler.h>
 #include <faabric/snapshot/SnapshotRegistry.h>
 #include <faabric/transport/PointToPointBroker.h>
@@ -21,6 +22,7 @@
 #include <WAVM/Runtime/Runtime.h>
 
 using namespace WAVM;
+using namespace faabric::scheduler;
 
 namespace wasm {
 
@@ -88,7 +90,7 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
 {
     SPDLOG_DEBUG("S - pthread_join - {} {}", pthreadPtr, resPtrPtr);
 
-    faabric::Message* call = getExecutingCall();
+    faabric::Message* call = &ExecutorContext::get()->getMsg();
     WasmModule* thisModule = getExecutingModule();
 
     // Await the result
@@ -175,31 +177,6 @@ I32 s__futex(I32 uaddrPtr,
 // Note we use trace logging here as these are invoked a lot
 // --------------------------
 
-std::shared_ptr<faabric::transport::PointToPointGroup> getPthreadGroup(int mx)
-{
-    thread_local std::weak_ptr<faabric::transport::PointToPointGroup> cache{};
-    thread_local uint64_t cacheId{};
-
-    faabric::Message* msg = getExecutingCall();
-    // https://stackoverflow.com/questions/3058139/hash-32bit-int-to-16bit-int
-    uint64_t id64{ uint64_t(msg->appid()) | (uint64_t(mx) << 32) };
-    uint32_t grpId = ((id64 * 0x8000000080000001ull) >> 32);
-
-    if (auto cached = cache.lock(); cached) {
-        if (cacheId == id64) {
-            return cached;
-        }
-    }
-
-    faabric::transport::PointToPointGroup::addGroupIfNotExists(
-      msg->appid(), grpId, 0);
-
-    auto group = faabric::transport::PointToPointGroup::getGroup(grpId);
-    cache = group;
-    cacheId = id64;
-    return group;
-}
-
 WAVM_DEFINE_INTRINSIC_FUNCTION(env,
                                "pthread_mutex_init",
                                I32,
@@ -208,10 +185,6 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
                                I32 attr)
 {
     SPDLOG_TRACE("S - pthread_mutex_init {} {}", mx, attr);
-
-    // getPthreadGroup(mx);
-    std::unique_lock lock{ getExecutingModule()->wasmMutexMx };
-    getExecutingModule()->wasmMutex[mx];
 
     return 0;
 }
@@ -222,13 +195,8 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
                                pthread_mutex_lock,
                                I32 mx)
 {
-    // SPDLOG_TRACE("S - pthread_mutex_lock {}", mx);
-
-    // getPthreadGroup(mx)->localLock();
-    std::unique_lock lock{ getExecutingModule()->wasmMutexMx };
-    auto& wmx = getExecutingModule()->wasmMutex[mx];
-    lock.unlock();
-    wmx.lock();
+    SPDLOG_TRACE("S - pthread_mutex_lock {}", mx);
+    getExecutingModule()->getOrCreatePthreadMutex(mx)->lock();
 
     return 0;
 }
@@ -239,13 +207,10 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
                                s__pthread_mutex_trylock,
                                I32 mx)
 {
-    // SPDLOG_TRACE("S - pthread_mutex_trylock {}", mx);
+    SPDLOG_TRACE("S - pthread_mutex_trylock {}", mx);
 
-    // bool success = getPthreadGroup(mx)->localTryLock();
-    std::unique_lock lock{ getExecutingModule()->wasmMutexMx };
-    auto& wmx = getExecutingModule()->wasmMutex[mx];
-    lock.unlock();
-    bool success = wmx.try_lock();
+    bool success =
+      getExecutingModule()->getOrCreatePthreadMutex(mx)->try_lock();
 
     if (!success) {
         return EBUSY;
@@ -260,12 +225,8 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
                                pthread_mutex_unlock,
                                I32 mx)
 {
-    // SPDLOG_TRACE("S - pthread_mutex_unlock {}", mx);
-    // getPthreadGroup(mx)->localUnlock();
-    std::unique_lock lock{ getExecutingModule()->wasmMutexMx };
-    auto& wmx = getExecutingModule()->wasmMutex[mx];
-    lock.unlock();
-    wmx.unlock();
+    SPDLOG_TRACE("S - pthread_mutex_unlock {}", mx);
+    getExecutingModule()->getPthreadMutex(mx)->unlock();
 
     return 0;
 }
@@ -277,9 +238,6 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
                                I32 mx)
 {
     SPDLOG_TRACE("S - pthread_mutex_destroy {}", mx);
-    std::unique_lock lock{ getExecutingModule()->wasmMutexMx };
-    getExecutingModule()->wasmMutex.erase(mx);
-
     return 0;
 }
 

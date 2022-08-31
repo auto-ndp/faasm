@@ -42,7 +42,7 @@ int main()
           config.endpointPort,
           config.endpointNumThreads,
           std::make_shared<faabric::endpoint::FaabricEndpointHandler>());
-        endpoint.start();
+        endpoint.start(faabric::endpoint::EndpointMode::SIGNAL);
 
         SPDLOG_INFO("Shutting down");
         m.shutdown();

@@ -5,6 +5,7 @@
 
 #include <faabric/proto/faabric.pb.h>
 #include <faabric/runner/FaabricMain.h>
+#include <faabric/scheduler/ExecutorContext.h>
 #include <faabric/util/config.h>
 #include <faabric/util/files.h>
 #include <faabric/util/func.h>
@@ -122,7 +123,10 @@ TEST_CASE_METHOD(FlushingTestFixture,
     // Execute a task
     std::shared_ptr<faabric::BatchExecuteRequest> req =
       faabric::util::batchExecFactory("demo", "echo", 1);
-    faaslet::Faaslet f(faabric::MessageInBatch(req, 0));
+    faabric::Message& msg = req->mutable_messages()->at(0);
+
+    faabric::scheduler::ExecutorContext::set(nullptr, req, 0);
+    faaslet::Faaslet f(msg);
     f.executeTask(0, 0, req);
 
     // Check the module has been cached
@@ -132,6 +136,8 @@ TEST_CASE_METHOD(FlushingTestFixture,
     // Flush and check it's gone
     faabric::scheduler::getExecutorFactory()->flushHost();
     REQUIRE(!cache.isModuleCached("demo", "echo", ""));
+
+    f.shutdown();
 }
 
 TEST_CASE_METHOD(FlushingTestFixture,

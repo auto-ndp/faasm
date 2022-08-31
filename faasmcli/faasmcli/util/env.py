@@ -11,7 +11,7 @@ def _get_dir(variable, default):
 
 HOME_DIR = expanduser("~")
 PROJ_ROOT = dirname(dirname(dirname(dirname(realpath(__file__)))))
-ANSIBLE_ROOT = join(PROJ_ROOT, "ansible")
+DOCS_ROOT = join(PROJ_ROOT, "docs")
 
 PYTHON_USER = "python"
 PYTHON_FUNC = "py_func"
@@ -29,6 +29,12 @@ GLOBAL_FAASM_CONFIG_DIR = join(HOME_DIR, ".config")
 GLOBAL_FAASM_CONFIG_FILE = join(GLOBAL_FAASM_CONFIG_DIR, "faasm.ini")
 
 PY_RUNTIME_ROOT = join(FAASM_RUNTIME_ROOT, "lib", "python3.8")
+
+FAASM_SGX_MODE_DISABLED = "Disabled"
+FAASM_SGX_MODE_SIM = "Simulation"
+FAASM_SGX_MODE_HARDWARE = "Hardware"
+
+AVAILABLE_HOSTS_SET = "available_hosts"
 
 
 def get_wasm_func_path(user, func_name):

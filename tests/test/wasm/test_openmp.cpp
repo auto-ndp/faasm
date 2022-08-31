@@ -1,6 +1,7 @@
 #include <catch2/catch.hpp>
 
 #include "faasm_fixtures.h"
+#include "fixtures.h"
 #include "utils.h"
 
 #include <faabric/proto/faabric.pb.h>
@@ -9,6 +10,7 @@
 #include <faabric/util/config.h>
 #include <faabric/util/environment.h>
 #include <faabric/util/func.h>
+#include <faabric/util/string_tools.h>
 
 // Longer timeout to allow longer-running functions to finish even when doing
 // trace-level logging
@@ -18,17 +20,21 @@ namespace tests {
 
 class OpenMPTestFixture
   : public FunctionExecTestFixture
-  , ConfTestFixture
+  , public ConfTestFixture
+  , public SnapshotTestFixture
 {
   public:
     OpenMPTestFixture() { conf.overrideCpuCount = 30; }
 
     ~OpenMPTestFixture() {}
 
-    void doOmpTestLocal(const std::string& function)
+    std::string doOmpTestLocal(const std::string& function)
     {
         faabric::Message msg = faabric::util::messageFactory("omp", function);
-        execFuncWithPool(msg, false, OMP_TEST_TIMEOUT_MS);
+        faabric::Message result =
+          execFuncWithPool(msg, false, OMP_TEST_TIMEOUT_MS);
+
+        return result.outputdata();
     }
 };
 
@@ -108,10 +114,13 @@ TEST_CASE_METHOD(OpenMPTestFixture,
 }
 
 TEST_CASE_METHOD(OpenMPTestFixture,
-                 "Test OpenMP Pi calculation",
+                 "Test OpenMP Pi calculation using libfaasm",
                  "[wasm][openmp]")
 {
-    doOmpTestLocal("mt_pi");
+    std::string output = doOmpTestLocal("pi_faasm");
+
+    // Just check Pi to one dp
+    REQUIRE(faabric::util::startsWith(output, "Pi estimate: 3.1"));
 }
 
 TEST_CASE_METHOD(OpenMPTestFixture,
@@ -177,5 +186,30 @@ TEST_CASE_METHOD(OpenMPTestFixture,
     msg.set_cmdline(std::to_string(nOmpThreads));
 
     execFuncWithPool(msg, false, OMP_TEST_TIMEOUT_MS);
+}
+
+TEST_CASE_METHOD(OpenMPTestFixture,
+                 "Test nested openmp explicitly disabled",
+                 "[wasm][openmp]")
+{
+    faabric::scheduler::Scheduler& sch = faabric::scheduler::getScheduler();
+
+    // Make sure there's definitely enough slots
+    int nSlots = 20;
+    faabric::HostResources res;
+    res.set_slots(nSlots);
+    sch.setThisHostResources(res);
+
+    faabric::Message msg =
+      faabric::util::messageFactory("omp", "nested_parallel");
+    faabric::Message result = execErrorFunction(msg);
+
+    // Get result
+    REQUIRE(result.returnvalue() > 0);
+
+    std::string expectedOutput = fmt::format(
+      "Task {} threw exception. What: OpenMP threads failed", msg.id());
+    const std::string actualOutput = result.outputdata();
+    REQUIRE(actualOutput == expectedOutput);
 }
 }

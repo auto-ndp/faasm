@@ -35,7 +35,7 @@ services:
     restart: on-failure
     volumes:
       - ./:/usr/local/code/faasm/
-      - ./dev/faasm/build/:${FAASM_BUILD_MOUNT}
+      - ${FAASM_BUILD_DIR}:${FAASM_BUILD_MOUNT}
       - ./dev/faasm-local/wasm/:/usr/local/faasm/wasm
       - ./dev/faasm-local/object/:/usr/local/faasm/object
       - /sys/kernel/debug:/sys/kernel/debug
@@ -48,6 +48,7 @@ services:
       - REDIS_QUEUE_HOST=redis-queue
       - REDIS_STATE_HOST=redis-state
       - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
+      - WASM_VM=${WASM_VM:-wavm}
       - ASAN_OPTIONS=verbosity=1:halt_on_error=1
       - TSAN_OPTIONS=halt_on_error=1:suppressions=/usr/local/code/faasm/thread-sanitizer-ignorelist.txt:history_size=7:second_deadlock_stack=1
       - UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=1
@@ -77,9 +78,11 @@ services:
     volumes:
       - ./:/usr/local/code/faasm/
       - /tmp/faasm-monitor:/var/faasm-monitor
-      - ./dev/faasm/build/:${FAASM_BUILD_MOUNT}
+      - ${FAASM_BUILD_DIR}:${FAASM_BUILD_MOUNT}
       - ./dev/faasm-local/:${FAASM_LOCAL_MOUNT}
+      - aesmd-socket:/var/run/aesmd
       - ./dev/container/shared_store/:/usr/local/faasm/debug_shared_store/
+      - ${SGX_DEVICE_MOUNT_DIR:-./dev/faasm-local/sgx}:/dev/sgx
       - ./bin/entrypoint_worker.sh:/entrypoint.sh
       - /sys/kernel/debug:/sys/kernel/debug
       - /sys/kernel/debug/tracing:/sys/kernel/debug/tracing
@@ -146,6 +149,9 @@ services:
       - SCHEDULER_MONITOR_FILE=/var/faasm-monitor-storage
       - STATE_MODE=redis
       - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
+      - WASM_VM=${WASM_VM:-wavm}
+      - SGX_AESM_ADDR=1
+      - AZ_ATTESTATION_PROVIDER_URL=https://faasmattprov.eus2.attest.azure.net
       - ENDPOINT_HOST=worker-storage
       - ENDPOINT_NUM_THREADS=1
       - OVERRIDE_CPU_COUNT=8
@@ -202,11 +208,32 @@ services:
       - LSAN_OPTIONS=suppressions=/usr/local/code/faasm/leak-sanitizer-ignorelist.txt
       - TSAN_OPTIONS=halt_on_error=1:suppressions=/usr/local/code/faasm/thread-sanitizer-ignorelist.txt:history_size=7:second_deadlock_stack=1
       - UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1
+      - WASM_VM=${WASM_VM:-wavm}
+      - SGX_AESM_ADDR=1
+      - AZ_ATTESTATION_PROVIDER_URL=https://faasmattprov.eus2.attest.azure.net
+      - AZDCAP_DEBUG_LOG_LEVEL=info
     volumes:
       - ./:/usr/local/code/faasm/
-      - ./dev/faasm/build/:${FAASM_BUILD_MOUNT}
+      - ${FAASM_BUILD_DIR}:${FAASM_BUILD_MOUNT}
       - ./dev/faasm-local/:${FAASM_LOCAL_MOUNT}
-      - ${CONAN_CACHE_MOUNT_SOURCE:-./dev/faasm/conan/}:/root/.conan
+      - ${CONAN_CACHE_MOUNT_SOURCE}:/root/.conan
+      - aesmd-socket:/var/run/aesmd
+      - ${SGX_DEVICE_MOUNT_DIR:-./dev/faasm-local/sgx}:/dev/sgx
+
+  # SGX AESM service to mock the remote attestation environment in production
+  # There is no need to re-create the image every time, as it does not depend
+  # on Faasm's code
+  aesmd:
+    image: faasm/sgx-aesmd:0.8.9
+    devices:
+      - ${SGX_DEVICE_MOUNT_DIR:-./dev/faasm-local/sgx}/enclave
+      - ${SGX_DEVICE_MOUNT_DIR:-./dev/faasm-local/sgx}/provision
+    environment:
+      - AZDCAP_DEBUG_LOG_LEVEL=info
+    volumes:
+      - aesmd-socket:/var/run/aesmd
+    stdin_open: true
+    tty: true
 
   # Distributed tests server
   dist-test-server:
@@ -229,7 +256,7 @@ services:
     command: ./bin/dist_test_server
     volumes:
       - ./:/usr/local/code/faasm/
-      - ./dev/faasm/build/:${FAASM_BUILD_MOUNT}
+      - ${FAASM_BUILD_DIR}:${FAASM_BUILD_MOUNT}
 
   # Profiling/ perf testing
   vector:
@@ -238,3 +265,10 @@ services:
       - faasm-cli
     ports:
       - "80:80"
+
+# This volume is only needed when running SGX in hardware mode, in an
+# SGX-enabled machine. It enables communication between the AESMD container
+# and the SGX-enabled client or worker. It is needed for remote attestation.
+volumes:
+  aesmd-socket:
+    external: ${AESMD_SOCKET_EXTERNAL_VOLUME:-false}

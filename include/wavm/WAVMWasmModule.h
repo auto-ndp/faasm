@@ -70,19 +70,13 @@ class WAVMWasmModule final
     void reset(faabric::Message& msg, const std::string& snapshotKey) override;
 
     // ----- Memory management -----
-    uint32_t growMemory(uint32_t nBytes) override;
-
-    uint32_t shrinkMemory(uint32_t nBytes) override;
-
-    uint32_t mmapMemory(uint32_t nBytes) override;
-
-    uint32_t mmapFile(uint32_t fd, uint32_t length) override;
-
-    void unmapMemory(uint32_t offset, uint32_t nBytes) override;
+    uint32_t mmapFile(uint32_t fd, size_t length) override;
 
     uint8_t* wasmPointerToNative(uint32_t wasmPtr) override;
 
     size_t getMemorySizeBytes() override;
+
+    size_t getMaxMemoryPages() override;
 
     uint8_t* getMemoryBase() override;
 
@@ -197,6 +191,9 @@ class WAVMWasmModule final
     std::unordered_map<std::string, WAVM::Uptr> globalOffsetTableMap;
     std::unordered_map<std::string, std::pair<int, bool>> globalOffsetMemoryMap;
     std::unordered_map<std::string, int> missingGlobalOffsetEntries;
+
+    // Memory management
+    bool doGrowMemory(uint32_t pageChange) override;
 
     // OpenMP
     std::vector<WAVM::Runtime::Context*> openMPContexts;

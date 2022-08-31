@@ -1,5 +1,6 @@
 #include <catch2/catch.hpp>
 
+#include "faasm_fixtures.h"
 #include "utils.h"
 
 #include <faabric/runner/FaabricMain.h>
@@ -8,53 +9,47 @@
 using namespace faaslet;
 
 namespace tests {
-faabric::Message execErrorFunction(faabric::Message& call)
+
+class ErrorCheckFixture : public MultiRuntimeFunctionExecTestFixture
 {
-    auto fac = std::make_shared<faaslet::FaasletFactory>();
-    faabric::runner::FaabricMain m(fac);
-    m.startRunner();
+  public:
+    void checkError(const std::string& funcName, const std::string& expectedMsg)
+    {
+        auto req = setUpContext("errors", funcName);
+        faabric::Message& call = req->mutable_messages()->at(0);
+        faabric::Message result = execErrorFunction(call);
 
-    faabric::scheduler::Scheduler& sch = faabric::scheduler::getScheduler();
-    sch.callFunction(call);
+        // Get result
+        REQUIRE(result.returnvalue() > 0);
 
-    faabric::Message result = sch.getFunctionResult(call.id(), 1);
+        if (expectedMsg.empty()) {
+            return;
+        }
 
-    m.shutdown();
+        const std::string actualOutput = result.outputdata();
+        bool messageIsFound = false;
+        if (actualOutput.find(expectedMsg) != std::string::npos) {
+            messageIsFound = true;
+        }
 
-    return result;
-}
+        if (!messageIsFound) {
+            printf("%s not found in %s\n",
+                   expectedMsg.c_str(),
+                   actualOutput.c_str());
+        }
 
-void checkError(const std::string& funcName, const std::string& expectedMsg)
+        REQUIRE(messageIsFound);
+    }
+};
+
+TEST_CASE_METHOD(ErrorCheckFixture,
+                 "Test non-zero return code is error",
+                 "[wasm]")
 {
-    cleanSystem();
+    SECTION("WAVM") { conf.wasmVm = "wavm"; }
 
-    faabric::Message call = faabric::util::messageFactory("errors", funcName);
+    SECTION("WAMR") { conf.wasmVm = "wamr"; }
 
-    faabric::Message result = execErrorFunction(call);
-
-    // Get result
-    REQUIRE(result.returnvalue() > 0);
-
-    if (expectedMsg.empty()) {
-        return;
-    }
-
-    const std::string actualOutput = result.outputdata();
-    bool messageIsFound = false;
-    if (actualOutput.find(expectedMsg) != std::string::npos) {
-        messageIsFound = true;
-    }
-
-    if (!messageIsFound) {
-        printf(
-          "%s not found in %s\n", expectedMsg.c_str(), actualOutput.c_str());
-    }
-
-    REQUIRE(messageIsFound);
-}
-
-TEST_CASE("Test non-zero return code is error", "[wasm]")
-{
     checkError("ret_one", "Call failed (return value=1)");
 }
 }

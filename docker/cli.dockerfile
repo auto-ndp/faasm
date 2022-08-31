@@ -1,4 +1,5 @@
 ARG FAASM_VERSION
+ARG FAASM_SGX_PARENT_SUFFIX
 FROM kubasz51/faasm-base:$FAASM_VERSION
 
 SHELL ["/bin/bash", "-c"]
@@ -7,12 +8,13 @@ SHELL ["/bin/bash", "-c"]
 RUN apt-get update \
     && apt-get upgrade --yes --no-install-recommends \
     && apt-get install --yes --no-install-recommends \
+    doxygen \
     libcairo2-dev \
     python3-cairo \
     vim \
     nano \
-    && apt-get clean autoclean \
-    && apt-get autoremove
+    && apt-get clean autoclean --yes \
+    && apt-get autoremove --yes
 
 # Install wabt
 # TODO - pin this to a release
@@ -28,14 +30,23 @@ WORKDIR /usr/local/code/faasm
 RUN ./bin/create_venv.sh
 
 # Build some useful targets
-RUN source venv/bin/activate && inv -r faasmcli/faasmcli dev.tools --build Release
+ARG FAASM_SGX_MODE
+RUN source venv/bin/activate && \
+        inv -r faasmcli/faasmcli dev.tools \
+        --build Release \
+        --sgx ${FAASM_SGX_MODE}
 
 # Remove worker entrypoint
 COPY bin/noop-entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
 
+ # Terminal colours
 ENV TERM xterm-256color
+
+# GDB config, allow loading repo-specific config
+RUN touch /root/.gdbinit
+RUN echo "set auto-load safe-path /" > /root/.gdbinit
 
 # Prepare bashrc
 RUN echo ". /usr/local/code/faasm/bin/workon.sh" >> ~/.bashrc

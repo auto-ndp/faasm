@@ -3,6 +3,7 @@
 #include "faasm_fixtures.h"
 #include "utils.h"
 
+#include <wamr/WAMRWasmModule.h>
 #include <wavm/WAVMWasmModule.h>
 
 #include <faabric/util/bytes.h>
@@ -55,10 +56,14 @@ TEST_CASE_METHOD(FunctionExecTestFixture, "Test mmapping a file", "[wasm]")
     REQUIRE(expected == actual);
 }
 
-TEST_CASE_METHOD(FunctionExecTestFixture,
+TEST_CASE_METHOD(MultiRuntimeFunctionExecTestFixture,
                  "Test memory growth and shrinkage",
                  "[wasm]")
 {
+    // Test different WASM VMs
+    SECTION("WAVM") { conf.wasmVm = "wavm"; }
+    SECTION("WAMR") { conf.wasmVm = "wamr"; }
+
     faabric::Message call = faabric::util::messageFactory("demo", "echo");
     wasm::WAVMWasmModule module;
     module.bindToFunction(call);
@@ -146,14 +151,59 @@ TEST_CASE_METHOD(FunctionExecTestFixture,
     REQUIRE(newBrk == oldBrk);
 }
 
-TEST_CASE_METHOD(FunctionExecTestFixture, "Test mmap/munmap", "[faaslet]")
+TEST_CASE_METHOD(MultiRuntimeFunctionExecTestFixture,
+                 "Test mmap/munmap",
+                 "[faaslet]")
 {
+    SECTION("WAVM") { conf.wasmVm = "wavm"; }
+
+    SECTION("WAMR") { conf.wasmVm = "wamr"; }
+
     checkCallingFunctionGivesBoolOutput("demo", "mmap", true);
 }
 
-TEST_CASE_METHOD(FunctionExecTestFixture, "Test big mmap", "[faaslet]")
+TEST_CASE_METHOD(MultiRuntimeFunctionExecTestFixture,
+                 "Test big mmap",
+                 "[faaslet]")
 {
-    faabric::Message msg = faabric::util::messageFactory("demo", "mmap_big");
-    execFunction(msg);
+    auto req = setUpContext("demo", "mmap_big");
+
+    SECTION("WAVM") { execFunction(req); }
+
+    SECTION("WAMR") { execWamrFunction(req->mutable_messages()->at(0)); }
+}
+
+TEST_CASE_METHOD(FunctionExecTestFixture,
+                 "Test allocating over max memory",
+                 "[wasm]")
+{
+    auto req = setUpContext("demo", "echo");
+    faabric::Message& call = req->mutable_messages()->at(0);
+
+    std::shared_ptr<wasm::WasmModule> module = nullptr;
+
+    std::string expectedMessage = "Memory growth exceeding max";
+    SECTION("WAVM") { module = std::make_shared<wasm::WAVMWasmModule>(); }
+
+    SECTION("WAMR") { module = std::make_shared<wasm::WAMRWasmModule>(); }
+
+    module->bindToFunction(call);
+
+    size_t oneKib = 1024L;
+    size_t oneMib = 1024L * oneKib;
+    size_t oneGib = 1024L * oneMib;
+
+    // We have to hope this works, otherwise we may cause an OOM on the host
+    size_t fiveGib = 5L * oneGib;
+    bool failed = false;
+    try {
+        module->setMemorySize(fiveGib);
+    } catch (std::runtime_error& ex) {
+        failed = true;
+        std::string actualMessage = ex.what();
+        REQUIRE(actualMessage == expectedMessage);
+    }
+
+    REQUIRE(failed);
 }
 }

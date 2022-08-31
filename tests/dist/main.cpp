@@ -7,8 +7,6 @@
 #include <faaslet/Faaslet.h>
 #include <storage/S3Wrapper.h>
 
-#include <faabric/endpoint/FaabricEndpoint.h>
-#include <faabric/endpoint/FaabricEndpointHandler.h>
 #include <faabric/runner/FaabricMain.h>
 #include <faabric/scheduler/ExecutorFactory.h>
 #include <faabric/transport/context.h>

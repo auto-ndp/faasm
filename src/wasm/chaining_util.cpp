@@ -1,5 +1,4 @@
-#include "WasmModule.h"
-
+#include <faabric/scheduler/ExecutorContext.h>
 #include <faabric/scheduler/Scheduler.h>
 #include <faabric/util/bytes.h>
 #include <faabric/util/config.h>
@@ -8,6 +7,7 @@
 
 #include <conf/FaasmConfig.h>
 #include <wasm/WasmExecutionContext.h>
+#include <wasm/WasmModule.h>
 #include <wasm/chaining.h>
 
 namespace wasm {
@@ -39,7 +39,8 @@ int makeChainedCall(const std::string& functionName,
 {
     const auto& fcfg = faabric::util::getSystemConfig();
     faabric::scheduler::Scheduler& sch = faabric::scheduler::getScheduler();
-    faabric::Message* originalCall = getExecutingCall();
+    faabric::Message* originalCall =
+      &faabric::scheduler::ExecutorContext::get()->getMsg();
 
     std::string user = originalCall->user();
 
@@ -57,6 +58,9 @@ int makeChainedCall(const std::string& functionName,
     msg.set_executeslocally(true);
     msg.set_forbidndp(originalCall->forbidndp());
 
+    // Propagate the command line if needed
+    msg.set_cmdline(originalCall->cmdline());
+
     // Propagate the app ID
     msg.set_appid(originalCall->appid());
 
@@ -67,10 +71,6 @@ int makeChainedCall(const std::string& functionName,
         msg.set_pythonentry(pyFuncName);
     }
     msg.set_ispython(originalCall->ispython());
-
-    if (originalCall->issgx()) {
-        msg.set_issgx(true);
-    }
 
     if (originalCall->recordexecgraph()) {
         msg.set_recordexecgraph(true);
@@ -107,37 +107,35 @@ int spawnChainedThread(const std::string& snapshotKey,
 {
     faabric::scheduler::Scheduler& sch = faabric::scheduler::getScheduler();
 
-    faabric::Message* originalCall = getExecutingCall();
-    auto req = faabric::util::batchExecFactory(originalCall->user(),
-                                               originalCall->function());
+    faabric::Message& originalMsg =
+      faabric::scheduler::ExecutorContext::get()->getMsg();
+    auto req = faabric::util::batchExecFactory(originalMsg.user(),
+                                               originalMsg.function());
     req->set_type(req->FUNCTIONS);
     faabric::MessageInBatch call(req, 0);
     call->set_isasync(true);
-    call->set_forbidndp(originalCall->forbidndp());
+    call->set_forbidndp(originalMsg.forbidndp());
 
     // Propagate app ID
-    call->set_appid(originalCall->appid());
+    call.set_appid(originalMsg.appid());
 
     // Snapshot details
-    call->set_snapshotkey(snapshotKey);
+    call.set_snapshotkey(snapshotKey);
 
     // Function pointer and args
     // NOTE - with a pthread interface we only ever pass the function a single
     // pointer argument, hence we use the input data here to hold this argument
     // as a string
-    call->set_funcptr(funcPtr);
-    call->set_inputdata(std::to_string(argsPtr));
+    call.set_funcptr(funcPtr);
+    call.set_inputdata(std::to_string(argsPtr));
 
-    const std::string origStr =
-      faabric::util::funcToString(*originalCall, false);
+    const std::string origStr = faabric::util::funcToString(originalMsg, false);
     const std::string chainedStr = faabric::util::funcToString(call, false);
 
-    auto callId = call->id();
-
     // Schedule the call
-    sch.callFunction(std::move(call), false, originalCall);
+    sch.callFunction(call);
 
-    return callId;
+    return call.id();
 }
 
 int awaitChainedCallOutput(unsigned int messageId,

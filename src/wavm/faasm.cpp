@@ -1,12 +1,16 @@
 #include "syscalls.h"
 
 #include <wasm/WasmExecutionContext.h>
+#include <wasm/chaining.h>
 #include <wavm/WAVMWasmModule.h>
 
 #include <WAVM/Platform/Diagnostics.h>
 #include <WAVM/Runtime/Intrinsics.h>
 #include <WAVM/Runtime/Runtime.h>
 
+#include <faabric/scheduler/ExecutorContext.h>
+#include <faabric/scheduler/Scheduler.h>
+#include <faabric/snapshot/SnapshotClient.h>
 #include <faabric/snapshot/SnapshotRegistry.h>
 #include <faabric/transport/PointToPointBroker.h>
 #include <faabric/util/bytes.h>
@@ -14,6 +18,7 @@
 #include <faabric/util/func.h>
 #include <faabric/util/logging.h>
 #include <faabric/util/macros.h>
+#include <faabric/util/scheduling.h>
 #include <faabric/util/snapshot.h>
 #include <faabric/util/state.h>
 
@@ -21,6 +26,7 @@
 
 using namespace WAVM;
 using namespace faabric::transport;
+using namespace faabric::scheduler;
 
 namespace wasm {
 
@@ -77,30 +83,6 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
     SPDLOG_DEBUG("S - pull_state - {} {}", kv->key, stateLen);
 
     kv->pull();
-}
-
-WAVM_DEFINE_INTRINSIC_FUNCTION(env,
-                               "__faasm_lock_state_global",
-                               void,
-                               __faasm_lock_state_global,
-                               I32 keyPtr)
-{
-    auto kv = getStateKV(keyPtr, 0);
-    SPDLOG_DEBUG("S - lock_state_global - {}", kv->key);
-
-    kv->lockGlobal();
-}
-
-WAVM_DEFINE_INTRINSIC_FUNCTION(env,
-                               "__faasm_unlock_state_global",
-                               void,
-                               __faasm_unlock_state_global,
-                               I32 keyPtr)
-{
-    auto kv = getStateKV(keyPtr, 0);
-    SPDLOG_DEBUG("S - unlock_state_global - {}", kv->key);
-
-    kv->unlockGlobal();
 }
 
 WAVM_DEFINE_INTRINSIC_FUNCTION(env,
@@ -179,7 +161,6 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
                                I32 dataPtr,
                                I32 dataLen)
 {
-
     Runtime::Memory* memoryPtr = getExecutingWAVMModule()->defaultMemory;
     U8* data =
       Runtime::memoryArrayPtr<U8>(memoryPtr, (Uptr)dataPtr, (Uptr)dataLen);
@@ -297,7 +278,7 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
 
     // If buffer len is zero, just need the state size
     if (bufferLen == 0) {
-        std::string user = getExecutingCall()->user();
+        std::string user = ExecutorContext::get()->getMsg().user();
         std::string key = getStringFromWasm(keyPtr);
         SPDLOG_DEBUG("S - read_state - {} {} {}", key, bufferPtr, bufferLen);
 
@@ -422,8 +403,9 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
 I32 _readInputImpl(I32 bufferPtr, I32 bufferLen)
 {
     // Get the input
-    faabric::Message* call = getExecutingCall();
-    const auto& inputBytes = call->inputdata();
+    faabric::Message* call = &ExecutorContext::get()->getMsg();
+    std::vector<uint8_t> inputBytes =
+      faabric::util::stringToBytes(call->inputdata());
 
     if (bufferLen == 0) {
         return inputBytes.size();
@@ -463,7 +445,7 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
 void _writeOutputImpl(I32 outputPtr, I32 outputLen)
 {
     std::vector<uint8_t> outputData = getBytesFromWasm(outputPtr, outputLen);
-    faabric::Message* call = getExecutingCall();
+    faabric::Message* call = &ExecutorContext::get()->getMsg();
     call->set_outputdata(outputData.data(), outputData.size());
 }
 
@@ -505,7 +487,7 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
                                I32 bufferLen)
 {
     SPDLOG_DEBUG("S - get_py_user - {} {}", bufferPtr, bufferLen);
-    std::string value = getExecutingCall()->pythonuser();
+    std::string value = ExecutorContext::get()->getMsg().pythonuser();
 
     if (value.empty()) {
         throw std::runtime_error("Python user empty, cannot return");
@@ -522,7 +504,7 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
                                I32 bufferLen)
 {
     SPDLOG_DEBUG("S - get_py_func - {} {}", bufferPtr, bufferLen);
-    std::string value = getExecutingCall()->pythonfunction();
+    std::string value = ExecutorContext::get()->getMsg().pythonfunction();
     _readPythonInput(bufferPtr, bufferLen, value);
 }
 
@@ -534,7 +516,7 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
                                I32 bufferLen)
 {
     SPDLOG_DEBUG("S - get_py_entry - {} {}", bufferPtr, bufferLen);
-    std::string value = getExecutingCall()->pythonentry();
+    std::string value = ExecutorContext::get()->getMsg().pythonentry();
     _readPythonInput(bufferPtr, bufferLen, value);
 }
 
@@ -599,8 +581,8 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
 
 static std::shared_ptr<PointToPointGroup> getPointToPointGroup()
 {
-    faabric::Message* msg = getExecutingCall();
-    return PointToPointGroup::getOrAwaitGroup(msg->groupid());
+    faabric::Message msg = ExecutorContext::get()->getMsg();
+    return PointToPointGroup::getOrAwaitGroup(msg.groupid());
 }
 
 static std::pair<uint32_t, faabric::util::SnapshotDataType>
@@ -634,7 +616,7 @@ extractSnapshotDataType(I32 varType)
 
 static faabric::util::SnapshotMergeOperation extractSnapshotMergeOp(I32 mergeOp)
 {
-    if (faabric::util::SnapshotMergeOperation::Overwrite <= mergeOp &&
+    if (faabric::util::SnapshotMergeOperation::Bytewise <= mergeOp &&
         mergeOp <= faabric::util::SnapshotMergeOperation::Min) {
         return static_cast<faabric::util::SnapshotMergeOperation>(mergeOp);
     }
@@ -643,57 +625,65 @@ static faabric::util::SnapshotMergeOperation extractSnapshotMergeOp(I32 mergeOp)
     throw std::runtime_error("Unrecognised merge operation");
 }
 
-static std::shared_ptr<faabric::util::SnapshotData> getSnapshot()
-{
-    faabric::Message* msg = getExecutingCall();
-    std::string snapKey = msg->snapshotkey();
-
-    if (snapKey.empty()) {
-        // Use app snapshot by default
-        WasmModule* module = getExecutingModule();
-        snapKey = module->getOrCreateAppSnapshot(*msg, false);
-    }
-
-    // Set up the corresponding merge region
-    faabric::snapshot::SnapshotRegistry& reg =
-      faabric::snapshot::getSnapshotRegistry();
-    auto snap = reg.getSnapshot(snapKey);
-
-    return snap;
-}
-
-static void addSharedMemMergeRegion(
-  I32 varPtr,
-  size_t regionSize,
-  faabric::util::SnapshotDataType dataType,
-  faabric::util::SnapshotMergeOperation mergeOp)
-{
-    faabric::Message* msg = getExecutingCall();
-    auto snap = getSnapshot();
-
-    SPDLOG_DEBUG("Registering shared memory region {}-{} for {}",
-                 varPtr,
-                 varPtr + regionSize,
-                 faabric::util::funcToString(*msg, false));
-
-    snap->addMergeRegion(varPtr, regionSize, dataType, mergeOp, true);
-}
-
 WAVM_DEFINE_INTRINSIC_FUNCTION(env,
                                "__faasm_sm_reduce",
                                void,
                                __faasm_sm_reduce,
                                I32 varPtr,
                                I32 varType,
-                               I32 reduceOp)
+                               I32 reduceOp,
+                               int currentBatch)
 {
-    SPDLOG_DEBUG("S - sm_reduce - {} {} {}", varPtr, varType, reduceOp);
+    // Here we have two scenarios, the second of which differs in behaviour when
+    // we're in single host mode:
+    //
+    // 1. We're being notified of a reduction variable in an *upcoming* batch of
+    // threads. This means the snapshot doesn't yet exist, and we don't know
+    // whether it will be in single host mode or not. Therefore, we always keep
+    // the merge region in a list.
+    //
+    // 2. We're being notified of a reduction variable in the *current* batch of
+    // threads. If this is in single host mode, we can ignore it, as there won't
+    // be any snapshotting at all, otherwise we add it to the snapshot.
+
+    bool isCurrentBatch = currentBatch == 1;
+    bool isSingleHost = ExecutorContext::get()->getBatchRequest()->singlehost();
+
+    // Here we can ignore if we're in the current batch, and it's in single host
+    // mode.
+    if (isCurrentBatch && isSingleHost) {
+        SPDLOG_DEBUG("S - sm_reduce - {} {} {} {} (ignored, single host)",
+                     varPtr,
+                     varType,
+                     reduceOp,
+                     currentBatch);
+        return;
+    }
+
+    SPDLOG_DEBUG(
+      "S - sm_reduce - {} {} {} {}", varPtr, varType, reduceOp, currentBatch);
 
     auto dataType = extractSnapshotDataType(varType);
     faabric::util::SnapshotMergeOperation mergeOp =
       extractSnapshotMergeOp(reduceOp);
 
-    addSharedMemMergeRegion(varPtr, dataType.first, dataType.second, mergeOp);
+    faabric::Message* msg = &ExecutorContext::get()->getMsg();
+    SPDLOG_DEBUG("Registering reduction variable {}-{} for {} {}",
+                 varPtr,
+                 varPtr + dataType.first,
+                 faabric::util::funcToString(*msg, false),
+                 isCurrentBatch ? "this batch" : "next batch");
+
+    if (isCurrentBatch) {
+        faabric::scheduler::Executor* executor =
+          ExecutorContext::get()->getExecutor();
+        auto snap = executor->getMainThreadSnapshot(*msg, false);
+        snap->addMergeRegion(varPtr, dataType.first, dataType.second, mergeOp);
+    } else {
+        wasm::WasmModule* module = getExecutingModule();
+        module->addMergeRegionForNextThreads(
+          varPtr, dataType.first, dataType.second, mergeOp);
+    }
 }
 
 WAVM_DEFINE_INTRINSIC_FUNCTION(env,
@@ -714,6 +704,115 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
     SPDLOG_DEBUG("S - sm_critical_local_end");
 
     getPointToPointGroup()->localUnlock();
+}
+
+// ------------------------------------
+// MIGRATION
+// ------------------------------------
+
+WAVM_DEFINE_INTRINSIC_FUNCTION(env,
+                               "__faasm_migrate_point",
+                               void,
+                               __faasm_migrate_point,
+                               I32 entrypointFuncPtr,
+                               I32 entrypointFuncArg)
+{
+    SPDLOG_DEBUG(
+      "S - faasm_migrate_point {} {}", entrypointFuncPtr, entrypointFuncArg);
+
+    auto* call = &ExecutorContext::get()->getMsg();
+    auto& sch = faabric::scheduler::getScheduler();
+
+    // Detect if there is a pending migration for the current app
+    auto pendingMigrations = sch.getPendingAppMigrations(call->appid());
+    bool appMustMigrate = pendingMigrations != nullptr;
+
+    // Detect if this particular function needs to be migrated or not
+    bool funcMustMigrate = false;
+    std::string hostToMigrateTo = "otherHost";
+    if (appMustMigrate) {
+        for (int i = 0; i < pendingMigrations->migrations_size(); i++) {
+            auto m = pendingMigrations->mutable_migrations()->at(i);
+            if (m.msg().id() == call->id()) {
+                funcMustMigrate = true;
+                hostToMigrateTo = m.dsthost();
+                break;
+            }
+        }
+    }
+
+    // Regardless if we have to individually migrate or not, we need to prepare
+    // for the app migration
+    if (appMustMigrate && call->ismpi()) {
+        auto& mpiWorld = faabric::scheduler::getMpiWorldRegistry().getWorld(
+          call->mpiworldid());
+        mpiWorld.prepareMigration(call->mpirank(), pendingMigrations);
+    }
+
+    // Do actual migration
+    if (funcMustMigrate) {
+        std::string argStr = std::to_string(entrypointFuncArg);
+        std::vector<uint8_t> inputData(argStr.begin(), argStr.end());
+
+        std::string user = call->user();
+
+        std::shared_ptr<faabric::BatchExecuteRequest> req =
+          faabric::util::batchExecFactory(call->user(), call->function(), 1);
+        req->set_type(faabric::BatchExecuteRequest::MIGRATION);
+
+        faabric::Message& msg = req->mutable_messages()->at(0);
+        msg.set_inputdata(inputData.data(), inputData.size());
+        msg.set_funcptr(entrypointFuncPtr);
+
+        // Take snapshot of function and send it to the host we are migrating
+        // to. Note that the scheduler only pushes snapshots as part of function
+        // chaining from the master host of the app, and
+        // we are most likely migrating from a non-master host. Thus, we must
+        // take and push the snapshot manually.
+        auto* exec = faabric::scheduler::ExecutorContext::get()->getExecutor();
+        auto snap =
+          std::make_shared<faabric::util::SnapshotData>(exec->getMemoryView());
+        std::string snapKey = "migration_" + std::to_string(msg.id());
+        auto& reg = faabric::snapshot::getSnapshotRegistry();
+        reg.registerSnapshot(snapKey, snap);
+        sch.getSnapshotClient(hostToMigrateTo).pushSnapshot(snapKey, snap);
+        msg.set_snapshotkey(snapKey);
+
+        // Propagate the app ID and set the _same_ message ID
+        msg.set_appid(call->appid());
+        msg.set_groupid(call->groupid());
+        msg.set_groupidx(call->groupidx());
+
+        // If message is MPI, propagate the necessary MPI bits
+        if (call->ismpi()) {
+            msg.set_ismpi(true);
+            msg.set_mpiworldid(call->mpiworldid());
+            msg.set_mpiworldsize(call->mpiworldsize());
+            msg.set_mpirank(call->mpirank());
+        }
+
+        if (call->recordexecgraph()) {
+            msg.set_recordexecgraph(true);
+        }
+
+        SPDLOG_INFO("Migrating {}/{} {} to {}",
+                    msg.user(),
+                    msg.function(),
+                    call->id(),
+                    hostToMigrateTo);
+
+        // Build decision and send
+        faabric::util::SchedulingDecision decision(msg.appid(), msg.groupid());
+        decision.addMessage(hostToMigrateTo, msg);
+        sch.callFunctions(req, decision);
+
+        if (call->recordexecgraph()) {
+            sch.logChainedFunction(call->id(), msg.id());
+        }
+
+        // Throw an exception to be caught by the executor and terminate
+        throw faabric::util::FunctionMigratedException("Migrating MPI rank");
+    }
 }
 
 // ------------------------------------

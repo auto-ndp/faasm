@@ -1,0 +1,80 @@
+// Annoyingly we have to redefine these here
+#define FAASM_SGX 1
+#define FAASM_SGX_WAMR_WASI_LIBC 0
+
+enclave{
+    include "/usr/local/code/faasm/include/enclave/error.h"
+    include "/build/faasm/_deps/wamr_ext-src/core/iwasm/include/wasm_export.h"
+    include "sgx_report.h"
+
+    from "sgx_tstdc.edl" import *;
+    from "sgx_pthread.edl" import *;
+#if(FAASM_SGX_WAMR_WASI_LIBC)
+    from "sgx_wamr.edl" import *;
+#endif
+
+    trusted{
+        public faasm_sgx_status_t ecallCreateReport(
+            [in]    const sgx_target_info_t* qeTarget,
+            [in]    const sgx_report_data_t* heldData,
+            [out]   sgx_report_t* report);
+
+        public faasm_sgx_status_t ecallInitWamr(void);
+
+        public faasm_sgx_status_t ecallLoadModule(
+            [in, size=wasmOpCodeSize]   void *wasmOpCodePtr,
+                                        uint32_t wasmOpCodeSize,
+                                        uint32_t faasletId
+        );
+
+        public faasm_sgx_status_t ecallUnloadModule(
+            uint32_t faasletId
+        );
+
+        public faasm_sgx_status_t ecallCallFunction(
+                                uint32_t faasletId,
+                                uint32_t argc,
+            [in, count=argc]    char** argv
+        );
+
+        public faasm_sgx_status_t ecallCryptoChecks(void);
+    };
+
+    untrusted{
+        void ocallLogError([in, string] const char* msg);
+
+        void ocallLogDebug([in, string] const char* msg);
+
+        int ocallFaasmReadInput(
+            [in, out, size=bufferSize]  uint8_t* buffer,
+                                        unsigned int bufferSize
+        );
+
+        void ocallFaasmWriteOutput(
+            [in, size=outputSize]   uint8_t* output,
+                                    unsigned int outputSize
+        );
+
+        unsigned int ocallFaasmChainName(
+            [in, string]            const char* name,
+            [in, size=inputSize]    uint8_t* input,
+                                    long inputSize
+        ) allow(ecallLoadModule);
+
+        unsigned int ocallFaasmChainPtr(
+                                    int wasmFuncPtr,
+            [in, size=inputSize]    uint8_t* input,
+                                    long inputSize
+        );
+
+        unsigned int ocallFaasmAwaitCall(unsigned int callId);
+
+        unsigned int ocallFaasmAwaitCallOutput(
+                                    unsigned int callId,
+            [out, size=bufferSize]  uint8_t* buffer,
+                                    unsigned int bufferSize
+        );
+
+        int32_t ocallSbrk(int32_t increment);
+    };
+};

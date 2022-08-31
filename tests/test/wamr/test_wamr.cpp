@@ -1,6 +1,7 @@
-#include "utils.h"
-
 #include <catch2/catch.hpp>
+
+#include "faasm_fixtures.h"
+#include "utils.h"
 
 #include <faabric/util/config.h>
 #include <faabric/util/func.h>
@@ -12,25 +13,71 @@ using namespace wasm;
 
 namespace tests {
 
-TEST_CASE("Test executing echo function with WAMR", "[wamr]")
+TEST_CASE_METHOD(MultiRuntimeFunctionExecTestFixture,
+                 "Test executing simple function with WAMR",
+                 "[wamr]")
 {
-    faabric::Message call = faabric::util::messageFactory("demo", "echo");
-    std::string inputData = "hello there";
-    call.set_inputdata(inputData);
+    int nExecs = 0;
+    std::string function;
 
-    wasm::WAMRWasmModule module;
-    module.bindToFunction(call);
+    SECTION("echo function")
+    {
+        function = "echo";
 
-    int returnValue = module.executeFunction(call);
-    REQUIRE(returnValue == 0);
+        SECTION("Once") { nExecs = 1; }
 
-    std::string outputData = call.outputdata();
-    REQUIRE(outputData == inputData);
+        SECTION("Multiple") { nExecs = 5; }
+    }
+
+    // We must also check a function that changes the memory size to check that
+    // it doesn't mess up
+    SECTION("brk function")
+    {
+        function = "brk";
+
+        SECTION("Once") { nExecs = 1; }
+
+        SECTION("Multiple") { nExecs = 5; }
+    }
+
+    // Set to run WAMR
+    conf.wasmVm = "wamr";
+
+    // Create a Faaslet
+    std::shared_ptr<faabric::BatchExecuteRequest> req =
+      faabric::util::batchExecFactory("demo", function, 1);
+    faabric::Message& msg = req->mutable_messages()->at(0);
+    faabric::scheduler::ExecutorContext::set(nullptr, req, 0);
+    faaslet::Faaslet f(msg);
+
+    // Execute the function using another message
+    for (int i = 0; i < nExecs; i++) {
+        std::shared_ptr<faabric::BatchExecuteRequest> req =
+          faabric::util::batchExecFactory("demo", function, 1);
+        faabric::Message& msg = req->mutable_messages()->at(0);
+        faabric::scheduler::ExecutorContext::set(nullptr, req, 0);
+
+        std::string inputData = fmt::format("hello there {}", i);
+        msg.set_inputdata(inputData);
+
+        int returnValue = f.executeTask(0, 0, req);
+        REQUIRE(returnValue == 0);
+
+        REQUIRE(msg.returnvalue() == 0);
+
+        if (function == "echo") {
+            std::string outputData = msg.outputdata();
+            REQUIRE(outputData == inputData);
+        }
+    }
+
+    f.shutdown();
 }
 
-TEST_CASE("Test WAMR sbrk", "[wamr]")
+TEST_CASE_METHOD(FunctionExecTestFixture, "Test WAMR sbrk", "[wamr]")
 {
-    faabric::Message call = faabric::util::messageFactory("demo", "echo");
+    auto req = setUpContext("demo", "echo");
+    faabric::Message& call = req->mutable_messages()->at(0);
     std::string inputData = "hello there";
     call.set_inputdata(inputData);
 
@@ -56,7 +103,9 @@ TEST_CASE("Test WAMR sbrk", "[wamr]")
     REQUIRE(module.getCurrentBrk() == sizeB);
 }
 
-TEST_CASE("Test executing chain function with WAMR", "[wamr]")
+TEST_CASE_METHOD(FunctionExecTestFixture,
+                 "Test executing chain function with WAMR",
+                 "[wamr]")
 {
     executeWithWamrPool("demo", "chain", 10000);
 }

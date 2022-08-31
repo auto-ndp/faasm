@@ -1,4 +1,5 @@
 ARG FAASM_VERSION
+ARG FAASM_SGX_PARENT_SUFFIX
 FROM kubasz51/faasm-base-runtime:${FAASM_VERSION}
 
 # Build the worker binary

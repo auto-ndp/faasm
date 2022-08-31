@@ -4,6 +4,8 @@
 #include <wasm/WasmExecutionContext.h>
 #include <wasm/WasmModule.h>
 
+#include <faabric/proto/faabric.pb.h>
+#include <faabric/scheduler/ExecutorContext.h>
 #include <faabric/scheduler/Scheduler.h>
 #include <faabric/snapshot/SnapshotRegistry.h>
 #include <faabric/state/State.h>
@@ -37,7 +39,7 @@ bool isWasmPageAligned(int32_t offset)
     }
 }
 
-size_t getNumberOfWasmPagesForBytes(uint32_t nBytes)
+size_t getNumberOfWasmPagesForBytes(size_t nBytes)
 {
     // Round up to nearest page
     size_t pageCount =
@@ -65,6 +67,7 @@ WasmModule::WasmModule()
 
 WasmModule::WasmModule(int threadPoolSizeIn)
   : threadPoolSize(threadPoolSizeIn)
+  , reg(faabric::snapshot::getSnapshotRegistry())
 {}
 
 WasmModule::~WasmModule() {}
@@ -96,104 +99,11 @@ std::shared_ptr<faabric::util::SnapshotData> WasmModule::getSnapshotData()
     return snap;
 }
 
-faabric::util::MemoryView WasmModule::getMemoryView()
+std::span<uint8_t> WasmModule::getMemoryView()
 {
     uint8_t* memBase = getMemoryBase();
     size_t currentSize = getMemorySizeBytes();
-    return faabric::util::MemoryView({ memBase, currentSize });
-}
-
-static std::string getAppSnapshotKey(const faabric::Message& msg)
-{
-    ZoneScopedNS("WasmModule::snapshot", 6);
-    PROF_START(wasmSnapshot)
-    std::string funcStr = faabric::util::funcToString(msg, false);
-    if (msg.appid() == 0) {
-        SPDLOG_ERROR("Cannot create app snapshot key without app ID for {}",
-                     funcStr);
-        throw std::runtime_error(
-          "Cannot create app snapshot key without app ID");
-    }
-
-    std::string snapshotKey = funcStr + "_" + std::to_string(msg.appid());
-    return snapshotKey;
-}
-
-std::string WasmModule::getOrCreateAppSnapshot(const faabric::Message& msg,
-                                               bool update)
-{
-    std::string snapshotKey = getAppSnapshotKey(msg);
-
-    faabric::snapshot::SnapshotRegistry& reg =
-      faabric::snapshot::getSnapshotRegistry();
-
-    bool exists = reg.snapshotExists(snapshotKey);
-    if (!exists) {
-        faabric::util::FullLock lock(moduleMutex);
-        exists = reg.snapshotExists(snapshotKey);
-
-        if (!exists) {
-            SPDLOG_DEBUG(
-              "Creating app snapshot: {} for app {}", snapshotKey, msg.appid());
-            snapshotWithKey(snapshotKey);
-
-            return snapshotKey;
-        }
-    }
-
-    if (update) {
-        faabric::util::FullLock lock(moduleMutex);
-
-        SPDLOG_DEBUG(
-          "Updating app snapshot: {} for app {}", snapshotKey, msg.appid());
-
-        std::vector<faabric::util::SnapshotDiff> updates =
-          getMemoryView().getDirtyRegions();
-
-        std::shared_ptr<faabric::util::SnapshotData> snap =
-          reg.getSnapshot(snapshotKey);
-
-        snap->queueDiffs(updates);
-        snap->writeQueuedDiffs();
-
-        // Reset dirty tracking
-        faabric::util::resetDirtyTracking();
-    }
-
-    {
-        faabric::util::SharedLock lock(moduleMutex);
-        return snapshotKey;
-    }
-}
-
-void WasmModule::deleteAppSnapshot(const faabric::Message& msg)
-{
-    std::string snapshotKey = getAppSnapshotKey(msg);
-
-    faabric::snapshot::SnapshotRegistry& reg =
-      faabric::snapshot::getSnapshotRegistry();
-
-    if (reg.snapshotExists(snapshotKey)) {
-        // Broadcast the deletion
-        faabric::scheduler::Scheduler& sch = faabric::scheduler::getScheduler();
-        sch.broadcastSnapshotDelete(msg, snapshotKey);
-
-        // Delete locally
-        reg.deleteSnapshot(snapshotKey);
-    }
-}
-
-void WasmModule::snapshotWithKey(const std::string& snapKey)
-
-{
-    PROF_START(wasmSnapshot)
-    std::shared_ptr<faabric::util::SnapshotData> data = getSnapshotData();
-
-    faabric::snapshot::SnapshotRegistry& reg =
-      faabric::snapshot::getSnapshotRegistry();
-    reg.registerSnapshot(snapKey, data);
-
-    PROF_END(wasmSnapshot)
+    return std::span<uint8_t>(memBase, currentSize);
 }
 
 std::string WasmModule::snapshot(bool locallyRestorable)
@@ -202,29 +112,35 @@ std::string WasmModule::snapshot(bool locallyRestorable)
     std::string snapKey =
       this->boundUser + "_" + this->boundFunction + "_" + std::to_string(gid);
 
-    snapshotWithKey(snapKey);
+    PROF_START(wasmSnapshot)
+    std::shared_ptr<faabric::util::SnapshotData> data = getSnapshotData();
+
+    faabric::snapshot::SnapshotRegistry& reg =
+      faabric::snapshot::getSnapshotRegistry();
+    reg.registerSnapshot(snapKey, data);
+
+    PROF_END(wasmSnapshot)
 
     return snapKey;
 }
 
-void WasmModule::syncAppSnapshot(const faabric::Message& msg)
+void WasmModule::setMemorySize(size_t nBytes)
 {
-    faabric::snapshot::SnapshotRegistry& reg =
-      faabric::snapshot::getSnapshotRegistry();
-    std::string snapshotKey = getAppSnapshotKey(msg);
+    uint32_t memSize = getCurrentBrk();
 
-    SPDLOG_DEBUG("{} syncing with snapshot {}",
-                 faabric::util::funcToString(msg, false),
-                 snapshotKey);
-
-    std::shared_ptr<faabric::util::SnapshotData> snap =
-      reg.getSnapshot(snapshotKey);
-
-    // Update the snapshot itself
-    snap->writeQueuedDiffs();
-
-    // Restore from snapshot
-    restore(snapshotKey);
+    if (nBytes > memSize) {
+        size_t bytesRequired = nBytes - memSize;
+        SPDLOG_DEBUG("Growing memory by {} bytes to set memory size",
+                     bytesRequired);
+        this->growMemory(bytesRequired);
+    } else if (nBytes < memSize) {
+        size_t shrinkBy = memSize - nBytes;
+        SPDLOG_DEBUG("Shrinking memory by {} bytes to set memory size",
+                     shrinkBy);
+        this->shrinkMemory(shrinkBy);
+    } else {
+        SPDLOG_DEBUG("Memory already correct size for snapshot ({})", memSize);
+    }
 }
 
 void WasmModule::restore(const std::string& snapshotKey)
@@ -245,21 +161,7 @@ void WasmModule::restore(const std::string& snapshotKey)
 
     // Expand memory if necessary
     auto data = reg.getSnapshot(snapshotKey);
-    uint32_t memSize = getMemorySizeBytes();
-
-    if (data->getSize() > memSize) {
-        size_t bytesRequired = data->getSize() - memSize;
-        SPDLOG_DEBUG("Growing memory by {} bytes to restore snapshot",
-                     bytesRequired);
-        this->growMemory(bytesRequired);
-    } else if (data->getSize() < memSize) {
-        size_t shrinkBy = memSize - data->getSize();
-        SPDLOG_DEBUG("Shrinking memory by {} bytes to restore snapshot",
-                     shrinkBy);
-        this->shrinkMemory(shrinkBy);
-    } else {
-        SPDLOG_DEBUG("Memory already correct size for snapshot ({})", memSize);
-    }
+    setMemorySize(data->getSize());
 
     // Map the snapshot into memory
     ZoneValue(data->getSize());
@@ -325,8 +227,7 @@ void WasmModule::ignoreThreadStacksInSnapshot(const std::string& snapKey)
     snap->addMergeRegion(threadStackRegionStart,
                          threadStackRegionSize,
                          faabric::util::SnapshotDataType::Raw,
-                         faabric::util::SnapshotMergeOperation::Ignore,
-                         true);
+                         faabric::util::SnapshotMergeOperation::Ignore);
 }
 
 void WasmModule::zygoteDeltaRestore(std::span<const uint8_t> zygoteDelta)
@@ -517,7 +418,7 @@ void WasmModule::bindToFunction(faabric::Message& msg, bool cache)
     boundFunction = msg.function();
 
     // Call into subclass hook, setting the context beforehand
-    WasmExecutionContext ctx(this, &msg);
+    WasmExecutionContext ctx(this);
     doBindToFunction(msg, cache);
 }
 
@@ -628,7 +529,7 @@ int32_t WasmModule::executeTask(
     assert(boundFunction == msg.function());
 
     // Set up context for this task
-    WasmExecutionContext ctx(this, &msg);
+    WasmExecutionContext ctx(this);
 
     const auto& zygoteDelta = msg.zygotedelta();
     if (!zygoteDelta.empty()) {
@@ -679,8 +580,6 @@ int32_t WasmModule::executeTask(
         ZoneScopedN("WasmModule::execute Standard function execute");
         SPDLOG_TRACE("Executing {} as standard function", funcStr);
         returnValue = executeFunction(msg);
-
-        deleteAppSnapshot(msg);
     }
 
     if (returnValue != 0 && !msg.isstorage()) {
@@ -728,6 +627,25 @@ uint32_t WasmModule::createMemoryGuardRegion(uint32_t wasmOffset)
     return wasmOffset + regionSize;
 }
 
+void WasmModule::addMergeRegionForNextThreads(
+  uint32_t wasmPtr,
+  size_t regionSize,
+  faabric::util::SnapshotDataType dataType,
+  faabric::util::SnapshotMergeOperation mergeOp)
+{
+    mergeRegions.emplace_back(wasmPtr, regionSize, dataType, mergeOp);
+}
+
+std::vector<faabric::util::SnapshotMergeRegion> WasmModule::getMergeRegions()
+{
+    return mergeRegions;
+}
+
+void WasmModule::clearMergeRegions()
+{
+    mergeRegions.clear();
+}
+
 void WasmModule::queuePthreadCall(threads::PthreadCall call)
 {
     // We assume that all pthread calls are queued from the main thread before
@@ -736,25 +654,22 @@ void WasmModule::queuePthreadCall(threads::PthreadCall call)
     queuedPthreadCalls.emplace_back(call);
 }
 
-int WasmModule::awaitPthreadCall(const faabric::Message* msg, int pthreadPtr)
+int WasmModule::awaitPthreadCall(faabric::Message* msg, int pthreadPtr)
 {
-    // We assume that await is called in a loop from the master thread, after
+    // We assume that await is called in a loop from the main thread, after
     // all pthread calls have been queued, so this function doesn't need to be
     // thread safe.
     assert(msg != nullptr);
 
     // Execute the queued pthread calls
+    faabric::scheduler::Executor* executor =
+      faabric::scheduler::ExecutorContext::get()->getExecutor();
     if (!queuedPthreadCalls.empty()) {
         int nPthreadCalls = queuedPthreadCalls.size();
 
-        // Set up the master snapshot if not already set up
-        std::string snapshotKey = getOrCreateAppSnapshot(*msg, true);
-
         std::string funcStr = faabric::util::funcToString(*msg, true);
-        SPDLOG_DEBUG("Executing {} pthread calls for {} with snapshot {}",
-                     nPthreadCalls,
-                     funcStr,
-                     snapshotKey);
+        SPDLOG_DEBUG(
+          "Executing {} pthread calls for {}", nPthreadCalls, funcStr);
 
         std::shared_ptr<faabric::BatchExecuteRequest> req =
           faabric::util::batchExecFactory(
@@ -763,17 +678,12 @@ int WasmModule::awaitPthreadCall(const faabric::Message* msg, int pthreadPtr)
         req->set_type(faabric::BatchExecuteRequest::THREADS);
         req->set_subtype(wasm::ThreadRequestType::PTHREAD);
 
-        uint32_t groupGid = faabric::util::generateGid();
-
         for (int i = 0; i < nPthreadCalls; i++) {
             threads::PthreadCall p = queuedPthreadCalls.at(i);
             faabric::Message& m = req->mutable_messages()->at(i);
 
             // Propagate app ID
             m.set_appid(msg->appid());
-
-            // Snapshot details
-            m.set_snapshotkey(snapshotKey);
 
             // Function pointer and args
             // NOTE - with a pthread interface we only ever pass the
@@ -785,39 +695,48 @@ int WasmModule::awaitPthreadCall(const faabric::Message* msg, int pthreadPtr)
             // Assign a thread ID and increment. Our pthread IDs start
             // at 1. Set this as part of the group with the other threads.
             m.set_appidx(i + 1);
-            m.set_groupid(groupGid);
             m.set_groupidx(i + 1);
-            m.set_groupsize(nPthreadCalls);
 
             // Record this thread -> call ID
             SPDLOG_TRACE("pthread {} mapped to call {}", p.pthreadPtr, m.id());
             pthreadPtrsToChainedCalls.insert({ p.pthreadPtr, m.id() });
         }
 
-        // Submit the call
-        faabric::scheduler::Scheduler& sch = faabric::scheduler::getScheduler();
-        sch.callFunctions(req);
+        // Execute the threads and await results
+        lastPthreadResults = executor->executeThreads(req, mergeRegions);
 
         // Empty the queue
         queuedPthreadCalls.clear();
     }
 
-    // Await the results of this call
-    unsigned int callId = pthreadPtrsToChainedCalls[pthreadPtr];
-    SPDLOG_DEBUG("Awaiting pthread: {} ({})", pthreadPtr, callId);
-    auto& sch = faabric::scheduler::getScheduler();
+    // Get the result of this call
+    unsigned int pthreadMsgId = pthreadPtrsToChainedCalls[pthreadPtr];
+    bool found = false;
+    int thisResult = 0;
+    for (auto [mid, res] : lastPthreadResults) {
+        if (pthreadMsgId == mid) {
+            thisResult = res;
+            found = true;
+            break;
+        }
+    }
 
-    int returnValue = sch.awaitThreadResult(callId);
+    if (!found) {
+        SPDLOG_ERROR("Did not find a result for pthread: ptr {}, mid {}",
+                     pthreadPtr,
+                     pthreadMsgId);
+        throw std::runtime_error("Result not found for pthread");
+    }
 
     // Remove the mapping for this pointer
     pthreadPtrsToChainedCalls.erase(pthreadPtr);
 
-    // If we're the last, resync the snapshot
+    // If we're done, clear the results
     if (pthreadPtrsToChainedCalls.empty()) {
-        syncAppSnapshot(*msg);
+        lastPthreadResults.clear();
     }
 
-    return returnValue;
+    return thisResult;
 }
 
 void WasmModule::addThreadStack()
@@ -844,6 +763,41 @@ void WasmModule::addThreadStack()
 std::vector<uint32_t> WasmModule::getThreadStacks()
 {
     return threadStacks;
+}
+
+std::shared_ptr<std::mutex> WasmModule::getPthreadMutex(uint32_t id)
+{
+    faabric::util::SharedLock lock(pthreadLocksMx);
+    auto it = pthreadLocks.find(id);
+    if (it != pthreadLocks.end()) {
+        return it->second;
+    }
+
+    SPDLOG_ERROR("Trying to get non-existent pthread lock {}", id);
+    throw std::runtime_error("Non-existent pthread lock");
+}
+
+std::shared_ptr<std::mutex> WasmModule::getOrCreatePthreadMutex(uint32_t id)
+{
+    std::shared_ptr<std::mutex> mx = nullptr;
+    {
+        faabric::util::SharedLock lock(pthreadLocksMx);
+        auto it = pthreadLocks.find(id);
+        if (it != pthreadLocks.end()) {
+            return it->second;
+        }
+    }
+
+    faabric::util::FullLock lock(pthreadLocksMx);
+    auto it = pthreadLocks.find(id);
+    if (it != pthreadLocks.end()) {
+        return it->second;
+    }
+
+    mx = std::make_shared<std::mutex>();
+    pthreadLocks[id] = mx;
+
+    return mx;
 }
 
 bool WasmModule::isBound()
@@ -876,29 +830,165 @@ void WasmModule::writeWasmEnvToMemory(uint32_t envPointers, uint32_t envBuffer)
     throw std::runtime_error("writeWasmEnvToMemory not implemented");
 }
 
-uint32_t WasmModule::growMemory(uint32_t nBytes)
+uint32_t WasmModule::growMemory(size_t nBytes)
 {
-    throw std::runtime_error("growMemory not implemented");
+    if (nBytes == 0) {
+        return currentBrk.load(std::memory_order_acquire);
+    }
+
+    faabric::util::FullLock lock(moduleMutex);
+
+    uint32_t oldBytes = getMemorySizeBytes();
+    uint32_t oldBrk = currentBrk.load(std::memory_order_acquire);
+    uint32_t newBrk = oldBrk + nBytes;
+
+    if (!isWasmPageAligned(newBrk)) {
+        SPDLOG_ERROR("Growing memory by {} is not wasm page aligned"
+                     " (current brk: {}, new brk: {})",
+                     nBytes,
+                     oldBrk,
+                     newBrk);
+        throw std::runtime_error("Non-wasm-page-aligned memory growth");
+    }
+
+    size_t newBytes = oldBytes + nBytes;
+    uint32_t oldPages = getNumberOfWasmPagesForBytes(oldBytes);
+    uint32_t newPages = getNumberOfWasmPagesForBytes(newBytes);
+    size_t maxPages = getMaxMemoryPages();
+
+    if (newBytes > UINT32_MAX || newPages > maxPages) {
+        SPDLOG_ERROR("Growing memory would exceed max of {} pages (current {}, "
+                     "requested {})",
+                     maxPages,
+                     oldPages,
+                     newPages);
+        throw std::runtime_error("Memory growth exceeding max");
+    }
+
+    // If we can reclaim old memory, just bump the break
+    if (newBrk <= oldBytes) {
+        SPDLOG_TRACE(
+          "MEM - Growing memory using already provisioned {} + {} <= {}",
+          oldBrk,
+          nBytes,
+          oldBytes);
+
+        currentBrk.store(newBrk, std::memory_order_release);
+
+        // Make sure permissions on memory are open
+        size_t newTop = faabric::util::getRequiredHostPages(currentBrk);
+        size_t newStart = faabric::util::getRequiredHostPagesRoundDown(oldBrk);
+        newTop *= faabric::util::HOST_PAGE_SIZE;
+        newStart *= faabric::util::HOST_PAGE_SIZE;
+        SPDLOG_TRACE("Reclaiming memory {}-{}", newStart, newTop);
+
+        uint8_t* memBase = getMemoryBase();
+        faabric::util::claimVirtualMemory(
+          { memBase + newStart, memBase + newTop });
+
+        return oldBrk;
+    }
+
+    uint32_t pageChange = newPages - oldPages;
+    bool success = doGrowMemory(pageChange);
+    if (!success) {
+        throw std::runtime_error("Failed to grow memory");
+    }
+
+    SPDLOG_TRACE("Growing memory from {} to {} pages (max {})",
+                 oldPages,
+                 newPages,
+                 maxPages);
+
+    size_t newMemorySize = getMemorySizeBytes();
+    currentBrk.store(newMemorySize, std::memory_order_release);
+
+    if (newMemorySize != newBytes) {
+        SPDLOG_ERROR(
+          "Expected new brk ({}) to be old memory plus new bytes ({})",
+          newMemorySize,
+          newBytes);
+        throw std::runtime_error("Memory growth discrepancy");
+    }
+
+    return oldBrk;
 }
 
-uint32_t WasmModule::shrinkMemory(uint32_t nBytes)
+bool WasmModule::doGrowMemory(uint32_t pageChange)
 {
-    throw std::runtime_error("shrinkMemory not implemented");
+    throw std::runtime_error("doGrowMemory not implemented");
 }
 
-uint32_t WasmModule::mmapMemory(uint32_t nBytes)
+uint32_t WasmModule::shrinkMemory(size_t nBytes)
 {
-    throw std::runtime_error("mmapMemory not implemented");
+    if (!isWasmPageAligned(nBytes)) {
+        SPDLOG_ERROR("Shrink size not page aligned {}", nBytes);
+        throw std::runtime_error("New break not page aligned");
+    }
+
+    faabric::util::FullLock lock(moduleMutex);
+
+    uint32_t oldBrk = currentBrk.load(std::memory_order_acquire);
+
+    if (nBytes > oldBrk) {
+        SPDLOG_ERROR(
+          "Shrinking by more than current brk ({} > {})", nBytes, oldBrk);
+        throw std::runtime_error("Shrinking by more than current brk");
+    }
+
+    // Note - we don't actually free the memory, we just change the brk
+    uint32_t newBrk = oldBrk - nBytes;
+
+    SPDLOG_TRACE("MEM - shrinking memory {} -> {}", oldBrk, newBrk);
+    currentBrk.store(newBrk, std::memory_order_release);
+
+    return oldBrk;
 }
 
-uint32_t WasmModule::mmapFile(uint32_t fp, uint32_t length)
+uint32_t WasmModule::mmapMemory(size_t nBytes)
+{
+    // The mmap interface allows non page-aligned values, and rounds up
+    uint32_t pageAligned = roundUpToWasmPageAligned(nBytes);
+    return growMemory(pageAligned);
+}
+
+uint32_t WasmModule::mmapFile(uint32_t fp, size_t length)
 {
     throw std::runtime_error("mmapFile not implemented");
 }
 
-void WasmModule::unmapMemory(uint32_t offset, uint32_t nBytes)
+void WasmModule::unmapMemory(uint32_t offset, size_t nBytes)
 {
-    throw std::runtime_error("unmapMemory not implemented");
+    if (nBytes == 0) {
+        return;
+    }
+
+    // Munmap expects the offset itself to be page-aligned, but will round up
+    // the number of bytes
+    if (!isWasmPageAligned(offset)) {
+        SPDLOG_ERROR("Non-page aligned munmap address {}", offset);
+        throw std::runtime_error("Non-page aligned munmap address");
+    }
+
+    uint32_t pageAligned = roundUpToWasmPageAligned(nBytes);
+    size_t maxPages = getMaxMemoryPages();
+    size_t maxSize = maxPages * WASM_BYTES_PER_PAGE;
+    uint32_t unmapTop = offset + pageAligned;
+
+    if (unmapTop > maxSize) {
+        SPDLOG_ERROR(
+          "Munmapping outside memory max ({} > {})", unmapTop, maxSize);
+        throw std::runtime_error("munmapping outside memory max");
+    }
+
+    if (unmapTop == currentBrk.load(std::memory_order_acquire)) {
+        SPDLOG_TRACE("MEM - munmapping top of memory by {}", pageAligned);
+        shrinkMemory(pageAligned);
+    } else {
+        SPDLOG_WARN("MEM - unable to reclaim unmapped memory {} at {}",
+                    pageAligned,
+                    offset);
+    }
 }
 
 uint8_t* WasmModule::wasmPointerToNative(uint32_t wasmPtr)
@@ -914,6 +1004,11 @@ void WasmModule::printDebugInfo()
 size_t WasmModule::getMemorySizeBytes()
 {
     throw std::runtime_error("getMemorySizeBytes not implemented");
+}
+
+size_t WasmModule::getMaxMemoryPages()
+{
+    throw std::runtime_error("getMaxMemoryPages not implemented");
 }
 
 uint8_t* WasmModule::getMemoryBase()

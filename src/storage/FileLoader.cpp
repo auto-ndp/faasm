@@ -2,8 +2,6 @@
 #include <storage/FileLoader.h>
 #include <storage/SharedFiles.h>
 
-#include <stdexcept>
-
 #include <faabric/util/bytes.h>
 #include <faabric/util/config.h>
 #include <faabric/util/files.h>
@@ -12,6 +10,7 @@
 
 #include <absl/strings/str_cat.h>
 #include <filesystem>
+#include <stdexcept>
 
 using namespace faabric::util;
 
@@ -349,7 +348,7 @@ void FileLoader::uploadFunctionObjectHash(const faabric::Message& msg,
 static const std::string getWamrAotKey(const faabric::Message& msg,
                                        conf::CodegenTargetSpec target)
 {
-    if (msg.issgx()) {
+    if (conf::getFaasmConfig().wasmVm == "sgx") {
         return getKey(msg, SGX_WAMR_AOT_FILENAME);
     } else {
         return getKey(msg, WAMR_AOT_FILENAME(target));
@@ -360,7 +359,7 @@ std::string FileLoader::getFunctionAotFile(const faabric::Message& msg,
                                            conf::CodegenTargetSpec target)
 {
     auto path = getDir(conf.objectFileDir, msg, true);
-    if (msg.issgx()) {
+    if (conf::getFaasmConfig().wasmVm == "sgx") {
         path.append(SGX_WAMR_AOT_FILENAME);
     } else {
         path.append(WAMR_AOT_FILENAME(target));
@@ -517,7 +516,28 @@ std::string FileLoader::getSharedFileFile(const std::string& path)
 
 std::vector<uint8_t> FileLoader::loadSharedFile(const std::string& path)
 {
-    return loadFileBytes(path, getSharedFileFile(path));
+    // Tolerate missing, throw exception if file doesn't exist
+    std::vector<uint8_t> bytes =
+      loadFileBytes(path, getSharedFileFile(path), true);
+
+    if (bytes.empty()) {
+        throw SharedFileNotExistsException(path);
+    }
+
+    return bytes;
+}
+
+void FileLoader::deleteSharedFile(const std::string& path)
+{
+    std::string pathCopy = trimLeadingSlashes(path);
+    SPDLOG_TRACE(
+      "Deleting shared file {} in S3 at {}/{}", path, conf.s3Bucket, pathCopy);
+    s3.deleteKey(conf.s3Bucket, pathCopy);
+
+    const std::string localCachePath = getSharedFileFile(path);
+    if (useLocalFsCache && !localCachePath.empty()) {
+        std::filesystem::remove(localCachePath);
+    }
 }
 
 void FileLoader::uploadSharedFile(const std::string& path,
