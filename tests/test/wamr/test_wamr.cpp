@@ -48,7 +48,7 @@ TEST_CASE_METHOD(MultiRuntimeFunctionExecTestFixture,
       faabric::util::batchExecFactory("demo", function, 1);
     faabric::Message& msg = req->mutable_messages()->at(0);
     faabric::scheduler::ExecutorContext::set(nullptr, req, 0);
-    faaslet::Faaslet f(msg);
+    faaslet::Faaslet f(faabric::MessageInBatch(req, 0));
 
     // Execute the function using another message
     for (int i = 0; i < nExecs; i++) {

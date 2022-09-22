@@ -63,12 +63,14 @@ size_t getPagesForGuardRegion()
 
 WasmModule::WasmModule()
   : WasmModule(faabric::util::getUsableCores())
-{}
+{
+}
 
 WasmModule::WasmModule(int threadPoolSizeIn)
   : threadPoolSize(threadPoolSizeIn)
   , reg(faabric::snapshot::getSnapshotRegistry())
-{}
+{
+}
 
 WasmModule::~WasmModule() {}
 
@@ -416,6 +418,7 @@ void WasmModule::bindToFunction(faabric::Message& msg, bool cache)
     _isBound = true;
     boundUser = msg.user();
     boundFunction = msg.function();
+    executingRecord = faabric::MessageRecord(msg);
 
     // Call into subclass hook, setting the context beforehand
     WasmExecutionContext ctx(this);
@@ -527,6 +530,7 @@ int32_t WasmModule::executeTask(
 
     assert(boundUser == msg.user());
     assert(boundFunction == msg.function());
+    executingRecord = faabric::MessageRecord(msg);
 
     // Set up context for this task
     WasmExecutionContext ctx(this);
@@ -833,20 +837,18 @@ void WasmModule::writeWasmEnvToMemory(uint32_t envPointers, uint32_t envBuffer)
 uint32_t WasmModule::growMemory(size_t nBytes)
 {
     if (nBytes == 0) {
-        return currentBrk.load(std::memory_order_acquire);
+        return getMemorySizeBytes();
     }
 
     faabric::util::FullLock lock(moduleMutex);
 
     uint32_t oldBytes = getMemorySizeBytes();
-    uint32_t oldBrk = currentBrk.load(std::memory_order_acquire);
-    uint32_t newBrk = oldBrk + nBytes;
+    uint32_t newBrk = oldBytes + nBytes;
 
     if (!isWasmPageAligned(newBrk)) {
         SPDLOG_ERROR("Growing memory by {} is not wasm page aligned"
-                     " (current brk: {}, new brk: {})",
+                     " (new brk: {})",
                      nBytes,
-                     oldBrk,
                      newBrk);
         throw std::runtime_error("Non-wasm-page-aligned memory growth");
     }
@@ -865,30 +867,6 @@ uint32_t WasmModule::growMemory(size_t nBytes)
         throw std::runtime_error("Memory growth exceeding max");
     }
 
-    // If we can reclaim old memory, just bump the break
-    if (newBrk <= oldBytes) {
-        SPDLOG_TRACE(
-          "MEM - Growing memory using already provisioned {} + {} <= {}",
-          oldBrk,
-          nBytes,
-          oldBytes);
-
-        currentBrk.store(newBrk, std::memory_order_release);
-
-        // Make sure permissions on memory are open
-        size_t newTop = faabric::util::getRequiredHostPages(currentBrk);
-        size_t newStart = faabric::util::getRequiredHostPagesRoundDown(oldBrk);
-        newTop *= faabric::util::HOST_PAGE_SIZE;
-        newStart *= faabric::util::HOST_PAGE_SIZE;
-        SPDLOG_TRACE("Reclaiming memory {}-{}", newStart, newTop);
-
-        uint8_t* memBase = getMemoryBase();
-        faabric::util::claimVirtualMemory(
-          { memBase + newStart, memBase + newTop });
-
-        return oldBrk;
-    }
-
     uint32_t pageChange = newPages - oldPages;
     bool success = doGrowMemory(pageChange);
     if (!success) {
@@ -901,7 +879,6 @@ uint32_t WasmModule::growMemory(size_t nBytes)
                  maxPages);
 
     size_t newMemorySize = getMemorySizeBytes();
-    currentBrk.store(newMemorySize, std::memory_order_release);
 
     if (newMemorySize != newBytes) {
         SPDLOG_ERROR(
@@ -911,7 +888,7 @@ uint32_t WasmModule::growMemory(size_t nBytes)
         throw std::runtime_error("Memory growth discrepancy");
     }
 
-    return oldBrk;
+    return oldBytes;
 }
 
 bool WasmModule::doGrowMemory(uint32_t pageChange)
@@ -928,7 +905,7 @@ uint32_t WasmModule::shrinkMemory(size_t nBytes)
 
     faabric::util::FullLock lock(moduleMutex);
 
-    uint32_t oldBrk = currentBrk.load(std::memory_order_acquire);
+    uint32_t oldBrk = getMemorySizeBytes();
 
     if (nBytes > oldBrk) {
         SPDLOG_ERROR(
@@ -940,7 +917,7 @@ uint32_t WasmModule::shrinkMemory(size_t nBytes)
     uint32_t newBrk = oldBrk - nBytes;
 
     SPDLOG_TRACE("MEM - shrinking memory {} -> {}", oldBrk, newBrk);
-    currentBrk.store(newBrk, std::memory_order_release);
+    // TODO: doShrinkMemory
 
     return oldBrk;
 }
@@ -981,7 +958,7 @@ void WasmModule::unmapMemory(uint32_t offset, size_t nBytes)
         throw std::runtime_error("munmapping outside memory max");
     }
 
-    if (unmapTop == currentBrk.load(std::memory_order_acquire)) {
+    if (unmapTop == getMemorySizeBytes()) {
         SPDLOG_TRACE("MEM - munmapping top of memory by {}", pageAligned);
         shrinkMemory(pageAligned);
     } else {

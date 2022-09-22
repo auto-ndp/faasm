@@ -174,7 +174,7 @@ struct UffdMemoryRange : public std::enable_shared_from_this<UffdMemoryRange>
     }
 };
 
-struct UffdMemoryRangeLess final
+struct UffdMemoryRangeLess
 {
     using is_transparent = std::true_type;
 

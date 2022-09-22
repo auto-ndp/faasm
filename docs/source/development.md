@@ -422,3 +422,90 @@ in `bin/workon.sh`.
 source bin/workon.sh
 ./deploy/local/dev_cluster.sh
 ```
+
+## CMake user presets example
+
+CMakeUserPresets.json
+```json
+{
+    "version": 3,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 21,
+        "patch": 0
+    },
+    "configurePresets": [
+        {
+            "name": "default-myarch",
+            "displayName": "Default Config MyArch (Debug)",
+            "description": "Default build using Ninja generator",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/work/debug",
+            "cacheVariables": {
+                "CMAKE_INSTALL_PREFIX": {
+                    "type": "STRING",
+                    "value": "${sourceDir}/work/debuginstall"
+                },
+                "CMAKE_BUILD_TYPE": {
+                    "type": "STRING",
+                    "value": "Debug"
+                },
+                "CMAKE_EXPORT_COMPILE_COMMANDS": {
+                    "type": "BOOL",
+                    "value": true
+                },
+                "BUILD_SHARED_LIBS": {
+                    "type": "BOOL",
+                    "value": false
+                },
+                "FAABRIC_TRACY_TRACING": {
+                    "type": "BOOL",
+                    "value": true
+                },
+                "CMAKE_CXX_COMPILER": {
+                    "type": "FILEPATH",
+                    "value": "/usr/lib/llvm13/bin/clang++"
+                },
+                "CMAKE_C_COMPILER": {
+                    "type": "FILEPATH",
+                    "value": "/usr/lib/llvm13/bin/clang"
+                },
+                "LLVM_DIR": {
+                    "type": "STRING",
+                    "value": "/usr/lib/llvm-11/lib/cmake/llvm"
+                },
+                "FAABRIC_CONAN_PROFILE_OVERRIDE": {
+                    "type": "STRING",
+                    "value": "conan-profile-user.txt"
+                },
+                "FAASM_SGX_MODE": {
+                    "type": "STRING",
+                    "value": "Disabled"
+                }
+            },
+            "environment": {},
+            "vendor": {}
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "default-myarch",
+            "configurePreset": "default-myarch"
+        }
+    ],
+    "testPresets": [
+        {
+            "name": "default-myarch",
+            "configurePreset": "default-myarch",
+            "output": {
+                "outputOnFailure": true
+            },
+            "execution": {
+                "noTestsAction": "error",
+                "stopOnFailure": true
+            }
+        }
+    ],
+    "vendor": {}
+}
+```

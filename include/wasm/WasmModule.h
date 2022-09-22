@@ -68,6 +68,10 @@ class WasmModule
 
     std::string getBoundFunction();
 
+    inline const faabric::MessageRecord& getExecutingRecord() {
+        return executingRecord;
+    }
+
     virtual void flush();
 
     // ----- argc/ argv -----
@@ -200,6 +204,7 @@ class WasmModule
     std::string boundUser;
     std::string boundFunction;
     bool _isBound = false;
+    faabric::MessageRecord executingRecord;
 
     storage::FileSystem filesystem;
 

@@ -10,6 +10,7 @@
 #include <faabric/util/macros.h>
 #include <faabric/util/snapshot.h>
 #include <faabric/util/timing.h>
+#include <faabric/scheduler/ExecutorContext.h>
 #include <wasm/WasmExecutionContext.h>
 #include <wasm/chaining.h>
 #include <wasm/ndp.h>
@@ -172,7 +173,7 @@ I32 storageCallAndAwaitImpl(I32 wasmFuncPtr,
     SPDLOG_DEBUG(
       "S - __faasmndp_storageCallAndAwait - {} {}", wasmFuncPtr, pyFuncName);
 
-    faabric::Message* call = getCurrentWasmExecutionContext()->executingCall;
+    faabric::Message* call = &faabric::scheduler::ExecutorContext::get()->getMsg();
 
     WAVMWasmModule* thisModule = static_cast<WAVMWasmModule*>(
       getCurrentWasmExecutionContext()->executingModule);

@@ -126,7 +126,7 @@ TEST_CASE_METHOD(FlushingTestFixture,
     faabric::Message& msg = req->mutable_messages()->at(0);
 
     faabric::scheduler::ExecutorContext::set(nullptr, req, 0);
-    faaslet::Faaslet f(msg);
+    faaslet::Faaslet f(faabric::MessageInBatch(req, 0));
     f.executeTask(0, 0, req);
 
     // Check the module has been cached

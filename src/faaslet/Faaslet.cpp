@@ -67,7 +67,7 @@ Faaslet::Faaslet(faabric::MessageInBatch msg)
     // Instantiate the right wasm module for the chosen runtime
     if (isBuiltin(msg->function())) {
         module = std::make_unique<wasm::NDPBuiltinModule>();
-    if (conf.wasmVm == "sgx") {
+    } else if (conf.wasmVm == "sgx") {
 #ifndef FAASM_SGX_DISABLED_MODE
         module = std::make_unique<wasm::EnclaveInterface>();
 #else

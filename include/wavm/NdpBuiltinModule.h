@@ -45,18 +45,10 @@ class NDPBuiltinModule final : public WasmModule
     inline void flush() override {}
 
     // ----- Memory management -----
-    inline uint32_t growMemory(uint32_t nBytes) override { return 0; }
-
-    inline uint32_t shrinkMemory(uint32_t nBytes) override { return 0; }
-
-    inline uint32_t mmapMemory(uint32_t nBytes) override { return 0; }
-
-    inline uint32_t mmapFile(uint32_t fp, uint32_t length) override
+    inline uint32_t mmapFile(uint32_t fp, size_t length) override
     {
         return 0;
     }
-
-    inline void unmapMemory(uint32_t offset, uint32_t nBytes) override {}
 
     inline uint32_t mapSharedStateMemory(
       const std::shared_ptr<faabric::state::StateKeyValue>& kv,

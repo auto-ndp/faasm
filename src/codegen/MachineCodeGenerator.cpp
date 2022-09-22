@@ -73,7 +73,7 @@ void MachineCodeGenerator::codegenForFunction(faabric::Message& msg)
         std::vector<uint8_t> oldHash;
         if (conf.wasmVm == "wamr" || conf.wasmVm == "sgx") {
             oldHash = loader.loadFunctionWamrAotHash(msg, target);
-        } else if (conf.wasmVm == "wavm" && msg.issgx()) {
+        } else if (conf.wasmVm == "wavm") {
             oldHash = loader.loadFunctionObjectHash(msg);
         } else {
             SPDLOG_ERROR("Unrecognised WASM VM during codegen: {}", conf.wasmVm);

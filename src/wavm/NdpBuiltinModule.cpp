@@ -138,7 +138,6 @@ int32_t NDPBuiltinModule::executeFunction(faabric::Message& msg)
     SPDLOG_INFO(
       "executing NDP builtin `{}` (user {})", msg.function(), msg.user());
 
-    WasmExecutionContext _wec(this, &msg);
     boundFn = &getNdpBuiltin(msg.function());
 
     // Call the function
