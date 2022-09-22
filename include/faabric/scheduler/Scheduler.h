@@ -7,12 +7,13 @@
 #include <faabric/snapshot/SnapshotClient.h>
 #include <faabric/snapshot/SnapshotRegistry.h>
 #include <faabric/transport/PointToPointBroker.h>
-#include <faabric/util/asio.h>
 #include <faabric/util/PeriodicBackgroundThread.h>
+#include <faabric/util/asio.h>
 #include <faabric/util/clock.h>
 #include <faabric/util/config.h>
 #include <faabric/util/dirty.h>
 #include <faabric/util/func.h>
+#include <faabric/util/gids.h>
 #include <faabric/util/memory.h>
 #include <faabric/util/queue.h>
 #include <faabric/util/scheduling.h>
@@ -215,15 +216,18 @@ class Scheduler
       faabric::util::SchedulingTopologyHint topologyHint =
         faabric::util::SchedulingTopologyHint::NONE);
 
-    void callFunction(faabric::Message& msg, bool forceLocal = false, faabric::Message* caller = nullptr);
+    void callFunction(faabric::Message& msg,
+                      bool forceLocal = false,
+                      const MessageRecord& caller = {});
 
     faabric::util::SchedulingDecision callFunctions(
-      std::shared_ptr<faabric::BatchExecuteRequest> req, faabric::Message* caller = nullptr);
+      std::shared_ptr<faabric::BatchExecuteRequest> req,
+      const MessageRecord& caller = {});
 
     faabric::util::SchedulingDecision callFunctions(
       std::shared_ptr<faabric::BatchExecuteRequest> req,
       faabric::util::SchedulingDecision& hint,
-      faabric::Message* caller = nullptr);
+      const MessageRecord& caller = {});
 
     void reset();
 
@@ -260,7 +264,7 @@ class Scheduler
 
     faabric::Message getFunctionResult(unsigned int messageId,
                                        int timeoutMs,
-                                       faabric::Message* caller = nullptr);
+                                       const MessageRecord& caller = {});
 
     void getFunctionResultAsync(unsigned int messageId,
                                 int timeoutMs,
@@ -431,7 +435,7 @@ class Scheduler
     faabric::util::SchedulingDecision doCallFunctions(
       std::shared_ptr<faabric::BatchExecuteRequest> req,
       faabric::util::SchedulingDecision& decision,
-      faabric::Message* caller,
+      const MessageRecord& caller,
       faabric::util::FullLock& lock,
       faabric::util::SchedulingTopologyHint topologyHint);
 

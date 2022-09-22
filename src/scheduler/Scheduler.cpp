@@ -378,7 +378,7 @@ void Scheduler::vacateSlot()
 
 faabric::util::SchedulingDecision Scheduler::callFunctions(
   std::shared_ptr<faabric::BatchExecuteRequest> req,
-  faabric::Message* caller)
+  const MessageRecord& caller)
 {
     ZoneScopedNS("Scheduler::callFunctions", 5);
 
@@ -685,7 +685,7 @@ faabric::util::SchedulingDecision Scheduler::doSchedulingDecision(
 faabric::util::SchedulingDecision Scheduler::callFunctions(
   std::shared_ptr<faabric::BatchExecuteRequest> req,
   faabric::util::SchedulingDecision& hint,
-  faabric::Message* caller)
+  const MessageRecord& caller)
 {
     faabric::util::FullLock lock(mx);
     return doCallFunctions(
@@ -695,7 +695,7 @@ faabric::util::SchedulingDecision Scheduler::callFunctions(
 faabric::util::SchedulingDecision Scheduler::doCallFunctions(
   std::shared_ptr<faabric::BatchExecuteRequest> req,
   faabric::util::SchedulingDecision& decision,
-  faabric::Message* caller,
+  const MessageRecord& caller,
   faabric::util::FullLock& lock,
   faabric::util::SchedulingTopologyHint topologyHint)
 {
@@ -1041,7 +1041,7 @@ void Scheduler::broadcastSnapshotDelete(const faabric::Message& msg,
 
 void Scheduler::callFunction(faabric::Message& msg,
                              bool forceLocal,
-                             faabric::Message* caller)
+                             const MessageRecord& caller)
 {
     // TODO - avoid this copy
     auto req = faabric::util::batchExecFactory();
@@ -1402,13 +1402,13 @@ size_t Scheduler::getCachedMessageCount()
 
 faabric::Message Scheduler::getFunctionResult(unsigned int messageId,
                                               int timeoutMs,
-                                              faabric::Message* caller)
+                                              const MessageRecord& caller)
 {
     std::atomic_int* suspendedCtr = nullptr;
-    if (caller != nullptr) {
+    if (!caller.function.empty()) {
         faabric::util::SharedLock _l(mx);
         suspendedCtr =
-          &suspendedExecutors[faabric::util::funcToString(*caller, false)];
+          &suspendedExecutors[caller.user + "/" + caller.function];
         _l.unlock();
         suspendedCtr->fetch_add(1, std::memory_order_acq_rel);
         monitorWaitingTasks.fetch_add(1, std::memory_order_acq_rel);
