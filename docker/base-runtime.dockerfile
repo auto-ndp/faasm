@@ -24,9 +24,6 @@ ENV FAASM_DOCKER="on"
 # Copy Python runtime libraries
 COPY --from=builder /usr/local/faasm/runtime_root /usr/local/faasm/runtime_root
 
-# Set up SGX SDK
-COPY --from=builder /opt/intel /opt/intel
-
 # Check out code (clean beforehand just in case)
 WORKDIR /usr/local/code
 RUN rm -rf faasm
