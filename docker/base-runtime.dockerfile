@@ -3,7 +3,7 @@ ARG FAASM_VERSION
 FROM kubasz51/faasm-base:${FAASM_VERSION} AS builder
 
 # Note - we don't often rebuild faabric-base so this dep may be behind
-FROM kubasz51/faasm-faabric-base-runtime:0.3.1
+FROM kubasz51/faasm-faabric-base-runtime:0.4.0
 ARG FAASM_VERSION
 
 RUN apt-get update \
