@@ -22,6 +22,7 @@ CONTAINER_NAME2FILE_MAP = {
     "redis": "redis.dockerfile",
     "minio": "minio.dockerfile",
     "base": "base.dockerfile",
+    "base-runtime": "base-runtime.dockerfile",
     "base-sgx": "base-sgx.dockerfile",
     "base-sgx-sim": "base-sgx.dockerfile",
     "upload": "upload.dockerfile",
@@ -106,7 +107,7 @@ def build(ctx, c, nocache=False, push=False):
             build_args["FAASM_SGX_MODE"] = FAASM_SGX_MODE_DISABLED
 
         cmd = [
-			"docker buildx build --platform linux/amd64,linux/arm64"
+            "docker buildx build --platform linux/amd64,linux/arm64"
             "--no-cache" if nocache else "",
             "-t {}".format(tag_name),
             "{}".format(
