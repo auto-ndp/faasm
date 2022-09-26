@@ -107,8 +107,9 @@ def build(ctx, c, nocache=False, push=False):
             build_args["FAASM_SGX_MODE"] = FAASM_SGX_MODE_DISABLED
 
         cmd = [
-            "docker buildx build --platform linux/amd64,linux/arm64 "
+            "docker buildx build --platform linux/amd64,linux/arm64",
             "--no-cache" if nocache else "",
+            "--push" if push else "",
             "-t {}".format(tag_name),
             "{}".format(
                 " ".join(
