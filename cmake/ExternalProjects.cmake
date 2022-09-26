@@ -36,6 +36,7 @@ conan_cmake_configure(
         "cppzmq/4.8.1@#010df8fa1c5ebbc615704e8c16693bac"
         "flatbuffers/2.0.5@#c6a9508bd476da080f7aecbe7a094b68"
         "hiredis/1.0.2@#370dad964286cadb1f15dc90252e8ef3"
+        "openssl/3.0.5@#40f4488f02b36c1193b68f585131e8ef"
         "protobuf/3.20.0@#8e4de7081bea093469c9e6076149b2b4"
         "rapidjson/cci.20211112@#65b4e5feb6f1edfc8cbac0f669acaf17"
         "readerwriterqueue/1.0.6@#a95c8da3d68822dec4d4c13fff4b5c96"
