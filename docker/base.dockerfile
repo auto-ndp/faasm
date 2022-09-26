@@ -21,8 +21,8 @@ RUN apt-get update \
     nasm \
     libclang-common-11-dev \
     libcgroup-dev \
-    && apt-get clean autoclean \
-    && apt-get autoremove
+    && apt-get clean autoclean --yes \
+    && apt-get autoremove --yes
 
 # Flag to say we're in a container
 ENV FAASM_DOCKER="on"

@@ -15,8 +15,8 @@ RUN apt-get update \
     iptables \
     nasm \
     libcgroup1 \
-    && apt-get clean autoclean \
-    && apt-get autoremove
+    && apt-get clean autoclean --yes \
+    && apt-get autoremove --yes
 
 # Flag to say we're in a container
 ENV FAASM_DOCKER="on"
