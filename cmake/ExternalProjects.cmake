@@ -73,7 +73,7 @@ set(AWS_CORE_LIBRARY ${CMAKE_INSTALL_PREFIX}/lib/libaws-cpp-sdk-core.a)
 set(AWS_S3_LIBRARY ${CMAKE_INSTALL_PREFIX}/lib/libaws-cpp-sdk-s3.a)
 ExternalProject_Add(aws_ext
     GIT_REPOSITORY   "https://github.com/aws/aws-sdk-cpp.git"
-    GIT_TAG          "021372ca9e5518d2dc5ba10d0b2aa34172894eed"
+    GIT_TAG          "eb196d341ee70368d84c4231a7b2c08abf0cca00"
     BUILD_ALWAYS     0
     TEST_COMMAND     ""
     UPDATE_COMMAND   ""
@@ -107,7 +107,7 @@ add_library(aws_ext_s3_lib INTERFACE)
 target_link_directories(aws_ext_s3_lib INTERFACE "${CMAKE_INSTALL_PREFIX}/lib")
 target_link_libraries(aws_ext_s3_lib INTERFACE aws-crt-cpp aws-c-auth aws-c-cal
     aws-c-common aws-c-compression aws-c-event-stream aws-c-http
-    aws-c-io aws-c-mqtt aws-c-s3 aws-checksums s2n
+    aws-c-io aws-c-mqtt aws-c-s3 aws-c-sdkutils aws-checksums s2n
     pthread curl crypto ssl z
     aws_ext_s3 aws_ext_core
 )
