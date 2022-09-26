@@ -4,9 +4,6 @@ FROM kubasz51/faasm-faabric:0.4.0 as faabric
 # Stage to extract Python runtime files
 FROM kubasz51/faasm-cpython:0.1.5 as python
 
-# Import from SGX container
-FROM kubasz51/faasm-sgx:0.8.2 as sgx
-
 # Note - we don't often rebuild faabric-base so this dep may be behind
 FROM kubasz51/faasm-faabric-base:0.4.0
 ARG FAASM_VERSION

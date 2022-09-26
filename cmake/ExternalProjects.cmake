@@ -29,8 +29,9 @@ endif()
 
 conan_cmake_configure(
     REQUIRES
-        catch2/2.13.7@#31c8cd08e3c957a9eac8cb1377cf5863
-	"mimalloc/2.0.6@#ca9e081f2a1d78eb2b70c6d2270b56d7"
+        "catch2/2.13.7@#31c8cd08e3c957a9eac8cb1377cf5863"
+        "mimalloc/2.0.6@#ca9e081f2a1d78eb2b70c6d2270b56d7"
+        "openssl/3.0.5@#40f4488f02b36c1193b68f585131e8ef"
         # These two dependencies are only needed to perform remote attestation
         # of SGX enclaves using Microsoft Azure's Attestation Service
         "jwt-cpp/0.6.0@#cd6b5c1318b29f4becaf807b23f7bb44"
@@ -57,6 +58,11 @@ find_package(Catch2 REQUIRED)
 find_package(mimalloc REQUIRED)
 find_package(jwt-cpp REQUIRED)
 find_package(picojson REQUIRED)
+find_package(OpenSSL REQUIRED COMPONENTS Crypto SSL)
+
+set(OPENSSL_CRYPTO_LIBFILE "${OPENSSL_LIBRARIES}")
+list(FILTER OPENSSL_CRYPTO_LIBFILE INCLUDE REGEX "libcrypto\\.")
+message(STATUS "OpenSSL Crypto lib file: ${OPENSSL_CRYPTO_LIBFILE}")
 
 # 22/12/2021 - WARNING: we don't install AWS through Conan as the recipe proved
 # very unstable and failed frequently.
@@ -86,6 +92,9 @@ ExternalProject_Add(aws_ext
                      -DENABLE_UNITY_BUILD=ON
                      -DENABLE_TESTING=OFF
                      -DCMAKE_BUILD_TYPE=Release
+                     "-Dcrypto_INCLUDE_DIR=${OPENSSL_INCLUDE_DIR}"
+                     "-Dcrypto_SHARED_LIBRARY=${OPENSSL_CRYPTO_LIBFILE}"
+                     "-Dcrypto_STATIC_LIBRARY=${OPENSSL_CRYPTO_LIBFILE}"
     LOG_CONFIGURE ON
     LOG_INSTALL ON
     LOG_BUILD ON
@@ -108,7 +117,7 @@ target_link_directories(aws_ext_s3_lib INTERFACE "${CMAKE_INSTALL_PREFIX}/lib")
 target_link_libraries(aws_ext_s3_lib INTERFACE aws-crt-cpp aws-c-auth aws-c-cal
     aws-c-common aws-c-compression aws-c-event-stream aws-c-http
     aws-c-io aws-c-mqtt aws-c-s3 aws-c-sdkutils aws-checksums s2n
-    pthread curl crypto ssl z
+    pthread curl OpenSSL::SSL OpenSSL::Crypto z
     aws_ext_s3 aws_ext_core
 )
 add_dependencies(aws_ext_s3_lib aws_ext)
