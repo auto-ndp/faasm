@@ -9,12 +9,11 @@ ARG FAASM_VERSION
 RUN apt-get update \
     && apt-get upgrade --yes --no-install-recommends \
     && apt-get install --yes --no-install-recommends \
-    ansible \
     cgroup-tools \
     iproute2 \
     iptables \
     nasm \
-    libcgroup1 \
+    libcgroup2 \
     && apt-get clean autoclean --yes \
     && apt-get autoremove --yes
 
@@ -30,9 +29,13 @@ RUN rm -rf faasm
 COPY --from=builder /usr/local/code/faasm /usr/local/code/faasm
 
 # Set up runtime filesystem
-WORKDIR /usr/local/code/faasm/ansible
-ENV USER=root
-RUN ansible-playbook runtime_fs.yml
+WORKDIR /usr/local/code/faasm
+RUN mkdir -p /usr/local/faasm/runtime_root/etc
+RUN cp deploy/conf/hosts /usr/local/faasm/runtime_root/etc/
+RUN cp deploy/conf/resolv.conf /usr/local/faasm/runtime_root/etc/
+RUN cp deploy/conf/passwd /usr/local/faasm/runtime_root/etc/
+RUN mkdir -p /usr/local/faasm/runtime_root/tmp
+RUN mkdir -p /usr/local/faasm/runtime_root/share
 
 # Out of tree build
 WORKDIR /build/faasm
