@@ -26,14 +26,12 @@ else
     MODE="container"
 fi
 
-pushd ${PROJ_ROOT} >> /dev/null
-
 # ----------------------------
 # Virtualenv
 # ----------------------------
 
 if [ ! -d ${VENV_PATH} ]; then
-    ${PROJ_ROOT}/bin/create_venv.sh
+    "${PROJ_ROOT}/bin/create_venv.sh"
 fi
 
 export VIRTUAL_ENV_DISABLE_PROMPT=1
@@ -50,7 +48,7 @@ alias invoke="invoke -r faasmcli/faasmcli"
 
 _complete_invoke() {
     local candidates
-    candidates=`invoke --complete -- ${COMP_WORDS[*]}`
+    candidates=$(invoke --complete -- ${COMP_WORDS[*]})
     COMPREPLY=( $(compgen -W "${candidates}" -- $2) )
 }
 
@@ -77,6 +75,8 @@ if [[ "$MODE" == "terminal" ]]; then
     export FAASM_LOCAL_DIR=$(pwd)/dev/faasm-local
 else
     export FAASM_BUILD_DIR=/build/faasm
+    export HISTFILE="/usr/local/faasm/bash_history"
+    export PROMPT_COMMAND="history -a"
 fi
 
 # Build binaries on path
@@ -97,4 +97,4 @@ echo "Mode: ${MODE}"
 echo "----------------------------------"
 echo ""
 
-popd >> /dev/null
+cd "${PROJ_ROOT}" || exit

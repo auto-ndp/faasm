@@ -10,7 +10,6 @@ set +o allexport
 export FAASM_ROOT=${PROJ_ROOT}
 export FAASM_VERSION=$(cat ${PROJ_ROOT}/VERSION)
 export FAASM_BUILD_MOUNT=/build/faasm
-export FAASM_BUILD_DIR=/build/faasm
 export FAASM_LOCAL_MOUNT=/usr/local/faasm
 
 touch /tmp/faasm-monitor
