@@ -38,7 +38,7 @@ int main()
         // Endpoint will block until killed
         SPDLOG_INFO("Starting HTTP endpoint on worker");
         const auto& config = faabric::util::getSystemConfig();
-        faabric::endpoint::Endpoint endpoint(
+        faabric::endpoint::FaabricEndpoint endpoint(
           config.endpointPort,
           config.endpointNumThreads,
           std::make_shared<faabric::endpoint::FaabricEndpointHandler>());

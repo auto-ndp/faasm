@@ -125,8 +125,9 @@ zmq::socket_t socketFactory(zmq::socket_type socketType,
                     break;
                 }
                 default: {
-                    SPDLOG_ERROR(
-                      "Invalid bind socket type {} ({})", (int) socketType, address);
+                    SPDLOG_ERROR("Invalid bind socket type {} ({})",
+                                 (int)socketType,
+                                 address);
                     throw std::runtime_error(
                       "Binding with invalid socket type");
                 }
@@ -179,7 +180,7 @@ zmq::socket_t socketFactory(zmq::socket_type socketType,
                 }
                 default: {
                     SPDLOG_ERROR("Invalid connect socket type {} ({})",
-                                 (int) socketType,
+                                 (int)socketType,
                                  address);
                     throw std::runtime_error(
                       "Connecting with unrecognized socket type");
@@ -215,7 +216,8 @@ MessageEndpoint::MessageEndpoint(const std::string& hostIn,
                                  int timeoutMsIn)
   : MessageEndpoint("tcp://" + hostIn + ":" + std::to_string(portIn),
                     timeoutMsIn)
-{}
+{
+}
 
 std::string MessageEndpoint::getAddress()
 {
@@ -330,7 +332,7 @@ Message MessageEndpoint::recvBuffer(zmq::socket_t& socket, size_t size)
           }
       } catch (zmq::error_t& e) {
           if (e.num() == ZMQ_ETERM) {
-              SPDLOG_WARN("Endpoint {} received ETERM on recv", address);
+              SPDLOG_WARN("FaabricEndpoint {} received ETERM on recv", address);
               return Message(MessageResponseCode::TERM);
           }
 
@@ -529,7 +531,8 @@ AsyncFanOutMessageEndpoint::AsyncFanOutMessageEndpoint(
 
 AsyncFanInMessageEndpoint::AsyncFanInMessageEndpoint(int portIn, int timeoutMs)
   : FanInMessageEndpoint(portIn, timeoutMs, zmq::socket_type::pull)
-{}
+{
+}
 
 // ----------------------------------------------
 // SYNC FAN IN AND FAN OUT
@@ -542,11 +545,13 @@ SyncFanOutMessageEndpoint::SyncFanOutMessageEndpoint(
                         timeoutMs,
                         zmq::socket_type::dealer,
                         MessageEndpointConnectType::BIND)
-{}
+{
+}
 
 SyncFanInMessageEndpoint::SyncFanInMessageEndpoint(int portIn, int timeoutMs)
   : FanInMessageEndpoint(portIn, timeoutMs, zmq::socket_type::router)
-{}
+{
+}
 
 // ----------------------------------------------
 // ASYNC RECV ENDPOINT
@@ -559,11 +564,13 @@ AsyncRecvMessageEndpoint::AsyncRecvMessageEndpoint(
                         timeoutMs,
                         zmq::socket_type::pull,
                         MessageEndpointConnectType::CONNECT)
-{}
+{
+}
 
 AsyncRecvMessageEndpoint::AsyncRecvMessageEndpoint(int portIn, int timeoutMs)
   : RecvMessageEndpoint(portIn, timeoutMs, zmq::socket_type::pull)
-{}
+{
+}
 
 Message AsyncRecvMessageEndpoint::recv()
 {
@@ -578,7 +585,8 @@ AsyncInternalRecvMessageEndpoint::AsyncInternalRecvMessageEndpoint(
                         timeoutMs,
                         zmq::socket_type::pull,
                         MessageEndpointConnectType::BIND)
-{}
+{
+}
 
 Message AsyncInternalRecvMessageEndpoint::recv()
 {
@@ -596,11 +604,13 @@ SyncRecvMessageEndpoint::SyncRecvMessageEndpoint(const std::string& inprocLabel,
                         timeoutMs,
                         zmq::socket_type::rep,
                         MessageEndpointConnectType::CONNECT)
-{}
+{
+}
 
 SyncRecvMessageEndpoint::SyncRecvMessageEndpoint(int portIn, int timeoutMs)
   : RecvMessageEndpoint(portIn, timeoutMs, zmq::socket_type::rep)
-{}
+{
+}
 
 Message SyncRecvMessageEndpoint::recv()
 {
@@ -626,7 +636,8 @@ AsyncDirectRecvEndpoint::AsyncDirectRecvEndpoint(const std::string& inprocLabel,
                         timeoutMs,
                         zmq::socket_type::pair,
                         MessageEndpointConnectType::BIND)
-{}
+{
+}
 
 Message AsyncDirectRecvEndpoint::recv()
 {

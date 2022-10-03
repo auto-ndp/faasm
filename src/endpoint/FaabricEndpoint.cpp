@@ -1,17 +1,11 @@
 #include <faabric/endpoint/FaabricEndpoint.h>
 #include <faabric/scheduler/Scheduler.h>
-#include <faabric/util/logging.h>
-#include <faabric/util/macros.h>
-#include <faabric/util/timing.h>
 
 #include <functional>
 #include <optional>
-#include <pistache/endpoint.h>
-#include <pistache/listener.h>
 #include <signal.h>
 #include <stdexcept>
 #include <thread>
-#include <typeinfo>
 #include <vector>
 
 namespace faabric::endpoint {
@@ -21,7 +15,8 @@ struct EndpointState
 {
     EndpointState(int threadCountIn)
       : ioc(threadCountIn)
-    {}
+    {
+    }
     asio::io_context ioc;
     std::vector<std::thread> ioThreads;
 };
@@ -45,7 +40,8 @@ class HttpConnection : public std::enable_shared_from_this<HttpConnection>
       , buffer()
       , parser()
       , handler(handlerIn)
-    {}
+    {
+    }
 
     void run()
     {
@@ -191,16 +187,18 @@ class EndpointListener : public std::enable_shared_from_this<EndpointListener>
 };
 }
 
-Endpoint::Endpoint(int portIn,
-                   int threadCountIn,
-                   std::shared_ptr<HttpRequestHandler> requestHandlerIn)
+FaabricEndpoint::FaabricEndpoint(
+  int portIn,
+  int threadCountIn,
+  std::shared_ptr<HttpRequestHandler> requestHandlerIn)
   : port(portIn)
   , threadCount(threadCountIn)
   , state(nullptr)
   , requestHandler(requestHandlerIn)
-{}
+{
+}
 
-Endpoint::~Endpoint() {}
+FaabricEndpoint::~FaabricEndpoint() {}
 
 struct SchedulerMonitoringTask
   : public std::enable_shared_from_this<SchedulerMonitoringTask>
@@ -211,7 +209,8 @@ struct SchedulerMonitoringTask
     SchedulerMonitoringTask(asio::io_context& ioc)
       : ioc(ioc)
       , timer(ioc, boost::posix_time::milliseconds(1))
-    {}
+    {
+    }
 
     void run()
     {
@@ -223,7 +222,7 @@ struct SchedulerMonitoringTask
     }
 };
 
-void Endpoint::start(EndpointMode mode)
+void FaabricEndpoint::start(EndpointMode mode)
 {
     SPDLOG_INFO("Starting HTTP endpoint on {}, {} threads", port, threadCount);
     if (getpid() != gettid()) {
@@ -253,7 +252,8 @@ void Endpoint::start(EndpointMode mode)
 
     std::make_shared<SchedulerMonitoringTask>(state->ioc)->run();
 
-    int extraThreads = std::max((mode == EndpointMode::SIGNAL) ? 0 : 1, this->threadCount - 1);
+    int extraThreads =
+      std::max((mode == EndpointMode::SIGNAL) ? 0 : 1, this->threadCount - 1);
     state->ioThreads.reserve(extraThreads);
     auto ioc_run = [&ioc{ state->ioc }]() { ioc.run(); };
     for (int i = 0; i < extraThreads; i++) {
@@ -264,7 +264,7 @@ void Endpoint::start(EndpointMode mode)
     }
 }
 
-void Endpoint::stop()
+void FaabricEndpoint::stop()
 {
     SPDLOG_INFO("Shutting down endpoint on {}", port);
     state->ioc.stop();

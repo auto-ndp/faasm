@@ -83,7 +83,7 @@ Scheduler::Scheduler()
 
     // Start the reaper thread
     reaperThread.start(conf.reaperIntervalSeconds);
-	
+
     if (this->conf.isStorageNode) {
         redis::Redis& redis = redis::Redis::getQueue();
         redis.sadd(ALL_STORAGE_HOST_SET, this->thisHost);
@@ -414,7 +414,8 @@ faabric::util::SchedulingDecision Scheduler::callFunctions(
     SchedulingDecision decision = doSchedulingDecision(req, topologyHint);
 
     // Pass decision as hint
-    return doCallFunctions(std::move(req), decision, caller, lock, topologyHint);
+    return doCallFunctions(
+      std::move(req), decision, caller, lock, topologyHint);
 }
 
 faabric::util::SchedulingDecision Scheduler::makeSchedulingDecision(
@@ -584,7 +585,8 @@ faabric::util::SchedulingDecision Scheduler::doSchedulingDecision(
                     unregisteredHosts.push_back(std::move(h));
                 }
             } else {
-              unregisteredHosts = getUnregisteredHosts(firstMsg.user(), firstMsg.function());
+                unregisteredHosts =
+                  getUnregisteredHosts(firstMsg.user(), firstMsg.function());
             }
 
             for (const auto& h : unregisteredHosts) {
@@ -688,8 +690,11 @@ faabric::util::SchedulingDecision Scheduler::callFunctions(
   const MessageRecord& caller)
 {
     faabric::util::FullLock lock(mx);
-    return doCallFunctions(
-      std::move(req), hint, caller, lock, faabric::util::SchedulingTopologyHint::NONE);
+    return doCallFunctions(std::move(req),
+                           hint,
+                           caller,
+                           lock,
+                           faabric::util::SchedulingTopologyHint::NONE);
 }
 
 faabric::util::SchedulingDecision Scheduler::doCallFunctions(
@@ -1407,8 +1412,7 @@ faabric::Message Scheduler::getFunctionResult(unsigned int messageId,
     std::atomic_int* suspendedCtr = nullptr;
     if (!caller.function.empty()) {
         faabric::util::SharedLock _l(mx);
-        suspendedCtr =
-          &suspendedExecutors[caller.user + "/" + caller.function];
+        suspendedCtr = &suspendedExecutors[caller.user + "/" + caller.function];
         _l.unlock();
         suspendedCtr->fetch_add(1, std::memory_order_acq_rel);
         monitorWaitingTasks.fetch_add(1, std::memory_order_acq_rel);
@@ -1544,7 +1548,8 @@ void Scheduler::getFunctionResultAsync(
               , mlr(std::move(mlr))
               , dsc(std::move(dsc))
               , handler(handler)
-            {}
+            {
+            }
             ~MlrAwaiter() { dsc.release(); }
             void await(const boost::system::error_code& ec)
             {

@@ -9,7 +9,6 @@
 #include <faabric/util/json.h>
 #include <faabric/util/macros.h>
 
-using namespace Pistache;
 using namespace faabric::scheduler;
 
 namespace tests {
@@ -25,7 +24,8 @@ class EndpointApiTestExecutor final : public Executor
   public:
     EndpointApiTestExecutor(faabric::Message& msg)
       : Executor(faabric::MessageInBatch(msg))
-    {}
+    {
+    }
 
     ~EndpointApiTestExecutor() {}
 
@@ -63,7 +63,8 @@ class EndpointApiTestExecutor final : public Executor
 class EndpointApiTestExecutorFactory : public ExecutorFactory
 {
   protected:
-    std::shared_ptr<Executor> createExecutor(faabric::MessageInBatch msg) override
+    std::shared_ptr<Executor> createExecutor(
+      faabric::MessageInBatch msg) override
     {
         return std::make_shared<EndpointApiTestExecutor>(msg);
     }
@@ -90,7 +91,7 @@ TEST_CASE_METHOD(EndpointApiTestFixture,
 {
     port++;
 
-    faabric::endpoint::Endpoint endpoint(
+    faabric::endpoint::FaabricEndpoint endpoint(
       port, 2, std::make_shared<faabric::endpoint::FaabricEndpointHandler>());
 
     endpoint.start(faabric::endpoint::EndpointMode::BG_THREAD);
@@ -147,7 +148,7 @@ TEST_CASE_METHOD(EndpointApiTestFixture,
                  "[endpoint]")
 {
     port++;
-    faabric::endpoint::Endpoint endpoint(
+    faabric::endpoint::FaabricEndpoint endpoint(
       port, 2, std::make_shared<faabric::endpoint::FaabricEndpointHandler>());
 
     endpoint.start(faabric::endpoint::EndpointMode::BG_THREAD);

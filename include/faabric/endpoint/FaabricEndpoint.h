@@ -6,8 +6,6 @@
 #include <faabric/proto/faabric.pb.h>
 #include <faabric/util/asio.h>
 #include <faabric/util/config.h>
-#include <pistache/endpoint.h>
-#include <pistache/http.h>
 
 namespace faabric::endpoint {
 
@@ -35,19 +33,19 @@ class HttpRequestHandler
                            faabric::util::BeastHttpRequest&& request) = 0;
 };
 
-class Endpoint
+class FaabricEndpoint
 {
   public:
-    Endpoint() = delete;
-    Endpoint(const Endpoint&) = delete;
-    Endpoint(Endpoint&&) = delete;
-    Endpoint& operator=(const Endpoint&) = delete;
-    Endpoint& operator=(Endpoint&&) = delete;
-    virtual ~Endpoint();
+    FaabricEndpoint() = delete;
+    FaabricEndpoint(const FaabricEndpoint&) = delete;
+    FaabricEndpoint(FaabricEndpoint&&) = delete;
+    FaabricEndpoint& operator=(const FaabricEndpoint&) = delete;
+    FaabricEndpoint& operator=(FaabricEndpoint&&) = delete;
+    virtual ~FaabricEndpoint();
 
-    Endpoint(int port,
-             int threadCount,
-             std::shared_ptr<HttpRequestHandler> requestHandlerIn);
+    FaabricEndpoint(int port,
+                    int threadCount,
+                    std::shared_ptr<HttpRequestHandler> requestHandlerIn);
 
     void start(EndpointMode mode = EndpointMode::SIGNAL);
 
