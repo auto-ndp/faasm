@@ -38,7 +38,7 @@ int main()
         // Start endpoint (will also have multiple threads)
         SPDLOG_INFO("Starting endpoint");
         const auto& config = faabric::util::getSystemConfig();
-        faabric::endpoint::Endpoint endpoint(
+        faabric::endpoint::FaabricEndpoint endpoint(
           config.endpointPort,
           config.endpointNumThreads,
           std::make_shared<faabric::endpoint::FaabricEndpointHandler>());

@@ -146,3 +146,11 @@ set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ${IPO_SUPPORTED})
 
 FetchContent_GetProperties(wamr_ext SOURCE_DIR WAMR_ROOT_DIR)
 message(STATUS WAMR_ROOT_DIR ${WAMR_ROOT_DIR})
+
+# librados for Ceph interoperability
+find_library(LIBRADOS_LIBRARY librados.so REQUIRED)
+message(STATUS LIBRADOS_LIBRARY "${LIBRADOS_LIBRARY}")
+add_library(librados::librados SHARED IMPORTED)
+set_target_properties(librados::librados PROPERTIES
+    IMPORTED_LOCATION "${LIBRADOS_LIBRARY}"
+)

@@ -229,6 +229,7 @@ add_library(faasm::common_deps ALIAS faasm_common_deps)
 target_link_libraries(faasm_common_deps INTERFACE
         faabric::faabric
         mimalloc::mimalloc
+        librados::librados
         )
 target_include_directories(faasm_common_deps INTERFACE
         # WAMR includes
