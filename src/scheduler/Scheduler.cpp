@@ -1226,7 +1226,7 @@ void Scheduler::setFunctionResult(std::unique_ptr<faabric::Message> msg)
         faabric::util::UniqueLock resultsLock(localResultsMutex);
         auto it = localResults.find(msg->id());
         if (it != localResults.end()) {
-            it->second->set_value(std::move(msg));
+            it->second->setValue(std::move(msg));
         } else {
             throw std::runtime_error(
               "Got direct result, but promise is registered");
@@ -1258,7 +1258,7 @@ void Scheduler::setFunctionResult(std::unique_ptr<faabric::Message> msg)
 
         auto it = localResults.find(msg->id());
         if (it != localResults.end()) {
-            it->second.set_value(std::make_unique<faabric::Message>(msg));
+            it->second->setValue(std::move(msg));
         }
 
         return;

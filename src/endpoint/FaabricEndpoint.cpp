@@ -1,4 +1,5 @@
 #include <faabric/endpoint/FaabricEndpoint.h>
+#include <faabric/endpoint/FaabricEndpointHandler.h>
 #include <faabric/scheduler/Scheduler.h>
 
 #include <functional>

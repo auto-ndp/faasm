@@ -215,29 +215,6 @@ class SchedulerReaperThread : public faabric::util::PeriodicBackgroundThread
     void doWork() override;
 };
 
-struct MessageLocalResult final
-{
-    std::promise<std::unique_ptr<faabric::Message>> promise;
-    int event_fd = -1;
-
-    MessageLocalResult();
-    MessageLocalResult(const MessageLocalResult&) = delete;
-    inline MessageLocalResult(MessageLocalResult&& other)
-    {
-        this->operator=(std::move(other));
-    }
-    MessageLocalResult& operator=(const MessageLocalResult&) = delete;
-    inline MessageLocalResult& operator=(MessageLocalResult&& other)
-    {
-        this->promise = std::move(other.promise);
-        this->event_fd = other.event_fd;
-        other.event_fd = -1;
-        return *this;
-    }
-    ~MessageLocalResult();
-    void set_value(std::unique_ptr<faabric::Message>&& msg);
-};
-
 class Scheduler
 {
   public:
@@ -299,12 +276,6 @@ class Scheduler
     faabric::Message getFunctionResult(unsigned int messageId,
                                        int timeoutMs,
                                        const MessageRecord& caller = {});
-
-    void getFunctionResultAsync(unsigned int messageId,
-                                int timeoutMs,
-                                asio::io_context& ioc,
-                                asio::any_io_executor& executor,
-                                std::function<void(faabric::Message&)> handler);
 
     void getFunctionResultAsync(unsigned int messageId,
                                 int timeoutMs,
