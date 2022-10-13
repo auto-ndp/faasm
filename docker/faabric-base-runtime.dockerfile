@@ -1,5 +1,4 @@
-FROM debian:bookworm-20220822-slim
-# Debian "12" testing
+FROM ubuntu:22.04
 
 RUN apt-get update \
     && apt-get upgrade --yes --no-install-recommends \

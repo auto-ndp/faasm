@@ -1,5 +1,4 @@
-FROM kubasz51/faasm-faabric-base-runtime:0.3.1
-# Debian "12" testing
+FROM kubasz51/faasm-faabric-base-runtime:0.4.1
 
 RUN apt-get update \
     && apt-get upgrade --yes --no-install-recommends \
@@ -7,6 +6,7 @@ RUN apt-get update \
     autoconf \
     automake \
     build-essential \
+    ceph-common \
     clang-13 \
     clang-format-13 \
     clang-tidy-13 \
@@ -23,6 +23,7 @@ RUN apt-get update \
     liblttng-ust-dev \
     lttng-tools \
     libpython3-dev \
+    librados-dev \
     libssl-dev \
     libstdc++-11-dev \
     libtool \
@@ -37,7 +38,6 @@ RUN apt-get update \
     && apt-get autoremove --yes
 
 # Update pip
-RUN pip install -U pip
+RUN pip install -U pip wheel setuptools
 
-RUN pip install cmake==3.24.1
-RUN pip install conan==1.51.3
+RUN pip install cmake==3.24.1 conan==1.53.0
