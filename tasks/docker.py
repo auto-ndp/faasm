@@ -59,8 +59,8 @@ def build(ctx, c, nocache=False, push=False):
             img_name = FAABRIC_IMAGE_NAME
         elif ctr == "faabric-base":
             img_name = FAABRIC_BASE_IMAGE_NAME
-		elif ctr == "faabric-base-runtime":
-			img_name = FAABRIC_BASE_RUNTIME_IMAGE_NAME
+        elif ctr == "faabric-base-runtime":
+            img_name = FAABRIC_BASE_RUNTIME_IMAGE_NAME
         else:
             print("Unrecognised container name: {}".format(ctr))
             raise RuntimeError("Unrecognised container name")
@@ -78,8 +78,8 @@ def push(ctx, c):
             img_name = FAABRIC_IMAGE_NAME
         elif ctr == "faabric-base":
             img_name = FAABRIC_BASE_IMAGE_NAME
-		elif ctr == "faabric-base-runtime":
-			img_name = FAABRIC_BASE_RUNTIME_IMAGE_NAME	
+        elif ctr == "faabric-base-runtime":
+            img_name = FAABRIC_BASE_RUNTIME_IMAGE_NAME	
         else:
             print("Unrecognised container name: {}".format(ctr))
             raise RuntimeError("Unrecognised container name")
