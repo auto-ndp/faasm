@@ -27,10 +27,7 @@ int main()
 
         SPDLOG_INFO("Starting HTTP endpoint on worker");
         const auto& config = faabric::util::getSystemConfig();
-        faabric::endpoint::FaabricEndpoint endpoint(
-          config.endpointPort,
-          config.endpointNumThreads,
-          std::make_shared<faabric::endpoint::FaabricEndpointHandler>());
+        faabric::endpoint::FaabricEndpoint endpoint;
         endpoint.start(faabric::endpoint::EndpointMode::SIGNAL);
 
         SPDLOG_INFO("Shutting down");
