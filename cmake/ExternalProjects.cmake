@@ -17,7 +17,7 @@ endif()
 
 include(${CMAKE_CURRENT_BINARY_DIR}/conan.cmake)
 
-conan_check(VERSION 1.51.3 REQUIRED)
+conan_check(VERSION 1.52.0 REQUIRED)
 
 # Enable revisions in the conan config
 execute_process(COMMAND ${CONAN_CMD} config set general.revisions_enabled=1
@@ -29,7 +29,7 @@ endif()
 conan_cmake_configure(
     REQUIRES
         "abseil/20220623.0@#732381dc99db29b4cfd293684891da56"
-        "boost/1.79.0@#3249d9bd2b863a9489767bf9c8a05b4b"
+        "boost/1.80.0@#db5db5bd811d23b95089d4a95259d147"
         "catch2/2.13.9@#8793d3e6287d3684201418de556d98fe"
         "cppcodec/0.2@#f6385611ce2f7cff954ac8b16e25c4fa"
         "cpprestsdk/2.10.18@#ed9788e9d202d6eadd92581368ddfc2f"
@@ -92,10 +92,10 @@ conan_cmake_install(PATH_OR_REFERENCE .
 include(${CMAKE_CURRENT_BINARY_DIR}/conan_paths.cmake)
 
 find_package(absl REQUIRED)
-find_package(Boost 1.78.0 REQUIRED)
+find_package(Boost 1.79.0 REQUIRED)
 find_package(Catch2 REQUIRED)
 find_package(FlatBuffers REQUIRED)
-find_package(Protobuf 3.19.1 REQUIRED)
+find_package(Protobuf 3.20.0 REQUIRED)
 find_package(RapidJSON REQUIRED)
 find_package(ZLIB REQUIRED)
 find_package(ZeroMQ REQUIRED)
@@ -106,15 +106,6 @@ find_package(fmt REQUIRED)
 find_package(hiredis REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(readerwriterqueue REQUIRED)
-
-# Pistache - Conan version is out of date and doesn't support clang
-FetchContent_Declare(pistache_ext
-    GIT_REPOSITORY "https://github.com/pistacheio/pistache.git"
-    GIT_TAG "ff9db0d9439a4411b24541d97a937968f384a4d3"
-)
-
-FetchContent_MakeAvailable(pistache_ext)
-add_library(pistache::pistache ALIAS pistache_static)
 
 # zstd (Conan version not customizable enough)
 set(ZSTD_BUILD_CONTRIB OFF CACHE INTERNAL "")
@@ -133,7 +124,7 @@ set(ZSTD_LZ4_SUPPORT OFF CACHE INTERNAL "")
 
 FetchContent_Declare(zstd_ext
     GIT_REPOSITORY "https://github.com/facebook/zstd"
-    GIT_TAG "v1.5.1"
+    GIT_TAG "v1.5.2"
     SOURCE_SUBDIR "build/cmake"
 )
 
@@ -201,7 +192,6 @@ target_link_libraries(faabric_common_dependencies INTERFACE
     cppzmq::cppzmq
     flatbuffers::flatbuffers
     hiredis::hiredis
-    pistache::pistache
     protobuf::libprotobuf
     RapidJSON::RapidJSON
     readerwriterqueue::readerwriterqueue

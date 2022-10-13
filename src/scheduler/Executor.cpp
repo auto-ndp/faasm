@@ -94,6 +94,7 @@ void Executor::shutdown()
 
         // Wait for thread to terminate
         if (threadPoolThreads[i]->joinable()) {
+            threadPoolThreads[i]->request_stop();
             threadPoolThreads[i]->join();
         }
 

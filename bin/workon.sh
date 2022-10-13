@@ -33,14 +33,7 @@ pushd ${PROJ_ROOT}>>/dev/null
 # ----------------------------
 
 if [ ! -d ${VENV_PATH} ]; then
-    python3 -m venv ${VENV_PATH}
-    (
-        source ${VENV_PATH}/bin/activate
-        pip install -U pip
-        pip install -U setuptools
-        pip install -U wheel
-        pip install -r requirements.txt
-    )
+    ${PROJ_ROOT}/bin/create_venv.sh
 fi
 
 export VIRTUAL_ENV_DISABLE_PROMPT=1

@@ -171,6 +171,40 @@ class FunctionMigrationThread : public faabric::util::PeriodicBackgroundThread
 };
 
 /**
+ * A promise for a future message result with an associated eventfd for use with
+ * asio.
+ */
+class MessageLocalResult final
+{
+  public:
+    std::promise<std::unique_ptr<faabric::Message>> promise;
+    int eventFd = -1;
+
+    MessageLocalResult();
+
+    MessageLocalResult(const MessageLocalResult&) = delete;
+
+    inline MessageLocalResult(MessageLocalResult&& other)
+    {
+        this->operator=(std::move(other));
+    }
+
+    MessageLocalResult& operator=(const MessageLocalResult&) = delete;
+
+    inline MessageLocalResult& operator=(MessageLocalResult&& other)
+    {
+        this->promise = std::move(other.promise);
+        this->eventFd = other.eventFd;
+        other.eventFd = -1;
+        return *this;
+    }
+
+    ~MessageLocalResult();
+
+    void setValue(std::unique_ptr<faabric::Message>&& msg);
+};
+
+/**
  * Background thread that periodically checks to see if any executors have
  * become stale (i.e. not handled any requests in a given timeout). If any are
  * found, they are removed.
@@ -265,6 +299,12 @@ class Scheduler
     faabric::Message getFunctionResult(unsigned int messageId,
                                        int timeoutMs,
                                        const MessageRecord& caller = {});
+
+    void getFunctionResultAsync(unsigned int messageId,
+                                int timeoutMs,
+                                asio::io_context& ioc,
+                                asio::any_io_executor& executor,
+                                std::function<void(faabric::Message&)> handler);
 
     void getFunctionResultAsync(unsigned int messageId,
                                 int timeoutMs,

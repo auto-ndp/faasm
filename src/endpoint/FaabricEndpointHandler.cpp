@@ -14,6 +14,9 @@ thread_local bool registered_with_tracy = false;
 
 using header = beast::http::field;
 
+
+using header = beast::http::field;
+
 void FaabricEndpointHandler::onRequest(
   HttpRequestContext&& ctx,
   faabric::util::BeastHttpRequest&& request)
@@ -126,7 +129,7 @@ void FaabricEndpointHandler::executeFunction(
         msg->set_executeslocally(true);
     }
 
-    auto tid = (pid_t)syscall(SYS_gettid);
+    auto tid = gettid();
     const std::string funcStr = faabric::util::funcToString(msg, true);
     SPDLOG_DEBUG("Worker HTTP thread {} scheduling {}", tid, funcStr);
 
@@ -167,17 +170,11 @@ void FaabricEndpointHandler::onFunctionResult(
                                   : beast::http::status::internal_server_error;
     response.result(statusCode);
     SPDLOG_DEBUG("Worker thread {} result {}",
-                 (pid_t)syscall(SYS_gettid),
+                 gettid(),
                  faabric::util::funcToString(result, true));
 
     response.body() = result.outputdata();
     return ctx.sendFunction(std::move(response));
-    /*
-    } catch (faabric::redis::RedisNoResponseException& ex) {
-        response.result(beast::http::status::internal_server_error);
-        response.body() = "No response from function\n";
-        return ctx.sendFunction(std::move(response));
-    }*/
 }
 
 }

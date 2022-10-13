@@ -9,6 +9,7 @@ on:
 
 defaults:
   run:
+    working-directory: /code/faabric
     shell: bash
 
 jobs:
@@ -16,50 +17,47 @@ jobs:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     container:
-      image: faasm/faabric:0.3.3
-    defaults:
-      run:
-        working-directory: /code/faabric
+      image: faasm/faabric:0.3.5
     steps:
       - uses: faasm/conan-cache-action@v1
         with:
            directory: /code/faabric
       - name: "Build dependencies to be shared by all runs"
-        run: inv dev.cmake -b Debug
+        run: ./bin/inv_wrapper.sh dev.cmake -b Debug
 
   docs:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     container:
-      image: faasm/faabric:0.3.3
-    defaults:
-      run:
-        working-directory: /code/faabric
+      image: faasm/faabric:0.3.5
     steps:
       - name: "Fetch ref"
         run: git fetch origin ${GITHUB_REF}:ci-branch
       - name: "Check out branch"
         run: git checkout --force ci-branch
       - name: "Build docs"
-        run: inv docs
+        run: ./bin/inv_wrapper.sh docs
 
   formatting:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     container:
-      image: faasm/faabric:0.3.3
-    defaults:
-      run:
-        working-directory: /code/faabric
+      image: faasm/faabric:0.3.5
     steps:
       # --- Code update ---
       - name: "Fetch ref"
         run: git fetch origin ${GITHUB_REF}:ci-branch
       - name: "Check out branch"
         run: git checkout --force ci-branch
+      - name: "Update python deps"
+        run: |
+          source venv/bin/activate
+          pip3 install -r requirements.txt
       # --- Formatting checks ---
       - name: "Python formatting check"
-        run: ./bin/check_python.sh
+        run: |
+          source venv/bin/activate
+          ./bin/check_python.sh
       - name: "Run C/C++ formatting"
         run: ./bin/run_clang_format.sh
       - name: "Check C/C++ formatting changes"
@@ -81,11 +79,8 @@ jobs:
       TSAN_OPTIONS: "verbosity=1:halt_on_error=1:suppressions=/code/faabric/thread-sanitizer-ignorelist.txt:history_size=7"
       UBSAN_OPTIONS: "print_stacktrace=1:halt_on_error=1"
     container:
-      image: faasm/faabric:0.3.3
+      image: faasm/faabric:0.3.5
       options: --privileged
-    defaults:
-      run:
-        working-directory: /code/faabric
     services:
       redis:
         image: redis
@@ -96,9 +91,9 @@ jobs:
       - name: "Ping redis"
         run: redis-cli -h redis ping
       - name: "Run cmake for tests"
-        run: inv dev.cmake --build=Debug --sanitiser ${{ matrix.sanitiser }}
+        run: ./bin/inv_wrapper.sh dev.cmake --build=Debug --sanitiser ${{ matrix.sanitiser }}
       - name: "Build tests"
-        run: inv dev.cc faabric_tests
+        run: ./bin/inv_wrapper.sh dev.cc faabric_tests
       - name: "Run tests"
         run: ./bin/faabric_tests
         working-directory: /build/faabric/static
@@ -109,6 +104,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CONAN_CACHE_MOUNT_SOURCE: ~/.conan/
+    defaults:
+      run:
+        working-directory: ${{ github.workspace }}
     steps:
       # --- Code update ---
       - name: "Check out code"
@@ -131,10 +129,7 @@ jobs:
       REDIS_QUEUE_HOST: redis
       REDIS_STATE_HOST: redis
     container:
-      image: faasm/faabric:0.3.3
-    defaults:
-      run:
-        working-directory: /code/faabric
+      image: faasm/faabric:0.3.5
     services:
       redis:
         image: redis
@@ -144,12 +139,12 @@ jobs:
           build-type: "release"
           directory: /code/faabric
       - name: "Run cmake shared"
-        run: inv dev.cmake --shared --build=Release
+        run: ./bin/inv_wrapper.sh dev.cmake --shared --build=Release
       - name: "Build Faabric shared library"
-        run: inv dev.cc faabric --shared
+        run: ./bin/inv_wrapper.sh dev.cc faabric --shared
       - name: "Install Faabric shared library"
-        run: inv dev.install faabric --shared
+        run: ./bin/inv_wrapper.sh dev.install faabric --shared
       - name: "Build examples"
-        run: inv examples
+        run: ./bin/inv_wrapper.sh examples
       - name: "Run example to check"
-        run: inv examples.execute check
+        run: ./bin/inv_wrapper.sh examples.execute check

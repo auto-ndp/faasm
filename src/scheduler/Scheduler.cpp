@@ -49,20 +49,20 @@ static thread_local std::unordered_map<std::string,
 
 MessageLocalResult::MessageLocalResult()
 {
-    event_fd = eventfd(0, EFD_CLOEXEC);
+    eventFd = eventfd(0, EFD_CLOEXEC);
 }
 
 MessageLocalResult::~MessageLocalResult()
 {
-    if (event_fd >= 0) {
-        close(event_fd);
+    if (eventFd >= 0) {
+        close(eventFd);
     }
 }
 
-void MessageLocalResult::set_value(std::unique_ptr<faabric::Message>&& msg)
+void MessageLocalResult::setValue(std::unique_ptr<faabric::Message>&& msg)
 {
     this->promise.set_value(std::move(msg));
-    eventfd_write(this->event_fd, (eventfd_t)1);
+    eventfd_write(this->eventFd, (eventfd_t)1);
 }
 
 Scheduler& getScheduler()
@@ -1258,7 +1258,7 @@ void Scheduler::setFunctionResult(std::unique_ptr<faabric::Message> msg)
 
         auto it = localResults.find(msg->id());
         if (it != localResults.end()) {
-            it->second->set_value(std::move(msg));
+            it->second.set_value(std::make_unique<faabric::Message>(msg));
         }
 
         return;
@@ -1523,21 +1523,25 @@ void Scheduler::getFunctionResultAsync(
 
     do {
         std::shared_ptr<MessageLocalResult> mlr;
+        // Try to find matching local promise
         {
             faabric::util::UniqueLock resultsLock(localResultsMutex);
             auto it = localResults.find(messageId);
             if (it == localResults.end()) {
-                break; // fallback to redis
+                break; // Fallback to redis
             }
             mlr = it->second;
         }
-        struct MlrAwaiter : public std::enable_shared_from_this<MlrAwaiter>
+        // Asio wrapper for the MLR eventfd
+        class MlrAwaiter : public std::enable_shared_from_this<MlrAwaiter>
         {
+          public:
             unsigned int messageId;
             Scheduler* sched;
             std::shared_ptr<MessageLocalResult> mlr;
             asio::posix::stream_descriptor dsc;
             std::function<void(faabric::Message&)> handler;
+
             MlrAwaiter(unsigned int messageId,
                        Scheduler* sched,
                        std::shared_ptr<MessageLocalResult> mlr,
@@ -1548,9 +1552,15 @@ void Scheduler::getFunctionResultAsync(
               , mlr(std::move(mlr))
               , dsc(std::move(dsc))
               , handler(handler)
+            {}
+
+            ~MlrAwaiter()
             {
+                // Ensure that Asio doesn't close the eventfd, to prevent a
+                // double-close in the MLR destructor
+                dsc.release();
             }
-            ~MlrAwaiter() { dsc.release(); }
+
             void await(const boost::system::error_code& ec)
             {
                 if (!ec) {
@@ -1562,9 +1572,13 @@ void Scheduler::getFunctionResultAsync(
                         sched->localResults.erase(messageId);
                     }
                 } else {
+                    // The waiting task can spuriously wake up, requeue if this
+                    // happens
                     doAwait();
                 }
             }
+
+            // Schedule this task waiting on the eventfd in the Asio queue
             void doAwait()
             {
                 dsc.async_wait(asio::posix::stream_descriptor::wait_read,
@@ -1576,13 +1590,14 @@ void Scheduler::getFunctionResultAsync(
           messageId,
           this,
           mlr,
-          asio::posix::stream_descriptor(ioc, mlr->event_fd),
+          asio::posix::stream_descriptor(ioc, mlr->eventFd),
           std::move(handler));
         awaiter->doAwait();
         return;
     } while (0);
 
-    // TODO: Non-blocking redis
+    // TODO: Use a non-blocking redis API here to avoid stalling the async
+    // worker thread
     redis::Redis& redis = redis::Redis::getQueue();
     TracyMessageL("Got redis queue");
 
