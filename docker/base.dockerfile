@@ -8,6 +8,7 @@ FROM kubasz51/faasm-cpython:0.1.5 as python
 FROM kubasz51/faasm-faabric-base:0.4.1
 ARG FAASM_VERSION
 
+ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
     && apt-get upgrade --yes --no-install-recommends \
     && apt-get install --yes --no-install-recommends \
