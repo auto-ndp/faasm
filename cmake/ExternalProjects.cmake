@@ -71,15 +71,11 @@ message(STATUS "OpenSSL Crypto lib file: ${OPENSSL_CRYPTO_LIBFILE}")
 # https://github.com/aws/aws-sdk-cpp/blob/main/Docs/CMake_External_Project.md
 # but they don't specify how to link the libraries, which required adding an
 # extra couple of CMake targets.
-# There are some AWS docs on using the cpp sdk as an external project:
-# https://github.com/aws/aws-sdk-cpp/blob/main/Docs/CMake_External_Project.md
-# but they don't specify how to link the libraries, which required adding an
-# extra couple of CMake targets.
 set(AWS_CORE_LIBRARY ${CMAKE_INSTALL_PREFIX}/lib/libaws-cpp-sdk-core.a)
 set(AWS_S3_LIBRARY ${CMAKE_INSTALL_PREFIX}/lib/libaws-cpp-sdk-s3.a)
 ExternalProject_Add(aws_ext
     GIT_REPOSITORY   "https://github.com/aws/aws-sdk-cpp.git"
-    GIT_TAG          "eb196d341ee70368d84c4231a7b2c08abf0cca00"
+    GIT_TAG          "a47c163630a4d4e62cd3c42e9c391c954be80664"
     BUILD_ALWAYS     0
     TEST_COMMAND     ""
     UPDATE_COMMAND   ""
@@ -126,7 +122,7 @@ add_library(AWS::s3 ALIAS aws_ext_s3_lib)
 # Tightly-coupled dependencies
 FetchContent_Declare(wamr_ext
     GIT_REPOSITORY "https://github.com/faasm/wasm-micro-runtime"
-    GIT_TAG "78274abbaa34a9b68af7d1fbe71e7b66d9d3ca02"
+    GIT_TAG "caef0bc4db394b2d603066cc8b1a1cf5731e1b62"
 )
 
 # WAMR and WAVM both link to LLVM

@@ -17,13 +17,13 @@ RUN apt-get update \
     && apt-get autoremove --yes
 
 # Install wabt
-# TODO - pin this to a release
-RUN git clone --depth 1 https://github.com/WebAssembly/wabt/ /tmp/wabt
-WORKDIR /tmp/wabt/build
-RUN cmake -GNinja -DBUILD_TESTS=OFF -DBUILD_LIBWASM=OFF ..
-RUN ninja install
-WORKDIR /
-RUN rm -r /tmp/wabt
+RUN git clone -b 1.0.29 --depth 1 https://github.com/WebAssembly/wabt/ /tmp/wabt \
+    && mkdir -p /tmp/wabt/build \
+    && cd /tmp/wabt/build \
+    && cmake -GNinja -DBUILD_TESTS=OFF -DBUILD_LIBWASM=OFF .. \
+    && ninja install \
+    && cd / \
+    && rm -r /tmp/wabt
 
 # Python set-up
 WORKDIR /usr/local/code/faasm

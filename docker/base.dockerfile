@@ -31,34 +31,32 @@ COPY --from=faabric /root/.conan /root/.conan
 COPY --from=python /usr/local/faasm/runtime_root /usr/local/faasm/runtime_root
 
 # Check out code (clean beforehand just in case)
-WORKDIR /usr/local/code
-RUN rm -rf faasm
-RUN git clone \
-    --depth 1 \
-    -b v${FAASM_VERSION} \
-    https://github.com/auto-ndp/faasm
-WORKDIR /usr/local/code/faasm
-
-RUN git submodule update --init --depth 1
+RUN rm -rf /usr/local/code/faasm \
+    && git clone \
+    	--depth 1 \
+        -b v${FAASM_VERSION} \
+    	https://github.com/auto-ndp/faasm \
+        /usr/local/code/faasm \
+    && cd /usr/local/code/faasm \
+    && git submodule update --init
 
 # Set up runtime filesystem
-RUN mkdir -p /usr/local/faasm/runtime_root/etc
-RUN cp deploy/conf/hosts /usr/local/faasm/runtime_root/etc/
-RUN cp deploy/conf/resolv.conf /usr/local/faasm/runtime_root/etc/
-RUN cp deploy/conf/passwd /usr/local/faasm/runtime_root/etc/
-RUN mkdir -p /usr/local/faasm/runtime_root/tmp
-RUN mkdir -p /usr/local/faasm/runtime_root/share
+RUN mkdir -p /usr/local/faasm/runtime_root/etc \
+    && cp /usr/local/code/faasm/deploy/conf/hosts /usr/local/faasm/runtime_root/etc/ \
+    && cp /usr/local/code/faasm/deploy/conf/resolv.conf /usr/local/faasm/runtime_root/etc/ \
+    && cp /usr/local/code/faasm/deploy/conf/passwd /usr/local/faasm/runtime_root/etc/ \
+    && mkdir -p /usr/local/faasm/runtime_root/tmp \
+    && mkdir -p /usr/local/faasm/runtime_root/share
 
-# Out of tree build
-WORKDIR /build/faasm
-
-# Build the basics here to set up the CMake build
-RUN cmake \
-    -GNinja \
-    -DCMAKE_CXX_COMPILER=/usr/bin/clang++-13 \
-    -DCMAKE_C_COMPILER=/usr/bin/clang-13 \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DFAASM_SGX_MODE=Disabled \
-    /usr/local/code/faasm
-
-RUN cmake --build . --target tests func_runner func_sym codegen_func codegen_shared_obj pool_runner upload
+# Out of tree clean build of the basic targets
+RUN rm -rf /build/faasm \
+    && mkdir -p /build/faasm \
+    && cd /build/faasm \
+    && cmake \
+        -GNinja \
+        -DCMAKE_CXX_COMPILER=/usr/bin/clang++-13 \
+        -DCMAKE_C_COMPILER=/usr/bin/clang-13 \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DFAASM_SGX_MODE=Disabled \
+        /usr/local/code/faasm \
+    && cmake --build . --target tests func_runner func_sym codegen_func codegen_shared_obj pool_runner upload
