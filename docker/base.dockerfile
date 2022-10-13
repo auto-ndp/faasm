@@ -1,11 +1,11 @@
 # Stage to copy Conan cache
-FROM kubasz51/faasm-faabric:0.4.0 as faabric
+FROM kubasz51/faasm-faabric:0.4.1 as faabric
 
 # Stage to extract Python runtime files
 FROM kubasz51/faasm-cpython:0.1.5 as python
 
 # Note - we don't often rebuild faabric-base so this dep may be behind
-FROM kubasz51/faasm-faabric-base:0.4.0
+FROM kubasz51/faasm-faabric-base:0.4.1
 ARG FAASM_VERSION
 
 RUN apt-get update \
