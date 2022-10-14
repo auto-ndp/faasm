@@ -72,7 +72,7 @@ class FaasmConfig
 
     void reset();
 
-    void print();
+    void print() const;
 
   private:
     int getIntParam(const char* name, const char* defaultValue);

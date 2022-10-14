@@ -125,7 +125,7 @@ void FaasmConfig::reset()
     this->initialise();
 }
 
-void FaasmConfig::print()
+void FaasmConfig::print() const
 {
     SPDLOG_INFO("--- HOST ---");
     SPDLOG_INFO("VM arena mode:        {}",

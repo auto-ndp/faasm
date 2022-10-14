@@ -4,9 +4,13 @@
 #include <string>
 #include <vector>
 
+/*
 #include <aws/core/Aws.h>
 #include <aws/core/auth/AWSCredentialsProvider.h>
 #include <aws/s3/S3Client.h>
+*/
+
+#include <rados/librados.h>
 
 #include <conf/FaasmConfig.h>
 
@@ -58,9 +62,12 @@ class S3Wrapper
     std::string getKeyStr(const std::string& bucketName,
                           const std::string& keyName);
 
+    static rados_t cluster;
   private:
     const conf::FaasmConfig& faasmConf;
+    /*
     Aws::Client::ClientConfiguration clientConf;
     Aws::S3::S3Client client;
+    */
 };
 }
