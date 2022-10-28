@@ -18,7 +18,7 @@ endif()
 
 include(${CMAKE_CURRENT_BINARY_DIR}/conan.cmake)
 
-conan_check(VERSION 1.51.3 REQUIRED)
+conan_check(VERSION 1.52.0 REQUIRED)
 
 # Enable revisions in the conan config
 execute_process(COMMAND ${CONAN_CMD} config set general.revisions_enabled=1
@@ -29,7 +29,7 @@ endif()
 
 conan_cmake_configure(
     REQUIRES
-        "catch2/2.13.7@#31c8cd08e3c957a9eac8cb1377cf5863"
+        "catch2/2.13.9@#8793d3e6287d3684201418de556d98fe"
         "mimalloc/2.0.6@#ca9e081f2a1d78eb2b70c6d2270b56d7"
         "openssl/3.0.5@#40f4488f02b36c1193b68f585131e8ef"
         # These two dependencies are only needed to perform remote attestation
@@ -122,7 +122,7 @@ add_library(AWS::s3 ALIAS aws_ext_s3_lib)
 # Tightly-coupled dependencies
 FetchContent_Declare(wamr_ext
     GIT_REPOSITORY "https://github.com/faasm/wasm-micro-runtime"
-    GIT_TAG "caef0bc4db394b2d603066cc8b1a1cf5731e1b62"
+    GIT_TAG "18af89dee49ee2a4148d5993669ce12f3b00941b"
 )
 
 # WAMR and WAVM both link to LLVM
