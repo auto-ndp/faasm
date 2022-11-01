@@ -7,20 +7,57 @@ services:
   redis-queue:
     image: kubasz51/faasm-redis:${REDIS_VERSION}
 
-  minio:
-    image: kubasz51/faasm-minio:${FAASM_VERSION}
-    ports:
-      - "9000:9000"
-    environment:
-      MINIO_ROOT_USER: minio
-      MINIO_ROOT_PASSWORD: minio123
+  # minio:
+  #   image: kubasz51/faasm-minio:${FAASM_VERSION}
+  #   ports:
+  #     - "9000:9000"
+  #   environment:
+  #     MINIO_ROOT_USER: minio
+  #     MINIO_ROOT_PASSWORD: minio123
+  #   volumes:
+  #     - ./dev/minio/data:/data/minio
+  #   healthcheck:
+  #     test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
+  #     interval: 5s
+  #     timeout: 3s
+  #     retries: 3
+
+  ceph-mon1:
+    image: kubasz51/faasm-ceph:${FAASM_VERSION}
+    hostname: ceph-mon1
+    entrypoint: ["/usr/bin/tini-static", "/bin/bash", "/usr/local/code/faasm/bin/run_ceph_mon.sh"]
     volumes:
-      - ./dev/minio/data:/data/minio
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
-      interval: 5s
-      timeout: 3s
-      retries: 3
+      - ./:/usr/local/code/faasm/
+      - ./deploy/conf/ceph/ceph.conf:/etc/ceph/ceph.conf:ro
+      - ${FAASM_BUILD_DIR}:${FAASM_BUILD_MOUNT}
+      - ./dev/faasm-local/:/usr/local/faasm/
+      - /sys/kernel/debug:/sys/kernel/debug
+      - /sys/kernel/debug/tracing:/sys/kernel/debug/tracing
+    restart: on-failure
+
+  ceph-osd1: &ceph-osd1
+    image: kubasz51/faasm-ceph:${FAASM_VERSION}
+    hostname: ceph-osd1
+    entrypoint: ["/usr/bin/tini-static", "/bin/bash", "/usr/local/code/faasm/bin/run_ceph_osd.sh"]
+    depends_on:
+      - ceph-mon1
+    volumes:
+      - ./:/usr/local/code/faasm/
+      - ./deploy/conf/ceph/ceph.conf:/etc/ceph/ceph.conf:ro
+      - ${FAASM_BUILD_DIR}:${FAASM_BUILD_MOUNT}
+      - ./dev/faasm-local/:/usr/local/faasm/
+      - /sys/kernel/debug:/sys/kernel/debug
+      - /sys/kernel/debug/tracing:/sys/kernel/debug/tracing
+      - /dev:/dev
+    restart: on-failure
+
+  ceph-osd2:
+    <<: *ceph-osd1
+    hostname: ceph-osd2
+
+  ceph-osd3:
+    <<: *ceph-osd1
+    hostname: ceph-osd3
 
   upload:
     image: kubasz51/faasm-upload:${FAASM_VERSION}
@@ -31,11 +68,15 @@ services:
     depends_on:
       - redis-queue
       - redis-state
-      - minio
+      - ceph-mon1
+      - ceph-osd1
+      - ceph-osd2
+      - ceph-osd3
     restart: on-failure
     volumes:
       - ./:/usr/local/code/faasm/
       - ${FAASM_BUILD_DIR}:${FAASM_BUILD_MOUNT}
+      - ./deploy/conf/ceph/ceph.conf:/etc/ceph/ceph.conf:ro
       - ./dev/faasm-local/wasm/:/usr/local/faasm/wasm
       - ./dev/faasm-local/object/:/usr/local/faasm/object
       - /sys/kernel/debug:/sys/kernel/debug
@@ -78,6 +119,7 @@ services:
     volumes:
       - ./:/usr/local/code/faasm/
       - /tmp/faasm-monitor:/var/faasm-monitor
+      - ./deploy/conf/ceph/ceph.conf:/etc/ceph/ceph.conf:ro
       - ${FAASM_BUILD_DIR}:${FAASM_BUILD_MOUNT}
       - ./dev/faasm-local/:${FAASM_LOCAL_MOUNT}
       - aesmd-socket:/var/run/aesmd
@@ -127,6 +169,7 @@ services:
     volumes:
       - ./:/usr/local/code/faasm/
       - /tmp/faasm-monitor:/var/faasm-monitor
+      - ./deploy/conf/ceph/ceph.conf:/etc/ceph/ceph.conf:ro
       - ${FAASM_BUILD_DIR}:${FAASM_BUILD_MOUNT}
       - ./dev/faasm-local/:${FAASM_LOCAL_MOUNT}
       - aesmd-socket:/var/run/aesmd
@@ -173,6 +216,7 @@ services:
     volumes:
       - ./clients/cpp:/code/cpp
       - ./dev/faasm-local/:${FAASM_LOCAL_MOUNT}
+      - ./deploy/conf/ceph/ceph.conf:/etc/ceph/ceph.conf:ro
 
   # Python functions
   python:
@@ -183,6 +227,7 @@ services:
     volumes:
       - ./clients/python:/code/python
       - ./dev/faasm-local/:${FAASM_LOCAL_MOUNT}
+      - ./deploy/conf/ceph/ceph.conf:/etc/ceph/ceph.conf:ro
 
   # Faasm dev
   faasm-cli:
@@ -194,7 +239,10 @@ services:
     depends_on:
       - redis-state
       - redis-queue
-      - minio
+      - ceph-mon1
+      - ceph-osd1
+      - ceph-osd2
+      - ceph-osd3
     environment:
       - UPLOAD_HOST=${UPLOAD_HOST:-upload}
       - INVOKE_HOST=${INVOKE_HOST:-worker}
@@ -213,6 +261,7 @@ services:
     volumes:
       - ./:/usr/local/code/faasm/
       - ${FAASM_BUILD_DIR}:${FAASM_BUILD_MOUNT}
+      - ./deploy/conf/ceph/ceph.conf:/etc/ceph/ceph.conf:ro
       - ./dev/faasm-local/:${FAASM_LOCAL_MOUNT}
       - ${CONAN_CACHE_MOUNT_SOURCE}:/root/.conan
       - aesmd-socket:/var/run/aesmd
@@ -240,7 +289,10 @@ services:
     depends_on:
       - redis-queue
       - redis-state
-      - minio
+      - ceph-mon1
+      - ceph-osd1
+      - ceph-osd2
+      - ceph-osd3
       - upload
     environment:
       - LD_LIBRARY_PATH=/usr/local/lib

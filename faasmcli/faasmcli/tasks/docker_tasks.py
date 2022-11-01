@@ -25,6 +25,7 @@ CONTAINER_NAME2FILE_MAP = {
     "base-runtime": "base-runtime.dockerfile",
     "base-sgx": "base-sgx.dockerfile",
     "base-sgx-sim": "base-sgx.dockerfile",
+    "ceph": "ceph.dockerfile",
     "upload": "upload.dockerfile",
     "worker": "worker.dockerfile",
     "worker-sgx": "worker.dockerfile",
