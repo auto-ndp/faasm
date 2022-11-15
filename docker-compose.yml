@@ -168,7 +168,7 @@ services:
     privileged: true
     volumes:
       - ./:/usr/local/code/faasm/
-      - /tmp/faasm-monitor:/var/faasm-monitor
+      - /tmp/faasm-monitor-storage:/var/faasm-monitor
       - ./deploy/conf/ceph/ceph.conf:/etc/ceph/ceph.conf:ro
       - ${FAASM_BUILD_DIR}:${FAASM_BUILD_MOUNT}
       - ./dev/faasm-local/:${FAASM_LOCAL_MOUNT}
