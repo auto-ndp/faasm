@@ -9,10 +9,7 @@ NODE_CEPH_DIR="/usr/local/faasm/ceph-$(hostname)"
 MON_CEPH_DIR="/usr/local/faasm/ceph-ceph-mon1"
 
 mkdir -p "${NODE_CEPH_DIR}"
-mkdir -p "${NODE_CEPH_DIR}"/data
-mkdir -p "${NODE_CEPH_DIR}"/journal
-
-chown -R ceph:ceph /var/lib/ceph "${NODE_CEPH_DIR}"/data "${NODE_CEPH_DIR}"/journal
+chown -R ceph:ceph /var/lib/ceph
 
 while [[ ! -e "${MON_CEPH_DIR}/ceph.mon.keyring" ]]; do
     echo "Waiting for monitor keyring"
