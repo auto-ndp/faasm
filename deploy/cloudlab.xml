@@ -1,0 +1,84 @@
+<rspec xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:jacks="http://www.protogeni.net/resources/rspec/ext/jacks/1" xmlns:client="http://www.protogeni.net/resources/rspec/ext/client/1" xmlns:emulab="http://www.protogeni.net/resources/rspec/ext/emulab/1" xmlns="http://www.geni.net/resources/rspec/3" xsi:schemaLocation="http://www.geni.net/resources/rspec/3 http://www.geni.net/resources/rspec/3/request.xsd" type="request">
+    <rspec_tour xmlns="http://www.protogeni.net/resources/rspec/ext/apt-tour/1">
+        <description type="markdown">Experiment configuration for the AutoNDP NDP-enabled Faasm runtime</description>
+    </rspec_tour>
+    <!-- controller & load generator node -->
+    <node client_id="loadgen" exclusive="true">
+        <sliver_type name="raw">
+            <disk_image name="urn:publicid:IDN+emulab.net+image+emulab-ops//UBUNTU22-64-BETA" />
+        </sliver_type>
+        <hardware_type name="x86_64" />
+        <interface client_id="loadgen:interface-6" />
+    </node>
+    <!-- CEPH Object storage -->
+    <node client_id="ceph-mon1" exclusive="true">
+        <sliver_type name="raw">
+            <disk_image name="urn:publicid:IDN+emulab.net+image+emulab-ops//UBUNTU22-64-BETA" />
+        </sliver_type>
+        <hardware_type name="x86_64" />
+        <interface client_id="ceph-mon1:interface-1" />
+    </node>
+    <node client_id="ceph-osd1" exclusive="true">
+        <sliver_type name="raw">
+            <disk_image name="urn:publicid:IDN+emulab.net+image+emulab-ops//UBUNTU22-64-BETA" />
+        </sliver_type>
+        <hardware_type name="x86_64" />
+        <interface client_id="ceph-osd1:interface-4" />
+    </node>
+    <node client_id="ceph-osd2" exclusive="true">
+        <sliver_type name="raw">
+            <disk_image name="urn:publicid:IDN+emulab.net+image+emulab-ops//UBUNTU22-64-BETA" />
+        </sliver_type>
+        <hardware_type name="x86_64" />
+        <interface client_id="ceph-osd2:interface-8" />
+    </node>
+    <node client_id="ceph-osd3" exclusive="true">
+        <sliver_type name="raw">
+            <disk_image name="urn:publicid:IDN+emulab.net+image+emulab-ops//UBUNTU22-64-BETA" />
+        </sliver_type>
+        <hardware_type name="x86_64" />
+        <interface client_id="ceph-osd3:interface-2" />
+    </node>
+    <!-- Faasm nodes -->
+    <node client_id="faasm-state" exclusive="true">
+        <!-- upload, redis-state, redis-queue -->
+        <sliver_type name="raw">
+            <disk_image name="urn:publicid:IDN+emulab.net+image+emulab-ops//UBUNTU22-64-BETA" />
+        </sliver_type>
+        <hardware_type name="x86_64" />
+        <interface client_id="faasm-state:interface-5" />
+    </node>
+    <node client_id="faasm-worker1" exclusive="true">
+        <sliver_type name="raw">
+            <disk_image name="urn:publicid:IDN+emulab.net+image+emulab-ops//UBUNTU22-64-BETA" />
+        </sliver_type>
+        <hardware_type name="x86_64" />
+        <interface client_id="faasm-worker1:interface-0" />
+    </node>
+    <node client_id="faasm-worker2" exclusive="true">
+        <sliver_type name="raw">
+            <disk_image name="urn:publicid:IDN+emulab.net+image+emulab-ops//UBUNTU22-64-BETA" />
+        </sliver_type>
+        <hardware_type name="x86_64" />
+        <interface client_id="faasm-worker2:interface-3" />
+    </node>
+    <node client_id="faasm-worker3" exclusive="true">
+        <sliver_type name="raw">
+            <disk_image name="urn:publicid:IDN+emulab.net+image+emulab-ops//UBUNTU22-64-BETA" />
+        </sliver_type>
+        <hardware_type name="x86_64" />
+        <interface client_id="faasm-worker3:interface-7" />
+    </node>
+    <link client_id="link-0">
+        <interface_ref client_id="faasm-worker1:interface-0" />
+        <interface_ref client_id="ceph-mon1:interface-1" />
+        <interface_ref client_id="ceph-osd3:interface-2" />
+        <interface_ref client_id="faasm-worker2:interface-3" />
+        <interface_ref client_id="ceph-osd1:interface-4" />
+        <interface_ref client_id="faasm-state:interface-5" />
+        <interface_ref client_id="loadgen:interface-6" />
+        <interface_ref client_id="faasm-worker3:interface-7" />
+        <interface_ref client_id="ceph-osd2:interface-8" />
+        <jacks:site id="undefined" />
+    </link>
+</rspec>
