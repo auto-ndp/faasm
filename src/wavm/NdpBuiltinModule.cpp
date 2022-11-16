@@ -19,6 +19,7 @@
 #include <faabric/util/logging.h>
 #include <faabric/util/memory.h>
 #include <faabric/util/timing.h>
+#include <storage/S3Wrapper.h>
 #include <wasm/WasmExecutionContext.h>
 #include <wasm/ndp.h>
 
@@ -46,64 +47,43 @@ static std::string userObjectPath(const std::string& user,
 static int ndpGet(NDPBuiltinModule& module, faabric::Message& msg)
 {
     ZoneScopedN("NdpBuiltinModule::ndpGet");
+    static storage::S3Wrapper s3w;
     const auto& inputData = msg.inputdata();
     auto args = BuiltinNdpGetArgs::fromBytes(
       std::span(BYTES_CONST(inputData.data()), inputData.size()));
-    TracyMessageL("Parsed input");
-    std::string objPath = userObjectPath(msg.user(), args.key);
-    if (!fs::exists(objPath)) {
-        SPDLOG_WARN("NDP GET file {} doesn't exist", objPath);
+    const std::string key = faabric::util::bytesToString(args.key);
+
+    std::string* outdata = msg.mutable_outputdata();
+
+    try {
+        s3w.getKeyPartIntoStr(
+          msg.user(), key, args.offset, args.uptoBytes, *outdata);
+    } catch (const std::runtime_error& err) {
+        SPDLOG_WARN("NDP GET file {}/{} couldn't be read", msg.user(), key);
         return 1;
     }
-    TracyMessageL("Checked file existance");
 
-    int fd = open(objPath.c_str(), O_RDONLY);
-    if (fd < 0) {
-        throw std::runtime_error("Couldn't open file " + objPath);
-    }
-    struct stat statbuf;
-    int staterr = fstat(fd, &statbuf);
-    if (staterr < 0) {
-        throw std::runtime_error("Couldn't stat file " + objPath);
-    }
-    size_t fsize = statbuf.st_size;
-    args.offset = std::min(fsize, args.offset);
-    args.uptoBytes = std::min(args.uptoBytes, fsize - args.offset);
-    posix_fadvise(fd, args.offset, args.uptoBytes, POSIX_FADV_SEQUENTIAL);
-    std::string* outdata = msg.mutable_outputdata();
-    outdata->resize(fsize, '\0');
-    lseek(fd, args.offset, SEEK_SET);
-    int cpos = 0;
-    while (cpos < args.uptoBytes) {
-        int rc = read(fd, outdata->data() + cpos, args.uptoBytes - cpos);
-        if (rc < 0) {
-            perror("Couldn't read file");
-            throw std::runtime_error("Couldn't read file " + objPath);
-        } else {
-            cpos += rc;
-        }
-    }
-    close(fd);
-
-    TracyMessageL("Read file to bytes");
-    SPDLOG_DEBUG("NDP GET from file {} "
-                "[bytes={}, args.offset={}, uptoBytes={}]",
-                objPath,
-                msg.outputdata().size(),
-                args.offset,
-                args.uptoBytes);
+    SPDLOG_DEBUG("NDP GET from file {}/{} "
+                 "[bytes={}, args.offset={}, uptoBytes={}]",
+                 msg.user(),
+                 key,
+                 msg.outputdata().size(),
+                 args.offset,
+                 args.uptoBytes);
     return 0;
 }
 
 static int ndpPut(NDPBuiltinModule& module, faabric::Message& msg)
 {
     ZoneScopedN("NdpBuiltinModule::ndpPut");
+    static storage::S3Wrapper s3w;
     const auto& inputData = msg.inputdata();
-    auto args = BuiltinNdpPutArgs::fromBytes(
+    const auto args = BuiltinNdpPutArgs::fromBytes(
       std::span(BYTES_CONST(inputData.data()), inputData.size()));
-    std::string objPath = userObjectPath(msg.user(), args.key);
-    SPDLOG_DEBUG("NDP PUT {} bytes to file {}", args.value.size(), objPath);
-    faabric::util::writeBytesToFile(objPath, args.value);
+    const std::string key = faabric::util::bytesToString(args.key);
+    SPDLOG_DEBUG(
+      "NDP PUT {} bytes to {}/{}", args.value.size(), msg.user(), key);
+    s3w.addKeyBytes(msg.user(), key, args.value);
     return 0;
 }
 
@@ -114,9 +94,8 @@ const std::array<BuiltinFunction, 2> NDP_BUILTINS{
 
 NDPBuiltinModule::NDPBuiltinModule()
   : boundFn(nullptr)
-  , input()
-  , output()
-{}
+{
+}
 
 NDPBuiltinModule::~NDPBuiltinModule()
 {

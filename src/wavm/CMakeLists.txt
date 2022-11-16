@@ -34,4 +34,5 @@ target_link_libraries(wavmmodule PUBLIC
     faasm::wasm
     libWAVM
     faasm::threads
+    faasm::storage_rados
 )

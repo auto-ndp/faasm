@@ -9,6 +9,5 @@ faasm_private_lib(wasm
 target_include_directories(wasm PRIVATE ${FAASM_INCLUDE_DIR}/wasm)
 target_link_libraries(wasm PUBLIC
     faasm::conf
-    faasm::storage
     faasm::threads
 )

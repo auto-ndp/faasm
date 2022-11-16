@@ -1,4 +1,5 @@
 #include <conf/FaasmConfig.h>
+#include <rados/librados.h>
 #include <storage/S3Wrapper.h>
 
 #include <faabric/util/bytes.h>
@@ -534,6 +535,9 @@ void S3Wrapper::addKeyBytes(const std::string& bucketName,
     auto response = client.PutObject(request);
     CHECK_ERRORS(response, bucketName, keyName);
      */
+    if (rados_pool_lookup(cluster, bucketName.c_str()) == -ENOENT) {
+        createBucket(bucketName);
+    }
     auto pool = RadosState::instance().getPool(bucketName);
     int err = rados_write_full(pool->ioctx,
                                keyName.c_str(),
@@ -632,6 +636,47 @@ std::vector<uint8_t> S3Wrapper::getKeyBytes(const std::string& bucketName,
     }
     data.resize(err);
     return data;
+}
+
+void S3Wrapper::getKeyPartIntoStr(const std::string& bucketName,
+                                  const std::string& keyName,
+                                  ssize_t offset,
+                                  ssize_t maxLength,
+                                  std::string& outStr)
+{
+    SPDLOG_TRACE("Getting S3 key part {}/{}:{}+{} into string buffer",
+                 bucketName,
+                 keyName,
+                 offset,
+                 maxLength);
+    auto pool = RadosState::instance().getPool(bucketName);
+    uint64_t oSize;
+    time_t mTime;
+    int err = rados_stat(pool->ioctx, keyName.c_str(), &oSize, &mTime);
+    if (err < 0) {
+        SPDLOG_ERROR("Key {}/{} cannot be statted: {}",
+                     bucketName,
+                     keyName,
+                     strerror(-err));
+        throw std::runtime_error("Key cannot be statted.");
+    }
+    oSize = std::min(oSize, SIZE_MAX / 2);
+
+    // calculate slice
+    oSize = std::max(ssize_t(0), std::min(ssize_t(oSize) - offset, maxLength));
+    outStr.resize(static_cast<size_t>(oSize));
+    if (oSize > 0) {
+        err = rados_read(
+          pool->ioctx, keyName.c_str(), outStr.data(), outStr.size(), offset);
+        if (err < 0) {
+            SPDLOG_ERROR("Key {}/{} cannot be read: {}",
+                         bucketName,
+                         keyName,
+                         strerror(-err));
+            throw std::runtime_error("Key cannot be read.");
+        }
+        outStr.resize(err);
+    }
 }
 
 std::string S3Wrapper::getKeyStr(const std::string& bucketName,

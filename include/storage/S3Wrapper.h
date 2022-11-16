@@ -62,7 +62,14 @@ class S3Wrapper
     std::string getKeyStr(const std::string& bucketName,
                           const std::string& keyName);
 
+    void getKeyPartIntoStr(const std::string& bucketName,
+                           const std::string& keyName,
+                           ssize_t offset,
+                           ssize_t maxLength,
+                           std::string& outStr);
+
     static rados_t cluster;
+
   private:
     const conf::FaasmConfig& faasmConf;
     /*

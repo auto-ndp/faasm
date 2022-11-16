@@ -27,11 +27,4 @@ docker-compose -f docker-compose.yml \
     -d \
     worker worker-storage
 
-sleep 0.1
-
-docker-compose -f docker-compose.yml \
-    restart \
-    --timeout 1 \
-    nginx
-
 popd > /dev/null
