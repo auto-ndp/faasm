@@ -76,9 +76,11 @@ services:
     volumes:
       - ./:/usr/local/code/faasm/
       - ${FAASM_BUILD_DIR}:${FAASM_BUILD_MOUNT}
+      - ./dev/faasm-local/:${FAASM_LOCAL_MOUNT}
       - ./deploy/conf/ceph/ceph.conf:/etc/ceph/ceph.conf:ro
       - ./dev/faasm-local/wasm/:/usr/local/faasm/wasm
       - ./dev/faasm-local/object/:/usr/local/faasm/object
+      - ./bin/entrypoint_upload.sh:/entrypoint.sh
       - /sys/kernel/debug:/sys/kernel/debug
       - /sys/kernel/debug/tracing:/sys/kernel/debug/tracing
     environment:

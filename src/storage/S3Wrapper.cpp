@@ -245,8 +245,7 @@ void initFaasmS3()
     */
     rados_t& cluster = S3Wrapper::cluster;
     int err = 0;
-    err =
-      rados_create2(&cluster, conf.s3Bucket.c_str(), conf.s3User.c_str(), 0);
+    err = rados_create(&cluster, nullptr);
     if (err < 0) {
         cluster = nullptr;
         conf.print();
