@@ -638,7 +638,7 @@ std::vector<uint8_t> S3Wrapper::getKeyBytes(const std::string& bucketName,
     time_t mTime;
     int err = rados_stat(pool->ioctx, keyName.c_str(), &oSize, &mTime);
     if (err < 0) {
-        if (err == ENOENT && tolerateMissing) {
+        if (err == -ENOENT && tolerateMissing) {
             return data;
         }
         SPDLOG_ERROR("Key {}/{} cannot be statted: {}",

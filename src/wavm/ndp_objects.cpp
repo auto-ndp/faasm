@@ -142,6 +142,7 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
             return 0;
         }
         module_->snapshotExcludedPtrLens.emplace_back(oldPagesEnd, allocLen);
+        *outDataLen = actualLength;
         return oldPagesEnd;
     }
 
