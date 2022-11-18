@@ -21,13 +21,15 @@ RUN apt-get update \
     libcurl4-openssl-dev \
     libhiredis-dev \
     liblttng-ust-dev \
-    lttng-tools \
     libpython3-dev \
     librados-dev \
+    libradospp-dev \
     libssl-dev \
     libstdc++-11-dev \
     libtool \
     libunwind-13-dev \
+    lttng-tools \
+    rados-objclass-dev \
     zlib1g-dev \
     lld-13 \
     lldb-13 \
