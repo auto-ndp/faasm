@@ -5,7 +5,6 @@
 #include <system/NetworkNamespace.h>
 #include <threads/ThreadState.h>
 #include <wamr/WAMRWasmModule.h>
-#include <wavm/NdpBuiltinModule.h>
 #include <wavm/WAVMWasmModule.h>
 
 #include <faabric/scheduler/Scheduler.h>
@@ -32,11 +31,6 @@ static thread_local bool threadIsIsolated = false;
 using namespace isolation;
 
 namespace faaslet {
-
-static bool isBuiltin(const std::string& funcName)
-{
-    return !funcName.empty() && funcName.at(0) == '!';
-}
 
 void preloadPythonRuntime()
 {
@@ -65,9 +59,7 @@ Faaslet::Faaslet(faabric::MessageInBatch msg)
     conf::FaasmConfig& conf = conf::getFaasmConfig();
 
     // Instantiate the right wasm module for the chosen runtime
-    if (isBuiltin(msg->function())) {
-        module = std::make_unique<wasm::NDPBuiltinModule>();
-    } else if (conf.wasmVm == "sgx") {
+    if (conf.wasmVm == "sgx") {
 #ifndef FAASM_SGX_DISABLED_MODE
         module = std::make_unique<wasm::EnclaveInterface>();
 #else
@@ -124,7 +116,7 @@ void Faaslet::reset(faabric::Message& msg)
         module->bindToFunction(msg);
         // Create the reset snapshot for this function if it doesn't already
         // exist (currently only supported in WAVM)
-        if (conf.wasmVm == "wavm" && !isBuiltin(msg.function())) {
+        if (conf.wasmVm == "wavm") {
             // Create the reset snapshot for this function if it doesn't already
             // exist (currently only supported in WAVM)
             localResetSnapshotKey =

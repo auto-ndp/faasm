@@ -1,6 +1,8 @@
 #pragma once
 
+#include <functional>
 #include <memory>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -49,7 +51,11 @@ class S3Wrapper
 
     void addKeyBytes(const std::string& bucketName,
                      const std::string& keyName,
-                     const std::vector<uint8_t>& data);
+                     std::span<const uint8_t> data);
+
+    void appendKeyBytes(const std::string& bucketName,
+                        const std::string& keyName,
+                        std::span<const uint8_t> data);
 
     void addKeyStr(const std::string& bucketName,
                    const std::string& keyName,
@@ -62,11 +68,16 @@ class S3Wrapper
     std::string getKeyStr(const std::string& bucketName,
                           const std::string& keyName);
 
-    void getKeyPartIntoStr(const std::string& bucketName,
-                           const std::string& keyName,
-                           ssize_t offset,
-                           ssize_t maxLength,
-                           std::string& outStr);
+    /**
+     * Calls setBufferLength(size) with the read size, and then writes to
+     * getBuffer(). Returns number of read bytes
+     */
+    ssize_t getKeyPartIntoBuf(const std::string& bucketName,
+                              const std::string& keyName,
+                              ssize_t offset,
+                              ssize_t maxLength,
+                              std::function<void(ssize_t)> setBufferLength,
+                              std::function<char*()> getBuffer);
 
     static rados_t cluster;
 

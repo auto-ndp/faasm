@@ -499,7 +499,6 @@ void S3Wrapper::deleteKey(const std::string& bucketName,
         }
     }
     */
-    // TODO: enoent
     auto pool = RadosState::instance().getPool(bucketName);
     int err = rados_remove(pool->ioctx, keyName.c_str());
     if (err < 0) {
@@ -517,7 +516,7 @@ void S3Wrapper::deleteKey(const std::string& bucketName,
 
 void S3Wrapper::addKeyBytes(const std::string& bucketName,
                             const std::string& keyName,
-                            const std::vector<uint8_t>& data)
+                            const std::span<const uint8_t> data)
 {
     // See example:
     // https://github.com/awsdocs/aws-doc-sdk-examples/blob/main/cpp/example_code/s3/put_object_buffer.cpp
@@ -549,6 +548,29 @@ void S3Wrapper::addKeyBytes(const std::string& bucketName,
                      keyName,
                      strerror(-err));
         throw std::runtime_error("Key cannot be written.");
+    }
+}
+
+void S3Wrapper::appendKeyBytes(const std::string& bucketName,
+                               const std::string& keyName,
+                               const std::span<const uint8_t> data)
+{
+    SPDLOG_TRACE("Appending S3 key {}/{} bytes", bucketName, keyName);
+
+    if (rados_pool_lookup(cluster, bucketName.c_str()) == -ENOENT) {
+        createBucket(bucketName);
+    }
+    auto pool = RadosState::instance().getPool(bucketName);
+    int err = rados_append(pool->ioctx,
+                           keyName.c_str(),
+                           std::bit_cast<const char*>(data.data()),
+                           data.size());
+    if (err < 0) {
+        SPDLOG_ERROR("Key {}/{} cannot be appended to: {}",
+                     bucketName,
+                     keyName,
+                     strerror(-err));
+        throw std::runtime_error("Key cannot be appended to.");
     }
 }
 
@@ -638,11 +660,13 @@ std::vector<uint8_t> S3Wrapper::getKeyBytes(const std::string& bucketName,
     return data;
 }
 
-void S3Wrapper::getKeyPartIntoStr(const std::string& bucketName,
-                                  const std::string& keyName,
-                                  ssize_t offset,
-                                  ssize_t maxLength,
-                                  std::string& outStr)
+ssize_t S3Wrapper::getKeyPartIntoBuf(
+  const std::string& bucketName,
+  const std::string& keyName,
+  ssize_t offset,
+  ssize_t maxLength,
+  std::function<void(ssize_t)> setBufferLength,
+  std::function<char*()> getBuffer)
 {
     SPDLOG_TRACE("Getting S3 key part {}/{}:{}+{} into string buffer",
                  bucketName,
@@ -664,10 +688,10 @@ void S3Wrapper::getKeyPartIntoStr(const std::string& bucketName,
 
     // calculate slice
     oSize = std::max(ssize_t(0), std::min(ssize_t(oSize) - offset, maxLength));
-    outStr.resize(static_cast<size_t>(oSize));
+    setBufferLength(static_cast<ssize_t>(oSize));
+    char* buffer = getBuffer();
     if (oSize > 0) {
-        err = rados_read(
-          pool->ioctx, keyName.c_str(), outStr.data(), outStr.size(), offset);
+        err = rados_read(pool->ioctx, keyName.c_str(), buffer, oSize, offset);
         if (err < 0) {
             SPDLOG_ERROR("Key {}/{} cannot be read: {}",
                          bucketName,
@@ -675,8 +699,9 @@ void S3Wrapper::getKeyPartIntoStr(const std::string& bucketName,
                          strerror(-err));
             throw std::runtime_error("Key cannot be read.");
         }
-        outStr.resize(err);
+        return err;
     }
+    return 0;
 }
 
 std::string S3Wrapper::getKeyStr(const std::string& bucketName,
