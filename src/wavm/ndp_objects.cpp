@@ -66,7 +66,7 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
     } else {
         try {
             s3w.addKeyBytes(
-              module_->getBoundFunction(), keyStr, std::span(data, dataLen));
+              module_->getBoundUser(), keyStr, std::span(data, dataLen));
         } catch (const std::runtime_error& err) {
             SPDLOG_ERROR("__faasmndp_put error: {}", err.what());
             return -1;

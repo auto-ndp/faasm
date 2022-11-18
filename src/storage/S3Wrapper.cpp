@@ -641,10 +641,11 @@ std::vector<uint8_t> S3Wrapper::getKeyBytes(const std::string& bucketName,
         if (err == -ENOENT && tolerateMissing) {
             return data;
         }
-        SPDLOG_ERROR("Key {}/{} cannot be statted: {}",
+        SPDLOG_ERROR("Key {}/{} cannot be statted for getKeyBytes: {}, {}",
                      bucketName,
                      keyName,
-                     strerror(-err));
+                     strerror(-err),
+                     tolerateMissing);
         throw std::runtime_error("Key cannot be statted.");
     }
     oSize = std::min(oSize, SIZE_MAX / 2);
@@ -678,7 +679,7 @@ ssize_t S3Wrapper::getKeyPartIntoBuf(
     time_t mTime;
     int err = rados_stat(pool->ioctx, keyName.c_str(), &oSize, &mTime);
     if (err < 0) {
-        SPDLOG_ERROR("Key {}/{} cannot be statted: {}",
+        SPDLOG_ERROR("Key {}/{} cannot be statted for getKeyPartIntoBuf: {}",
                      bucketName,
                      keyName,
                      strerror(-err));
