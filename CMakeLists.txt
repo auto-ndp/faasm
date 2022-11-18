@@ -249,6 +249,7 @@ else ()
 endif ()
 
 # Faasm runtime
+add_subdirectory(src/cephclass)
 add_subdirectory(src/codegen)
 add_subdirectory(src/conf)
 add_subdirectory(src/faaslet)
@@ -271,6 +272,7 @@ add_custom_target(faasm_dev_tools
         DEPENDS
         codegen_func
         codegen_shared_obj
+        faasm_ceph
         func_runner
         func_sym
         pool_runner

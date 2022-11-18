@@ -1,0 +1,43 @@
+
+namespace faasm.ceph;
+
+table WasmInfo {
+    user: string;
+    function: string;
+    fptr: int32;
+    pyptr: int32;
+    args: [int32];
+}
+
+table ObjectInfo {
+    bucket: string;
+    key: string;
+}
+
+table NdpCallInfo {
+    id: uint64;
+    wasm: WasmInfo;
+    object: ObjectInfo;
+    origin_host: string;
+}
+
+table NdpRequest {
+    call: NdpCallInfo;
+    mem_delta: [ubyte];
+}
+
+enum NdpResult: ubyte {
+    // Processed remotely, data is a memory delta
+    Ok = 0,
+    // Processing refused due to high load
+    ProcessLocally,
+    // An error happened during processing
+    Error
+}
+
+table NdpResponse {
+    call: NdpCallInfo;
+    result: NdpResult;
+    return_value: int32;
+    data: [ubyte];
+}
