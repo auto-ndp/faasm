@@ -238,7 +238,7 @@ int Scheduler::reapStaleExecutors()
     faabric::util::FullLock lock(mx);
 
     if (executors.empty()) {
-        SPDLOG_DEBUG("No executors to check for reaping");
+        SPDLOG_TRACE("No executors to check for reaping");
         return 0;
     }
 
