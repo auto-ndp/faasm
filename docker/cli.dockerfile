@@ -9,8 +9,7 @@ RUN apt-get update \
     && apt-get upgrade --yes --no-install-recommends \
     && apt-get install --yes --no-install-recommends \
     doxygen \
-    libcairo2-dev \
-    python3-cairo \
+
     vim \
     nano \
     && apt-get clean autoclean --yes \

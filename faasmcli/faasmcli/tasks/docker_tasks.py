@@ -21,6 +21,7 @@ SGX_SIMULATION_CONTAINER_SUFFIX = "-sgx-sim"
 CONTAINER_NAME2FILE_MAP = {
     "redis": "redis.dockerfile",
     "minio": "minio.dockerfile",
+    "cpp-root": "cpp-root.dockerfile",
     "base": "base.dockerfile",
     "base-runtime": "base-runtime.dockerfile",
     "base-sgx": "base-sgx.dockerfile",
@@ -33,7 +34,6 @@ CONTAINER_NAME2FILE_MAP = {
     "cli": "cli.dockerfile",
     "cli-sgx": "cli.dockerfile",
     "cli-sgx-sim": "cli.dockerfile",
-    "cpp-root": "cpp-root.dockerfile",
     "sgx-aesmd": "sgx-aesmd.dockerfile",
 }
 

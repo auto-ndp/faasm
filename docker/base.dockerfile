@@ -31,6 +31,8 @@ COPY --from=faabric /root/.conan /root/.conan
 # Copy Python runtime libraries
 COPY --from=python /usr/local/faasm/runtime_root /usr/local/faasm/runtime_root
 
+SHELL ["/bin/bash", "-c"]
+
 # Check out code (clean beforehand just in case). We also add the code
 # directory as a safe Git path. See:
 # https://github.blog/2022-04-12-git-security-vulnerability-announced/
@@ -53,14 +55,10 @@ RUN mkdir -p /usr/local/faasm/runtime_root/etc \
     && mkdir -p /usr/local/faasm/runtime_root/share
 
 # Out of tree clean build of the basic targets
-RUN rm -rf /build/faasm \
-    && mkdir -p /build/faasm \
-    && cd /build/faasm \
-    && cmake \
-        -GNinja \
-        -DCMAKE_CXX_COMPILER=/usr/bin/clang++-13 \
-        -DCMAKE_C_COMPILER=/usr/bin/clang-13 \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DFAASM_SGX_MODE=Disabled \
-        /usr/local/code/faasm \
-    && cmake --build . --target tests func_runner func_sym codegen_func codegen_shared_obj pool_runner upload
+RUN cd /usr/local/code/faasm \
+    && ./bin/create_venv.sh \
+    && source venv/bin/activate \
+    && inv -r faasmcli/faasmcli dev.tools \
+        --clean \
+        --build Release \
+        --sgx Disabled

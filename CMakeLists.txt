@@ -28,7 +28,7 @@ endif ()
 if (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
     add_compile_options(-march=skylake -mtune=skylake)
 endif ()
-set(CMAKE_CXX_FLAGS "-fwrapv -Wall -Wthread-safety -Werror=thread-safety")
+set(CMAKE_CXX_FLAGS "-fwrapv -Wall -Werror=vla -Wthread-safety -Werror=thread-safety")
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -97,6 +97,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 # Faasm directories
 set(FAASM_SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}/src)
 set(FAASM_INCLUDE_DIR ${CMAKE_CURRENT_LIST_DIR}/include)
+set(FAASM_GENERATED_INCLUDE_DIR ${CMAKE_BINARY_DIR}/include)
 set(FAASM_NATIVE_INSTALL "/usr/local/faasm/native")
 
 # Faabric
@@ -237,8 +238,11 @@ target_include_directories(faasm_common_deps INTERFACE
         ${WAMR_IWASM_DIR}/common
         # Faasm
         ${FAASM_INCLUDE_DIR}
+        # Put the generated include directories after the source include
+        # directories so that the latter take precedence
+        ${FAASM_GENERATED_INCLUDE_DIR}
         ${FAASM_PYTHON_LIB_DIR}
-        )
+)
 
 # Faasm SGX support
 if (SGX_FOUND)

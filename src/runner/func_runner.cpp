@@ -1,8 +1,4 @@
 #include <conf/FaasmConfig.h>
-#include <faaslet/Faaslet.h>
-#include <storage/FileLoader.h>
-#include <wasm/WasmModule.h>
-
 #include <faabric/redis/Redis.h>
 #include <faabric/runner/FaabricMain.h>
 #include <faabric/scheduler/ExecutorFactory.h>
@@ -11,6 +7,12 @@
 #include <faabric/util/environment.h>
 #include <faabric/util/logging.h>
 #include <faabric/util/timing.h>
+#include <faaslet/Faaslet.h>
+#include <runner/runner_utils.h>
+#include <storage/FileLoader.h>
+#include <wasm/WasmModule.h>
+
+namespace po = boost::program_options;
 
 #include "runner_common.h"
 
@@ -18,21 +20,9 @@ int doRunner(int argc, char* argv[])
 {
     faabric::util::initLogging();
 
-    if (argc < 3) {
-        SPDLOG_ERROR("Must provide user and function name");
-        return 1;
-    }
-
-    // Set up the call
-    std::string user = argv[1];
-    std::string function = argv[2];
-
-    std::string inputData;
-    bool hasInput = false;
-    if (argc == 4) {
-        inputData = argv[3];
-        hasInput = true;
-    }
+    auto vm = runner::parseRunnerCmdLine(argc, argv);
+    std::string user = vm["user"].as<std::string>();
+    std::string function = vm["function"].as<std::string>();
 
     std::shared_ptr<faabric::BatchExecuteRequest> req =
       faabric::util::batchExecFactory(user, function, 1);
@@ -74,11 +64,16 @@ int doRunner(int argc, char* argv[])
         SPDLOG_INFO("Running function {}/{}", user, function);
     }
 
-    if (hasInput) {
-        std::string inputData = argv[3];
-        msg.set_inputdata(inputData);
+    if (vm.count("input-data")) {
+        msg.set_inputdata(vm["input-data"].as<std::string>());
+        SPDLOG_INFO("Adding input data: {}",
+                    vm["input-data"].as<std::string>());
+    }
 
-        SPDLOG_INFO("Adding input data: {}", inputData);
+    if (vm.count("cmdline")) {
+        msg.set_cmdline(vm["cmdline"].as<std::string>());
+        SPDLOG_INFO("Adding command line arguments: {}",
+                    vm["cmdline"].as<std::string>());
     }
 
     // Set up the system

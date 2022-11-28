@@ -134,6 +134,10 @@ services:
       - TINI_SUBREAPER=1
       - CODEGEN_TARGETS=x86_64:skylake;aarch64:thunderx2t99
       - CAPTURE_STDOUT=on
+      # 02/11/2022 - Temporarily disable CGroup mode, to mitigate a potential
+      # mismatch between the host OS and the container image. Ubuntu 20.04
+      # uses CGroup v1, whereas Ubuntu 22.04 uses CGroup v2. This change will
+      # be reverted once we upgrade container images to 22.04
       - CGROUP_MODE=off
       - DELTA_SNAPSHOT_ENCODING=pages=64
       - GLOBAL_MESSAGE_TIMEOUT=30000
