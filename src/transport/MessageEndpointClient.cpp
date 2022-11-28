@@ -24,16 +24,16 @@ void MessageEndpointClient::asyncSend(int header,
                                       int sequenceNum)
 {
     ZoneScopedNS("MessageEndpointClient::asyncSend@2", 6);
-    size_t msgSize = msg->ByteSizeLong();
-    msgBuffer.resize(msgSize);
-    ZoneValue(msgSize);
+    std::string buffer;
 
-    TracyMessageL("Serialized");
-    if (!msg->SerializeToArray(msgBuffer.data(), msgBuffer.size())) {
+    if (!msg->SerializeToString(&buffer)) {
         throw std::runtime_error("Error serialising message");
     }
 
-    asyncSend(header, msgBuffer.data(), msgBuffer.size(), sequenceNum);
+    asyncSend(header,
+              reinterpret_cast<uint8_t*>(buffer.data()),
+              buffer.size(),
+              sequenceNum);
 }
 
 void MessageEndpointClient::asyncSend(int header,
@@ -51,15 +51,15 @@ void MessageEndpointClient::syncSend(int header,
                                      google::protobuf::Message* response)
 {
     ZoneScopedNS("MessageEndpointClient::syncSend@3", 6);
-    size_t msgSize = msg->ByteSizeLong();
-    ZoneValue(msgSize);
-    msgBuffer.resize(msgSize);
-    if (!msg->SerializeToArray(msgBuffer.data(), msgBuffer.size())) {
+    std::string buffer;
+    if (!msg->SerializeToString(&buffer)) {
         throw std::runtime_error("Error serialising message");
     }
-    TracyMessageL("Serialized");
 
-    syncSend(header, msgBuffer.data(), msgBuffer.size(), response);
+    syncSend(header,
+             reinterpret_cast<uint8_t*>(buffer.data()),
+             buffer.size(),
+             response);
 }
 
 void MessageEndpointClient::syncSend(int header,
