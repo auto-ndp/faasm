@@ -40,7 +40,12 @@
                 "CMAKE_C_COMPILER": {
                     "type": "FILEPATH",
                     "value": "/usr/bin/clang"
-                }
+                },
+                "FAASM_WASM_MAX_MEMORY": "4294901760",
+                "FAASM_WASM_STACK_SIZE": "4194304",
+                "FAASM_WASM_BYTES_PER_PAGE": "65536",
+                "FAASM_WASM_CTORS_FUNC_NAME": "__wasm_call_ctors",
+                "FAASM_WASM_ZYGOTE_FUNC_NAME": "_faasm_zygote"
             },
             "environment": {},
             "vendor": {}

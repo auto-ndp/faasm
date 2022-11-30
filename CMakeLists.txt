@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.24.0)
 project(faasm)
+cmake_policy(SET CMP0069 NEW)
 
 # Optional functionality
 option(FAASM_STATIC_LIBS "Statically link Faasm libs" ON)
