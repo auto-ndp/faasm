@@ -1,6 +1,6 @@
+#include "faabric/util/testing.h"
 #include <faabric/transport/MessageEndpointClient.h>
-#include <faabric/util/timing.h>
-#include <vector>
+#include <optional>
 
 namespace faabric::transport {
 
@@ -11,19 +11,19 @@ MessageEndpointClient::MessageEndpointClient(std::string hostIn,
   : host(hostIn)
   , asyncPort(asyncPortIn)
   , syncPort(syncPortIn)
-  , asyncEndpoint(host, asyncPort, timeoutMs)
-  , syncEndpoint(host, syncPort, timeoutMs)
-{}
-
-namespace {
-thread_local std::vector<uint8_t> msgBuffer;
+  , asyncEndpoint(std::nullopt)
+  , syncEndpoint(std::nullopt)
+{
+    if (!faabric::util::isMockMode()) {
+        asyncEndpoint.emplace(host, asyncPort, timeoutMs);
+        syncEndpoint.emplace(host, syncPort, timeoutMs);
+    }
 }
 
 void MessageEndpointClient::asyncSend(int header,
                                       google::protobuf::Message* msg,
                                       int sequenceNum)
 {
-    ZoneScopedNS("MessageEndpointClient::asyncSend@2", 6);
     std::string buffer;
 
     if (!msg->SerializeToString(&buffer)) {
@@ -41,16 +41,15 @@ void MessageEndpointClient::asyncSend(int header,
                                       size_t bufferSize,
                                       int sequenceNum)
 {
-    ZoneScopedNS("MessageEndpointClient::asyncSend@3", 6);
-    ZoneValue(bufferSize);
-    asyncEndpoint.send(header, buffer, bufferSize, sequenceNum);
+    if (asyncEndpoint.has_value()) {
+        asyncEndpoint->send(header, buffer, bufferSize, sequenceNum);
+    }
 }
 
 void MessageEndpointClient::syncSend(int header,
                                      google::protobuf::Message* msg,
                                      google::protobuf::Message* response)
 {
-    ZoneScopedNS("MessageEndpointClient::syncSend@3", 6);
     std::string buffer;
     if (!msg->SerializeToString(&buffer)) {
         throw std::runtime_error("Error serialising message");
@@ -67,15 +66,15 @@ void MessageEndpointClient::syncSend(int header,
                                      const size_t bufferSize,
                                      google::protobuf::Message* response)
 {
-    ZoneScopedNS("MessageEndpointClient::syncSend@4", 6);
-    ZoneValue(bufferSize);
+    if (syncEndpoint.has_value()) {
+        Message responseMsg =
+          syncEndpoint->sendAwaitResponse(header, buffer, bufferSize);
 
-    Message responseMsg = syncEndpoint.sendAwaitResponse(header, buffer, bufferSize);
-    TracyMessageL("Response sent");
-
-    // Deserialise response
-    if (!response->ParseFromArray(responseMsg.data(), responseMsg.size())) {
-        throw std::runtime_error("Error deserialising message");
+        // Deserialise response
+        if (!response->ParseFromArray(responseMsg.data().data(),
+                                      responseMsg.data().size())) {
+            throw std::runtime_error("Error deserialising message");
+        }
     }
 }
 }
