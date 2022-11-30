@@ -8,7 +8,6 @@
 #include <faabric/runner/FaabricMain.h>
 #include <faabric/scheduler/ExecutorFactory.h>
 #include <faabric/scheduler/Scheduler.h>
-#include <faabric/transport/context.h>
 #include <faabric/util/config.h>
 #include <faabric/util/logging.h>
 #include <faabric/util/timing.h>
@@ -24,7 +23,6 @@ int main(int argc, char* argv[])
 {
     runner::commonInit();
     storage::initFaasmS3();
-    faabric::transport::initGlobalMessageContext();
 
     initLogging();
 
@@ -46,8 +44,6 @@ int main(int argc, char* argv[])
     faasmConf.chainedCallTimeout = 60000;
 
     int returnValue = MicrobenchRunner::execute(inFile, outFile);
-
-    faabric::transport::closeGlobalMessageContext();
     storage::shutdownFaasmS3();
     return returnValue;
 }

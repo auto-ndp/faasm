@@ -2,7 +2,6 @@
 #include <faabric/redis/Redis.h>
 #include <faabric/runner/FaabricMain.h>
 #include <faabric/scheduler/ExecutorFactory.h>
-#include <faabric/transport/context.h>
 #include <faabric/util/config.h>
 #include <faabric/util/environment.h>
 #include <faabric/util/logging.h>
@@ -104,7 +103,6 @@ int main(int argc, char* argv[])
 {
     runner::commonInit();
     storage::initFaasmS3();
-    faabric::transport::initGlobalMessageContext();
 
     PROF_BEGIN
 
@@ -114,7 +112,6 @@ int main(int argc, char* argv[])
 
     PROF_SUMMARY
 
-    faabric::transport::closeGlobalMessageContext();
     storage::shutdownFaasmS3();
     return result;
 }

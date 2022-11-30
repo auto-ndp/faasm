@@ -17,6 +17,9 @@ race:faabric::endpoint::FaabricEndpointHandler::onFunctionResult
 race:tracy::_memory_heap_lookup
 race:tracy::InitRpmalloc
 
+# Tsan doesn't see through the readerwriterqueue's semaphore implementation
+race:moodycamel::BlockingReaderWriterCircularBuffer*
+
 # Raciness inside webassembly openmp modules
 race:wasm::startReduceCritical
 
