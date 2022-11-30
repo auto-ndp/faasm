@@ -133,15 +133,18 @@ add_library(zstd::libzstd_static ALIAS libzstd_static)
 # Tracy (not in Conan)
 FetchContent_Declare(tracy_ext
     GIT_REPOSITORY "https://github.com/wolfpld/tracy.git"
-    GIT_TAG "v0.8.2"
+    GIT_TAG "v0.9"
 )
 FetchContent_GetProperties(tracy_ext)
 if(NOT tracy_ext_POPULATED)
   FetchContent_Populate(tracy_ext)
 endif()
-add_library(TracyClient STATIC ${tracy_ext_SOURCE_DIR}/TracyClient.cpp)
+add_library(TracyClient STATIC
+    ${tracy_ext_SOURCE_DIR}/public/TracyClient.cpp
+    ${tracy_ext_SOURCE_DIR}/public/tracy/Tracy.hpp
+)
 target_link_libraries(TracyClient PUBLIC Threads::Threads dl)
-target_include_directories(TracyClient PUBLIC $<INSTALL_INTERFACE:include> $<BUILD_INTERFACE:${tracy_ext_SOURCE_DIR}>)
+target_include_directories(TracyClient PUBLIC $<INSTALL_INTERFACE:include> $<BUILD_INTERFACE:${tracy_ext_SOURCE_DIR}/public>)
 target_compile_features(TracyClient PUBLIC cxx_std_20)
 target_compile_definitions(TracyClient PUBLIC
     TRACY_ON_DEMAND

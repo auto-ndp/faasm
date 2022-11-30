@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Tracy.hpp>
+#include <tracy/Tracy.hpp>
 #include <faabric/util/clock.h>
 #include <string>
 
