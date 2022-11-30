@@ -1239,16 +1239,16 @@ void Scheduler::setFunctionResult(std::unique_ptr<faabric::Message> msg)
     // Remove the app from in-flight map if still there, and this host is the
     // master host for the message
     if (msg->masterhost() == thisHost) {
-        removePendingMigration(msg.appid());
+        removePendingMigration(msg->appid());
     }
     if (!directResultHost.empty()) {
         ZoneScopedN("Direct result send");
         faabric::util::FullLock lock(mx);
-        auto& fc = getFunctionCallClient(directResultHost);
+        auto fc = getFunctionCallClient(directResultHost);
         lock.unlock();
         {
             ZoneScopedN("Socket send");
-            fc.sendDirectResult(*msg);
+            fc->sendDirectResult(*msg);
         }
         return;
     }

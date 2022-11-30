@@ -32,8 +32,6 @@ namespace faabric::util {
 
 void handleCrash(int sig)
 {
-    std::array<void*, 32> stackPtrs;
-    size_t filledStacks = backtrace(stackPtrs.data(), stackPtrs.size());
     if (sig != TEST_SIGNAL) {
         write(STDERR_FILENO, ABORT_MSG.data(), ABORT_MSG.size());
     }
