@@ -1,5 +1,5 @@
 
-namespace faasm.ceph;
+namespace faasm.ndpmsg;
 
 table WasmInfo {
     user: string;
@@ -14,16 +14,12 @@ table ObjectInfo {
     key: string;
 }
 
-table NdpCallInfo {
-    id: uint64;
+// (First message) Sent by Compute Faasm -> Storage Ceph
+table NdpRequest {
+    call_id: uint64;
     wasm: WasmInfo;
     object: ObjectInfo;
     origin_host: string;
-}
-
-table NdpRequest {
-    call: NdpCallInfo;
-    mem_delta: [ubyte];
 }
 
 enum NdpResult: ubyte {
@@ -35,9 +31,37 @@ enum NdpResult: ubyte {
     Error
 }
 
+// (Last message) Sent by Storage Ceph -> Compute Faasm once all processing ends
 table NdpResponse {
-    call: NdpCallInfo;
+    call_id: uint64;
     result: NdpResult;
-    return_value: int32;
+    error_msg: string;
+}
+
+// Storage Ceph<->Storage Faasm messages
+table NdpRead {
+    offset: uint64;
+    upto_length: uint64;
+}
+
+table NdpWrite {
+    offset: uint64;
     data: [ubyte];
+}
+
+table NdpEnd {
+    result: NdpResult;
+    error_msg: [ubyte];
+}
+
+union TypedStorageMessage {
+    NdpRead,
+    NdpWrite,
+    NdpEnd
+}
+
+// Unions can't be used as root elements
+table StorageMessage {
+    call_id: uint64;
+    message: TypedStorageMessage;
 }

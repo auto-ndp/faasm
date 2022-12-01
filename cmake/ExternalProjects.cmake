@@ -56,6 +56,7 @@ include(${CMAKE_CURRENT_BINARY_DIR}/conan_paths.cmake)
 
 find_package(Catch2 REQUIRED)
 find_package(FlatBuffers REQUIRED)
+find_package(fmt REQUIRED)
 find_package(mimalloc REQUIRED)
 find_package(jwt-cpp REQUIRED)
 find_package(picojson REQUIRED)
