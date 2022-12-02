@@ -227,6 +227,11 @@ FaabricEndpoint::~FaabricEndpoint()
     this->stop();
 }
 
+void FaabricEndpoint::addStartHook(std::function<void(asio::io_context&)> hook)
+{
+    this->startHooks.push_back(std::move(hook));
+}
+
 void FaabricEndpoint::start(EndpointMode mode)
 {
     SPDLOG_INFO("Starting HTTP endpoint on {}, {} threads", port, threadCount);
@@ -256,6 +261,12 @@ void FaabricEndpoint::start(EndpointMode mode)
             }
         });
     }
+
+    // Call the startup hooks
+    for(auto& hook : this->startHooks) {
+        hook(state->ioc);
+    }
+    this->startHooks.clear();
 
     // Make sure the total number of worker threads is this->threadCount, when
     // in SIGNAL mode the main thread is also used as a worker thread.

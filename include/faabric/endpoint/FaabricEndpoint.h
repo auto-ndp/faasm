@@ -1,5 +1,6 @@
 #pragma once
 
+#include <boost/asio/io_context.hpp>
 #include <functional>
 #include <memory>
 
@@ -53,6 +54,8 @@ class FaabricEndpoint
 
     virtual ~FaabricEndpoint();
 
+    void addStartHook(std::function<void(asio::io_context&)> hook);
+
     void start(EndpointMode mode = EndpointMode::SIGNAL);
 
     void stop();
@@ -62,5 +65,6 @@ class FaabricEndpoint
     int threadCount;
     std::unique_ptr<detail::EndpointState> state;
     std::shared_ptr<HttpRequestHandler> requestHandler;
+    std::vector<std::function<void(asio::io_context&)>> startHooks;
 };
 }
