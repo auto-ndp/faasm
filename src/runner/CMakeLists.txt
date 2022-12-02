@@ -6,6 +6,7 @@ faasm_private_lib(runner_lib
 )
 target_link_libraries(runner_lib PUBLIC
     faasm::common_deps
+    faasm::ceph_comm
     faasm::conf
     faasm::faaslet_lib
     faasm::wavmmodule

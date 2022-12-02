@@ -41,6 +41,9 @@ int main()
           config.endpointPort,
           config.endpointNumThreads,
           std::make_shared<faabric::endpoint::FaabricEndpointHandler>());
+        if (faabric::util::getSystemConfig().isStorageNode) {
+            endpoint.addStartHook(runner::getNdpEndpoint());
+        }
         endpoint.start(faabric::endpoint::EndpointMode::SIGNAL);
 
         SPDLOG_INFO("Shutting down");

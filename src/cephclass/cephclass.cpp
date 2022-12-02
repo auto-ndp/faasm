@@ -76,22 +76,6 @@ std::vector<uint8_t> cephBufferToVecU8(const ceph::buffer::list& buflist)
     return output;
 }
 
-template<class FBType>
-void verifyFlatbuf(const uint8_t* dataPtr, size_t dataSz)
-{
-    fbs::Verifier verifier(dataPtr, dataSz);
-    if (!verifier.VerifyBuffer<FBType>(nullptr)) {
-        CLS_LOG(1, "Invalid Flatbuffer encountered!");
-        throw std::runtime_error("Invalid Flatbuffer encountered!");
-    }
-}
-
-template<class FBType>
-void verifyFlatbuf(const std::vector<uint8_t>& data)
-{
-    return verifyFlatbuf<FBType>(data.data(), data.size());
-}
-
 int maybe_exec_wasm(cls_method_context_t hctx,
                     ceph::buffer::list* inBuffers,
                     ceph::buffer::list* outBuffers,

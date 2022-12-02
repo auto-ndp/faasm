@@ -222,4 +222,19 @@ class CephFaasmSocket
     int fd = -1;
 };
 
+template<class FBType>
+void verifyFlatbuf(const uint8_t* dataPtr, size_t dataSz)
+{
+    flatbuffers::Verifier verifier(dataPtr, dataSz);
+    if (!verifier.VerifyBuffer<FBType>(nullptr)) {
+        throw std::runtime_error("Invalid Flatbuffer encountered!");
+    }
+}
+
+template<class FBType>
+void verifyFlatbuf(const std::vector<uint8_t>& data)
+{
+    return verifyFlatbuf<FBType>(data.data(), data.size());
+}
+
 }
