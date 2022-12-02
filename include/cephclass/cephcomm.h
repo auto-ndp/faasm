@@ -166,6 +166,14 @@ class CephFaasmSocket
         } while (remaining > 0);
     }
 
+    void sendError() const
+    {
+        assert(this->type == SocketType::connect);
+        uint64_t netSize = ::htole64(UINT64_MAX);
+        rawSendBytes(reinterpret_cast<const uint8_t*>(&netSize),
+                     sizeof(netSize));
+    }
+
     void sendMessage(const uint8_t* msgData, size_t msgSize) const
     {
         assert(this->type == SocketType::connect);
@@ -191,9 +199,12 @@ class CephFaasmSocket
 
     std::vector<uint8_t> recvMessageVector() const
     {
-        const size_t sz = recvMessageSize();
-        std::vector<uint8_t> output(sz);
-        recvMessageData(output.data(), sz);
+        const uint64_t sz = recvMessageSize();
+        if (sz == UINT64_MAX) {
+            throw std::runtime_error("Error received");
+        }
+        std::vector<uint8_t> output((size_t(sz)));
+        recvMessageData(output.data(), size_t(sz));
         return output;
     }
 
