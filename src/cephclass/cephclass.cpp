@@ -172,6 +172,8 @@ int maybe_exec_wasm(cls_method_context_t hctx,
                         runtime.sendError();
                         throw std::runtime_error("Error in a write operation");
                     }
+                    uint8_t OK_MSG[2] = { 'o', 'k' };
+                    runtime.sendMessage(OK_MSG, sizeof(OK_MSG));
                     break;
                 }
                 default: {

@@ -7,6 +7,4 @@ namespace runner {
 
 void commonInit();
 
-std::function<void(asio::io_context&)> getNdpEndpoint();
-
 }

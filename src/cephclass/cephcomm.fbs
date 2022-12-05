@@ -5,7 +5,8 @@ table WasmInfo {
     user: string;
     function: string;
     fptr: int32;
-    pyptr: int32;
+    pyptr: string;
+    globals: [int32];
     args: [int32];
 }
 

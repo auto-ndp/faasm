@@ -118,52 +118,9 @@ https://stackoverflow.com/questions/47105289/how-to-override-endpoint-in-aws-sdk
 
 rados_t S3Wrapper::cluster = nullptr;
 
-struct RadosCompletion
+class RadosPool final
 {
-    rados_completion_t completion = nullptr;
-
-    RadosCompletion()
-    {
-        int err = rados_aio_create_completion(
-          nullptr, nullptr, nullptr, &this->completion);
-        if (err < 0) {
-            SPDLOG_CRITICAL("Error creating a rados completion: {}",
-                            strerror(-err));
-            throw std::runtime_error("Error creating a rados completion.");
-        }
-    }
-    RadosCompletion(RadosCompletion&) = delete;
-    RadosCompletion& operator=(RadosCompletion&) = delete;
-    ~RadosCompletion()
-    {
-        if (completion != nullptr) {
-            rados_aio_release(completion);
-            completion = nullptr;
-        }
-    }
-
-    void wait()
-    {
-        if (completion != nullptr) {
-            rados_aio_wait_for_complete(completion);
-        }
-    }
-
-    bool isComplete()
-    {
-        return (completion != nullptr) ? rados_aio_is_complete(completion)
-                                       : true;
-    }
-
-    int getReturnValue()
-    {
-        return (completion != nullptr) ? rados_aio_get_return_value(completion)
-                                       : 0;
-    }
-};
-
-struct RadosPool
-{
+  public:
     RadosPool(std::string poolName)
     {
         std::scoped_lock<std::mutex> lock{ mx };
@@ -196,7 +153,7 @@ struct RadosPool
     std::mutex mx;
 };
 
-class RadosState
+class RadosState final
 {
   public:
     static RadosState& instance()
@@ -722,5 +679,42 @@ std::string S3Wrapper::getKeyStr(const std::string& bucketName,
      */
     return faabric::util::bytesToString(
       getKeyBytes(bucketName, keyName, false));
+}
+
+RadosCompletion S3Wrapper::asyncNdpCall(const std::string& bucketName,
+                                        const std::string& keyName,
+                                        const std::string& funcClass,
+                                        const std::string& funcName,
+                                        std::span<const uint8_t> inputData)
+{
+    SPDLOG_TRACE(
+      "Async Rados NDP call of {}:{} at {}/{} with {} bytes of input",
+      funcClass,
+      funcName,
+      bucketName,
+      keyName,
+      inputData.size());
+    auto pool = RadosState::instance().getPool(bucketName);
+    RadosCompletion completion(pool);
+    std::vector<uint8_t> outputBuf(1024);
+    int ec = rados_aio_exec(pool->ioctx,
+                            keyName.c_str(),
+                            completion.completion,
+                            funcClass.c_str(),
+                            funcName.c_str(),
+                            reinterpret_cast<const char*>(inputData.data()),
+                            inputData.size(),
+                            reinterpret_cast<char*>(outputBuf.data()),
+                            outputBuf.size());
+    if (ec < 0) {
+        SPDLOG_ERROR("Key {}/{} cannot run {}:{}: {}",
+                     bucketName,
+                     keyName,
+                     funcClass,
+                     funcName,
+                     strerror(-ec));
+        throw std::runtime_error("Key cannot run an NDP call.");
+    }
+    return completion;
 }
 }

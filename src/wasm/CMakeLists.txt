@@ -4,6 +4,7 @@ faasm_private_lib(wasm
     WasmExecutionContext.cpp
     WasmModule.cpp
     chaining_util.cpp
+    ndp_endpoint.cpp
 )
 
 # Shared variables with the cross-compilation toolchain
@@ -29,6 +30,7 @@ configure_file(
 target_include_directories(wasm PRIVATE ${FAASM_INCLUDE_DIR}/wasm)
 
 target_link_libraries(wasm PUBLIC
+    faasm::ceph_comm
     faasm::conf
     faasm::threads
 )

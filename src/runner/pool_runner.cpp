@@ -1,6 +1,7 @@
 #include <conf/FaasmConfig.h>
 #include <faaslet/Faaslet.h>
 #include <storage/S3Wrapper.h>
+#include <wasm/ndp.h>
 
 #include <faabric/endpoint/FaabricEndpoint.h>
 #include <faabric/endpoint/FaabricEndpointHandler.h>
@@ -42,7 +43,7 @@ int main()
           config.endpointNumThreads,
           std::make_shared<faabric::endpoint::FaabricEndpointHandler>());
         if (faabric::util::getSystemConfig().isStorageNode) {
-            endpoint.addStartHook(runner::getNdpEndpoint());
+            endpoint.addStartHook(faasm::getNdpEndpoint());
         }
         endpoint.start(faabric::endpoint::EndpointMode::SIGNAL);
 

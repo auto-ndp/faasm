@@ -34,6 +34,61 @@ void initFaasmS3();
 
 void shutdownFaasmS3();
 
+class RadosCompletion final
+{
+  public:
+    std::shared_ptr<void> contextOwner = nullptr;
+    rados_completion_t completion = nullptr;
+
+    explicit RadosCompletion(std::shared_ptr<void> contextOwner)
+      : contextOwner(std::move(contextOwner))
+    {
+        int err = rados_aio_create_completion(
+          nullptr, nullptr, nullptr, &this->completion);
+        if (err < 0) {
+            SPDLOG_CRITICAL("Error creating a rados completion: {}",
+                            strerror(-err));
+            throw std::runtime_error("Error creating a rados completion.");
+        }
+    }
+    RadosCompletion(const RadosCompletion&) = delete;
+    RadosCompletion& operator=(const RadosCompletion&) = delete;
+    RadosCompletion(RadosCompletion&& other) { *this = std::move(other); }
+    RadosCompletion& operator=(RadosCompletion&& other)
+    {
+        this->contextOwner = std::move(other.contextOwner);
+        this->completion = other.completion;
+        other.completion = nullptr;
+        return *this;
+    }
+    ~RadosCompletion()
+    {
+        if (completion != nullptr) {
+            rados_aio_release(completion);
+            completion = nullptr;
+        }
+    }
+
+    void wait() const
+    {
+        if (completion != nullptr) {
+            rados_aio_wait_for_complete(completion);
+        }
+    }
+
+    bool isComplete() const
+    {
+        return (completion != nullptr) ? rados_aio_is_complete(completion)
+                                       : true;
+    }
+
+    int getReturnValue() const
+    {
+        return (completion != nullptr) ? rados_aio_get_return_value(completion)
+                                       : 0;
+    }
+};
+
 class S3Wrapper
 {
   public:
@@ -67,6 +122,12 @@ class S3Wrapper
 
     std::string getKeyStr(const std::string& bucketName,
                           const std::string& keyName);
+
+    RadosCompletion asyncNdpCall(const std::string& bucketName,
+                                 const std::string& keyName,
+                                 const std::string& funcClass,
+                                 const std::string& funcName,
+                                 std::span<const uint8_t> inputData);
 
     /**
      * Calls setBufferLength(size) with the read size, and then writes to

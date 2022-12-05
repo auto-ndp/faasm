@@ -32,6 +32,7 @@ conan_cmake_configure(
         "catch2/2.13.9@#8793d3e6287d3684201418de556d98fe"
         "mimalloc/2.0.6@#ca9e081f2a1d78eb2b70c6d2270b56d7"
         "openssl/3.0.5@#40f4488f02b36c1193b68f585131e8ef"
+        "tl-expected/1.0.0@#4c84972dff9944a20643c1caf6317fd9"
         # These two dependencies are only needed to perform remote attestation
         # of SGX enclaves using Microsoft Azure's Attestation Service
         "jwt-cpp/0.6.0@#cd6b5c1318b29f4becaf807b23f7bb44"
@@ -58,9 +59,11 @@ find_package(Catch2 REQUIRED)
 find_package(FlatBuffers REQUIRED)
 find_package(fmt REQUIRED)
 find_package(mimalloc REQUIRED)
-find_package(jwt-cpp REQUIRED)
-find_package(picojson REQUIRED)
 find_package(OpenSSL REQUIRED COMPONENTS Crypto SSL)
+find_package(tl-expected REQUIRED)
+
+find_package(picojson REQUIRED)
+find_package(jwt-cpp REQUIRED)
 
 set(OPENSSL_CRYPTO_LIBFILE "${OPENSSL_LIBRARIES}")
 list(FILTER OPENSSL_CRYPTO_LIBFILE INCLUDE REGEX "libcrypto\\.")
