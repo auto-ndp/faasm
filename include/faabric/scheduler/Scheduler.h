@@ -26,6 +26,7 @@
 #include <functional>
 #include <future>
 #include <optional>
+#include <semaphore>
 #include <shared_mutex>
 
 #define AVAILABLE_HOST_SET "available_hosts"
@@ -372,6 +373,8 @@ class Scheduler
     std::atomic_int32_t monitorLocallyScheduledTasks;
     std::atomic_int32_t monitorStartedTasks;
     std::atomic_int32_t monitorWaitingTasks;
+
+    std::counting_semaphore<16384> executionSlotsSemaphore;
 
     // ----------------------------------
     // Function Migration

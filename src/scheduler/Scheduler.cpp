@@ -70,7 +70,8 @@ Scheduler& getScheduler()
 }
 
 Scheduler::Scheduler()
-  : thisHost(faabric::util::getSystemConfig().endpointHost)
+  : executionSlotsSemaphore(faabric::util::getUsableCores())
+  , thisHost(faabric::util::getSystemConfig().endpointHost)
   , conf(faabric::util::getSystemConfig())
   , reg(faabric::snapshot::getSnapshotRegistry())
   , broker(faabric::transport::getPointToPointBroker())
@@ -1547,7 +1548,8 @@ void Scheduler::getFunctionResultAsync(
               , mlr(std::move(mlr))
               , dsc(std::move(dsc))
               , handler(handler)
-            {}
+            {
+            }
 
             ~MlrAwaiter()
             {
