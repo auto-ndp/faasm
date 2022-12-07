@@ -55,6 +55,15 @@ message UnregisterRequest {
     string function = 3;
 }
 
+message GetNdpDelta {
+    int32 id = 1;
+}
+
+message NdpDelta {
+    int32 id = 1;
+    bytes delta = 2;
+}
+
 message FunctionStatusResponse {
     enum FunctionStatus {
         OK = 0;

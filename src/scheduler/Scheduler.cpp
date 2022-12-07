@@ -374,7 +374,8 @@ void Scheduler::vacateSlot()
 
 faabric::util::SchedulingDecision Scheduler::callFunctions(
   std::shared_ptr<faabric::BatchExecuteRequest> req,
-  const MessageRecord& caller)
+  const MessageRecord& caller,
+  std::shared_ptr<void> extraData)
 {
     ZoneScopedNS("Scheduler::callFunctions", 5);
 
@@ -410,8 +411,12 @@ faabric::util::SchedulingDecision Scheduler::callFunctions(
     SchedulingDecision decision = doSchedulingDecision(req, topologyHint);
 
     // Pass decision as hint
-    return doCallFunctions(
-      std::move(req), decision, caller, lock, topologyHint);
+    return doCallFunctions(std::move(req),
+                           decision,
+                           caller,
+                           lock,
+                           topologyHint,
+                           std::move(extraData));
 }
 
 faabric::util::SchedulingDecision Scheduler::makeSchedulingDecision(
@@ -683,14 +688,16 @@ faabric::util::SchedulingDecision Scheduler::doSchedulingDecision(
 faabric::util::SchedulingDecision Scheduler::callFunctions(
   std::shared_ptr<faabric::BatchExecuteRequest> req,
   faabric::util::SchedulingDecision& hint,
-  const MessageRecord& caller)
+  const MessageRecord& caller,
+  std::shared_ptr<void> extraData)
 {
     faabric::util::FullLock lock(mx);
     return doCallFunctions(std::move(req),
                            hint,
                            caller,
                            lock,
-                           faabric::util::SchedulingTopologyHint::NONE);
+                           faabric::util::SchedulingTopologyHint::NONE,
+                           std::move(extraData));
 }
 
 faabric::util::SchedulingDecision Scheduler::doCallFunctions(
@@ -698,7 +705,8 @@ faabric::util::SchedulingDecision Scheduler::doCallFunctions(
   faabric::util::SchedulingDecision& decision,
   const MessageRecord& caller,
   faabric::util::FullLock& lock,
-  faabric::util::SchedulingTopologyHint topologyHint)
+  faabric::util::SchedulingTopologyHint topologyHint,
+  std::shared_ptr<void> extraData)
 {
     ZoneScopedNS("Scheduler::doCallFunctions", 5);
     const faabric::Message& firstMsg = req->messages().at(0);
@@ -920,7 +928,7 @@ faabric::util::SchedulingDecision Scheduler::doCallFunctions(
                 assert(e != nullptr);
 
                 // Execute the tasks
-                e->executeTasks(thisHostIdxs, req);
+                e->executeTasks(thisHostIdxs, req, extraData);
             } else {
                 // Non-threads require one executor per task
                 for (auto i : thisHostIdxs) {
@@ -940,7 +948,7 @@ faabric::util::SchedulingDecision Scheduler::doCallFunctions(
 
                     std::shared_ptr<Executor> e =
                       claimExecutor(std::move(localMsg));
-                    e->executeTasks({ i }, req);
+                    e->executeTasks({ i }, req, extraData);
                 }
             }
         } else {
@@ -1041,7 +1049,8 @@ void Scheduler::broadcastSnapshotDelete(const faabric::Message& msg,
 
 void Scheduler::callFunction(faabric::Message& msg,
                              bool forceLocal,
-                             const MessageRecord& caller)
+                             const MessageRecord& caller,
+                             std::shared_ptr<void> extraData)
 {
     // TODO - avoid this copy
     auto req = faabric::util::batchExecFactory();
@@ -1055,7 +1064,7 @@ void Scheduler::callFunction(faabric::Message& msg,
     }
 
     // Make the call
-    callFunctions(req, caller);
+    callFunctions(req, caller, std::move(extraData));
 }
 
 void Scheduler::clearRecordedMessages()
@@ -2019,5 +2028,11 @@ void Scheduler::doStartFunctionMigrationThread(
                     firstMsg.migrationcheckperiod(),
                     functionMigrationThread.getIntervalSeconds());
     }
+}
+
+void Scheduler::addLocalResultSlot(int functionId)
+{
+    faabric::util::UniqueLock resultsLock(localResultsMutex);
+    localResults.insert({ functionId, std::make_shared<MessageLocalResult>() });
 }
 }

@@ -33,10 +33,13 @@
 namespace faabric::scheduler {
 
 ExecutorTask::ExecutorTask(int messageIndexIn,
-                           std::shared_ptr<faabric::BatchExecuteRequest> reqIn)
+                           std::shared_ptr<faabric::BatchExecuteRequest> reqIn,
+                           std::shared_ptr<void> extraData)
   : req(std::move(reqIn))
+  , extraData(std::move(extraData))
   , messageIndex(messageIndexIn)
-{}
+{
+}
 
 Executor::Executor(faabric::MessageInBatch msg)
   : boundMessage(std::move(msg))
@@ -204,7 +207,8 @@ std::vector<std::pair<uint32_t, int32_t>> Executor::executeThreads(
 }
 
 void Executor::executeTasks(std::vector<int> msgIdxs,
-                            std::shared_ptr<faabric::BatchExecuteRequest> req)
+                            std::shared_ptr<faabric::BatchExecuteRequest> req,
+                            std::shared_ptr<void> extraData)
 {
     ZoneScopedNS("Executor::executeTasks", 5);
     const std::string funcStr = faabric::util::funcToString(req);
@@ -327,7 +331,7 @@ void Executor::executeTasks(std::vector<int> msgIdxs,
         }
 
         // Enqueue the task
-        threadTaskQueues[threadPoolIdx].enqueue(ExecutorTask(msgIdx, req));
+        threadTaskQueues[threadPoolIdx].enqueue(ExecutorTask(msgIdx, req, extraData));
 
         // Lazily create the thread
         if (threadPoolThreads.at(threadPoolIdx) == nullptr) {
@@ -348,6 +352,9 @@ std::shared_ptr<faabric::util::SnapshotData> Executor::getMainThreadSnapshot(
   faabric::Message& msg,
   bool createIfNotExists)
 {
+    if (msg.appid() == 0) {
+        return nullptr;
+    }
     std::string snapshotKey = faabric::util::getMainThreadSnapshotKey(msg);
     bool exists = false;
     {
@@ -379,6 +386,10 @@ std::shared_ptr<faabric::util::SnapshotData> Executor::getMainThreadSnapshot(
 
 void Executor::deleteMainThreadSnapshot(const faabric::Message& msg)
 {
+    if (msg.appid() == 0) {
+        return;
+    }
+
     std::string snapshotKey = faabric::util::getMainThreadSnapshotKey(msg);
 
     if (reg.snapshotExists(snapshotKey)) {
@@ -519,22 +530,22 @@ void Executor::threadPoolThread(std::stop_token st, int threadPoolIdx)
                 ZoneScopedN("Execute task");
                 returnValue =
                   executeTask(threadPoolIdx, task.messageIndex, task.req);
-	        } catch (const faabric::util::FunctionMigratedException& ex) {
-	            SPDLOG_DEBUG(
-	              "Task {} migrated, shutting down executor {}", msg.id(), id);
+            } catch (const faabric::util::FunctionMigratedException& ex) {
+                SPDLOG_DEBUG(
+                  "Task {} migrated, shutting down executor {}", msg.id(), id);
 
-	            // Note that when a task has been migrated, we need to perform all
-	            // the normal executor shutdown, but we must NOT set the result for
-				// the call
-            	returnValue = MIGRATED_FUNCTION_RETURN_VALUE;
+                // Note that when a task has been migrated, we need to perform
+                // all the normal executor shutdown, but we must NOT set the
+                // result for the call
+                returnValue = MIGRATED_FUNCTION_RETURN_VALUE;
 
-	            // MPI migration
-	            if (msg.ismpi()) {
-	                auto& mpiWorld =
-	                  faabric::scheduler::getMpiWorldRegistry().getWorld(
-	                    msg.mpiworldid());
-	                mpiWorld.destroy();
-	            }
+                // MPI migration
+                if (msg.ismpi()) {
+                    auto& mpiWorld =
+                      faabric::scheduler::getMpiWorldRegistry().getWorld(
+                        msg.mpiworldid());
+                    mpiWorld.destroy();
+                }
             } catch (const std::exception& ex) {
                 returnValue = 1;
 
@@ -581,49 +592,52 @@ void Executor::threadPoolThread(std::stop_token st, int threadPoolIdx)
                      oldTaskCount - 1);
 
         // Handle last-in-batch dirty tracking
-        std::string mainThreadSnapKey =
-          faabric::util::getMainThreadSnapshotKey(msg);
+        std::string mainThreadSnapKey;
         std::vector<faabric::util::SnapshotDiff> diffs;
-        if (isLastInBatch && doDirtyTracking && !skippedExec) {
-			ZoneScopedN("Task snapshot diff push");
-            // Stop non-thread-local tracking as we're the last in the batch
-            std::span<uint8_t> memView = getMemoryView();
-            tracker->stopTracking(memView);
+        if (isThreads) {
+            mainThreadSnapKey = faabric::util::getMainThreadSnapshotKey(msg);
+            if (isLastInBatch && doDirtyTracking && !skippedExec) {
+                ZoneScopedN("Task snapshot diff push");
+                // Stop non-thread-local tracking as we're the last in the batch
+                std::span<uint8_t> memView = getMemoryView();
+                tracker->stopTracking(memView);
 
-            // Merge all dirty regions
-            {
-                faabric::util::FullLock lock(threadExecutionMutex);
+                // Merge all dirty regions
+                {
+                    faabric::util::FullLock lock(threadExecutionMutex);
 
-                // Merge together regions from all threads
-                faabric::util::mergeManyDirtyPages(dirtyRegions,
-                                                   threadLocalDirtyRegions);
+                    // Merge together regions from all threads
+                    faabric::util::mergeManyDirtyPages(dirtyRegions,
+                                                       threadLocalDirtyRegions);
 
-                // Clear thread-local dirty regions, no longer needed
-                threadLocalDirtyRegions.clear();
+                    // Clear thread-local dirty regions, no longer needed
+                    threadLocalDirtyRegions.clear();
 
-                // Merge the globally tracked regions
-                std::vector<char> globalDirtyRegions =
-                  tracker->getDirtyPages(memView);
-                faabric::util::mergeDirtyPages(dirtyRegions,
-                                               globalDirtyRegions);
+                    // Merge the globally tracked regions
+                    std::vector<char> globalDirtyRegions =
+                      tracker->getDirtyPages(memView);
+                    faabric::util::mergeDirtyPages(dirtyRegions,
+                                                   globalDirtyRegions);
+                }
+
+                // Fill snapshot gaps with overwrite regions first
+                auto snap = reg.getSnapshot(mainThreadSnapKey);
+                snap->fillGapsWithBytewiseRegions();
+
+                // Compare snapshot with all dirty regions for this executor
+                {
+                    // Do the diffing
+                    faabric::util::FullLock lock(threadExecutionMutex);
+                    diffs = snap->diffWithDirtyRegions(memView, dirtyRegions);
+                    dirtyRegions.clear();
+                }
+
+                // If last in batch on this host, clear the merge regions (only
+                // needed for doing the diffing on the current host)
+                SPDLOG_DEBUG("Clearing merge regions for {}",
+                             mainThreadSnapKey);
+                snap->clearMergeRegions();
             }
-
-            // Fill snapshot gaps with overwrite regions first
-            auto snap = reg.getSnapshot(mainThreadSnapKey);
-            snap->fillGapsWithBytewiseRegions();
-
-            // Compare snapshot with all dirty regions for this executor
-            {
-                // Do the diffing
-                faabric::util::FullLock lock(threadExecutionMutex);
-                diffs = snap->diffWithDirtyRegions(memView, dirtyRegions);
-                dirtyRegions.clear();
-            }
-
-            // If last in batch on this host, clear the merge regions (only
-            // needed for doing the diffing on the current host)
-            SPDLOG_DEBUG("Clearing merge regions for {}", mainThreadSnapKey);
-            snap->clearMergeRegions();
         }
 
         // Finally set the result of the task, this will allow anything waiting
@@ -678,6 +692,8 @@ void Executor::threadPoolThread(std::stop_token st, int threadPoolIdx)
             releaseClaim();
         }
 
+        task = ExecutorTask();
+
         // Return this thread index to the pool available for scheduling
         {
             faabric::util::UniqueLock lock(threadsMutex);
@@ -695,10 +711,8 @@ void Executor::threadPoolThread(std::stop_token st, int threadPoolIdx)
         // executor.
         ZoneScopedN("Task vacate slot");
         sch.vacateSlot();
-
-
     }
-            softShutdown();
+    softShutdown();
 }
 
 bool Executor::tryClaim()

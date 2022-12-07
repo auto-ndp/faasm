@@ -1,3 +1,4 @@
+#include "faabric.pb.h"
 #include <faabric/proto/faabric.pb.h>
 #include <faabric/scheduler/FunctionCallClient.h>
 #include <faabric/transport/common.h>
@@ -104,7 +105,8 @@ FunctionCallClient::FunctionCallClient(const std::string& hostIn)
   : faabric::transport::MessageEndpointClient(hostIn,
                                               FUNCTION_CALL_ASYNC_PORT,
                                               FUNCTION_CALL_SYNC_PORT)
-{}
+{
+}
 
 void FunctionCallClient::sendFlush()
 {
@@ -190,5 +192,14 @@ void FunctionCallClient::unregister(faabric::UnregisterRequest& req)
     } else {
         asyncSend(faabric::scheduler::FunctionCalls::Unregister, &req);
     }
+}
+
+faabric::NdpDelta FunctionCallClient::requestNdpDelta(int msgId)
+{
+    faabric::GetNdpDelta gnd;
+    gnd.set_id(msgId);
+    faabric::NdpDelta delta;
+    syncSend(faabric::scheduler::FunctionCalls::NdpDeltaRequest, &gnd, &delta);
+    return delta;
 }
 }

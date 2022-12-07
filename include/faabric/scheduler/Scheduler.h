@@ -50,7 +50,8 @@ class ExecutorTask
     ExecutorTask() = default;
 
     ExecutorTask(int messageIndexIn,
-                 std::shared_ptr<faabric::BatchExecuteRequest> reqIn);
+                 std::shared_ptr<faabric::BatchExecuteRequest> reqIn,
+                 std::shared_ptr<void> extraData = nullptr);
 
     // Delete everything copy-related, default everything move-related
     ExecutorTask(const ExecutorTask& other) = delete;
@@ -62,6 +63,7 @@ class ExecutorTask
     ExecutorTask& operator=(ExecutorTask&& other) = default;
 
     std::shared_ptr<faabric::BatchExecuteRequest> req;
+    std::shared_ptr<void> extraData; // Gets freed when the executor finishes
     int messageIndex = 0;
 };
 
@@ -80,7 +82,8 @@ class Executor
       const std::vector<faabric::util::SnapshotMergeRegion>& mergeRegions);
 
     void executeTasks(std::vector<int> msgIdxs,
-                      std::shared_ptr<faabric::BatchExecuteRequest> req);
+                      std::shared_ptr<faabric::BatchExecuteRequest> req,
+                      std::shared_ptr<void> extraData = nullptr);
 
     virtual void shutdown();
 
@@ -230,16 +233,19 @@ class Scheduler
 
     void callFunction(faabric::Message& msg,
                       bool forceLocal = false,
-                      const MessageRecord& caller = {});
+                      const MessageRecord& caller = {},
+                      std::shared_ptr<void> extraData = nullptr);
 
     faabric::util::SchedulingDecision callFunctions(
       std::shared_ptr<faabric::BatchExecuteRequest> req,
-      const MessageRecord& caller = {});
+      const MessageRecord& caller = {},
+      std::shared_ptr<void> extraData = nullptr);
 
     faabric::util::SchedulingDecision callFunctions(
       std::shared_ptr<faabric::BatchExecuteRequest> req,
       faabric::util::SchedulingDecision& hint,
-      const MessageRecord& caller = {});
+      const MessageRecord& caller = {},
+      std::shared_ptr<void> extraData = nullptr);
 
     void reset();
 
@@ -397,6 +403,8 @@ class Scheduler
     std::shared_ptr<faabric::snapshot::SnapshotClient> getSnapshotClient(
       const std::string& otherHost);
 
+    void addLocalResultSlot(int functionId);
+
   private:
     int monitorFd = -1;
 
@@ -451,7 +459,8 @@ class Scheduler
       faabric::util::SchedulingDecision& decision,
       const MessageRecord& caller,
       faabric::util::FullLock& lock,
-      faabric::util::SchedulingTopologyHint topologyHint);
+      faabric::util::SchedulingTopologyHint topologyHint,
+      std::shared_ptr<void> extraData);
 
     std::shared_ptr<Executor> claimExecutor(const faabric::MessageInBatch& msg);
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "faabric.pb.h"
 #include <faabric/proto/faabric.pb.h>
 #include <faabric/scheduler/FunctionCallApi.h>
 #include <faabric/transport/MessageEndpoint.h>
@@ -52,5 +53,7 @@ class FunctionCallClient : public faabric::transport::MessageEndpointClient
     void sendDirectResult(faabric::Message msg);
 
     void unregister(faabric::UnregisterRequest& req);
+
+    faabric::NdpDelta requestNdpDelta(int msgId);
 };
 }

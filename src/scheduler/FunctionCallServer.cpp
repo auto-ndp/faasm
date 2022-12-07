@@ -1,8 +1,10 @@
+#include "faabric.pb.h"
 #include <faabric/scheduler/FunctionCallServer.h>
 #include <faabric/snapshot/SnapshotRegistry.h>
 #include <faabric/state/State.h>
 #include <faabric/transport/common.h>
 #include <faabric/transport/macros.h>
+#include <faabric/util/concurrent_map.h>
 #include <faabric/util/config.h>
 #include <faabric/util/func.h>
 #include <faabric/util/logging.h>
@@ -16,7 +18,23 @@ FunctionCallServer::FunctionCallServer()
       FUNCTION_INPROC_LABEL,
       faabric::util::getSystemConfig().functionServerThreads)
   , scheduler(getScheduler())
-{}
+{
+}
+
+static faabric::util::ConcurrentMap<int, std::function<std::vector<uint8_t>()>>
+  ndpDeltaHandlers;
+
+void FunctionCallServer::registerNdpDeltaHandler(
+  int id,
+  std::function<std::vector<uint8_t>()> handler)
+{
+    ndpDeltaHandlers.insertOrAssign(id, std::move(handler));
+}
+
+void FunctionCallServer::removeNdpDeltaHandler(int id)
+{
+    ndpDeltaHandlers.erase(id);
+}
 
 void FunctionCallServer::doAsyncRecv(transport::Message& message)
 {
@@ -54,6 +72,9 @@ std::unique_ptr<google::protobuf::Message> FunctionCallServer::doSyncRecv(
         }
         case faabric::scheduler::FunctionCalls::PendingMigrations: {
             return recvPendingMigrations(message.udata());
+        }
+        case faabric::scheduler::FunctionCalls::NdpDeltaRequest: {
+            return recvNdpDeltaRequest(message.udata());
         }
         default: {
             throw std::runtime_error(
@@ -123,10 +144,24 @@ FunctionCallServer::recvPendingMigrations(std::span<const uint8_t> buffer)
 {
     PARSE_MSG(faabric::PendingMigrations, buffer.data(), buffer.size());
 
-    auto msgPtr = std::make_shared<faabric::PendingMigrations>(std::move(parsedMsg));
+    auto msgPtr =
+      std::make_shared<faabric::PendingMigrations>(std::move(parsedMsg));
 
     scheduler.addPendingMigration(msgPtr);
 
     return std::make_unique<faabric::EmptyResponse>();
+}
+
+std::unique_ptr<google::protobuf::Message>
+FunctionCallServer::recvNdpDeltaRequest(std::span<const uint8_t> buffer)
+{
+    PARSE_MSG(faabric::GetNdpDelta, buffer.data(), buffer.size());
+
+    auto ndpDelta = ndpDeltaHandlers.get(parsedMsg.id()).value()();
+
+    auto response = std::make_unique<faabric::NdpDelta>();
+    response->mutable_delta()->assign(
+      reinterpret_cast<const char*>(ndpDelta.data()), ndpDelta.size());
+    return response;
 }
 }

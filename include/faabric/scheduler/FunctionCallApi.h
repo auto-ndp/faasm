@@ -10,5 +10,6 @@ enum FunctionCalls
     GetResources = 4,
     PendingMigrations = 5,
     DirectResult = 6,
+    NdpDeltaRequest = 7,
 };
 }

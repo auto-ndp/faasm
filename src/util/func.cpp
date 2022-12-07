@@ -188,7 +188,7 @@ std::vector<std::string> getArgvForMessage(const faabric::Message& msg)
 std::string getMainThreadSnapshotKey(const faabric::Message& msg)
 {
     std::string funcStr = faabric::util::funcToString(msg, false);
-    assert(msg.appid() > 0);
+    // assert(msg.appid() > 0);
 
     std::string snapshotKey = funcStr + "_" + std::to_string(msg.appid());
     return snapshotKey;
