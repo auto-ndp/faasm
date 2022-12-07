@@ -30,6 +30,6 @@ faabric_gid_t generateGid()
     while (result == 0) {
         result = gidKeyHash + counter.fetch_add(1);
     }
-    return result;
+    return result & 0x7FFFFFFF;
 }
 }
