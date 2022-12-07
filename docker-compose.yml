@@ -30,7 +30,9 @@ services:
       - ./:/usr/local/code/faasm/
       - ./deploy/conf/ceph/ceph.conf:/etc/ceph/ceph.conf:ro
       - ${FAASM_BUILD_DIR}:${FAASM_BUILD_MOUNT}
+      - ${FAASM_BUILD_DIR}/lib/libfaasm_ceph.so:/usr/lib/x86_64-linux-gnu/rados-classes/libcls_faasm.so:ro
       - ./dev/faasm-local/:/usr/local/faasm/
+      - ./dev/dev-run/:/run/faasm
       - /sys/kernel/debug:/sys/kernel/debug
       - /sys/kernel/debug/tracing:/sys/kernel/debug/tracing
     restart: on-failure
@@ -45,7 +47,9 @@ services:
       - ./:/usr/local/code/faasm/
       - ./deploy/conf/ceph/ceph.conf:/etc/ceph/ceph.conf:ro
       - ${FAASM_BUILD_DIR}:${FAASM_BUILD_MOUNT}
+      - ${FAASM_BUILD_DIR}/lib/libfaasm_ceph.so:/usr/lib/x86_64-linux-gnu/rados-classes/libcls_faasm.so:ro
       - ./dev/faasm-local/:/usr/local/faasm/
+      - ./dev/dev-run/:/run/faasm
       - /sys/kernel/debug:/sys/kernel/debug
       - /sys/kernel/debug/tracing:/sys/kernel/debug/tracing
       - /dev:/dev
@@ -178,6 +182,7 @@ services:
       - ./deploy/conf/ceph/ceph.conf:/etc/ceph/ceph.conf:ro
       - ${FAASM_BUILD_DIR}:${FAASM_BUILD_MOUNT}
       - ./dev/faasm-local/:${FAASM_LOCAL_MOUNT}
+      - ./dev/dev-run/:/run/faasm
       - aesmd-socket:/var/run/aesmd
       - ./dev/container/shared_store/:/usr/local/faasm/debug_shared_store/
       - ${SGX_DEVICE_MOUNT_DIR:-./dev/faasm-local/sgx}:/dev/sgx
@@ -245,10 +250,6 @@ services:
     depends_on:
       - redis-state
       - redis-queue
-      - ceph-mon1
-      - ceph-osd1
-      - ceph-osd2
-      - ceph-osd3
     environment:
       - UPLOAD_HOST=${UPLOAD_HOST:-upload}
       - INVOKE_HOST=${INVOKE_HOST:-worker}

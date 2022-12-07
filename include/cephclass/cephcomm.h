@@ -1,5 +1,6 @@
 #include "cephcomm_generated.h"
 
+#include <asm-generic/errno.h>
 #include <cassert>
 #include <cstdio>
 #include <endian.h>
@@ -9,6 +10,7 @@
 #include <stdexcept>
 #include <sys/poll.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/un.h>
 #include <vector>
 
@@ -17,7 +19,7 @@
 namespace faasm {
 
 inline const std::string_view DEFAULT_FAASM_CEPH_SOCKET_PATH =
-  "/run/faasm-ndp.sock";
+  "/run/faasm/faasm-ndp.sock";
 
 enum class SocketType
 {
@@ -34,6 +36,27 @@ class CephFaasmSocket
       : type(type)
       , bindAddr(path)
     {
+        if (type == SocketType::listen) {
+            ::mkdir("/run/faasm", 0777);
+        } else {
+            struct stat st;
+            int sleepUs = 1000;
+            for (int i = 0; i < 10; i++, sleepUs *= 10) {
+                if (sleepUs > 2000000) {
+                    sleepUs = 2000000;
+                }
+                int ec = ::stat(path.data(), &st);
+                if (ec >= 0)
+                    break;
+                if (errno == ENOENT) {
+                    ::usleep(sleepUs);
+                    continue;
+                }
+                perror("Connecting to the ceph-faasm socket");
+                throw std::runtime_error(
+                  "Can't connect to the ceph-faasm socket");
+            }
+        }
         sockaddr_un addr = { AF_UNIX, { 0 } };
         if (path.size() >= sizeof(addr.sun_path)) {
             throw std::runtime_error("Path too long for socket");
@@ -47,8 +70,15 @@ class CephFaasmSocket
             throw std::runtime_error(
               "Couldn't create an fd for a ceph-faasm socket");
         }
+
+        linger lin;
+        lin.l_onoff = 1;
+        lin.l_linger = 1;
+        setsockopt(fd, SOL_SOCKET, SO_LINGER, &lin, sizeof(lin));
+
         switch (type) {
             case SocketType::listen: {
+                unlink(addr.sun_path);
                 if (::bind(fd,
                            reinterpret_cast<const sockaddr*>(&addr),
                            sizeof(addr)) < 0) {
@@ -58,6 +88,7 @@ class CephFaasmSocket
                     throw std::runtime_error(
                       "Couldn't bind the ceph-faasm socket");
                 }
+                ::chmod(addr.sun_path, 0777);
                 if (::listen(fd, 1024) < 0) {
                     ::perror("Couldn't listen on the ceph-faasm socket");
                     ::close(fd);
@@ -194,7 +225,7 @@ class CephFaasmSocket
     void recvMessageData(uint8_t* msgData, size_t msgSize) const
     {
         assert(this->type == SocketType::connect);
-        rawSendBytes(msgData, msgSize);
+        rawRecvBytes(msgData, msgSize);
     }
 
     std::vector<uint8_t> recvMessageVector() const

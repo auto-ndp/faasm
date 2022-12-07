@@ -1,9 +1,11 @@
 #include "WAVMWasmModule.h"
 #include "cephcomm_generated.h"
+#include "faabric/scheduler/Scheduler.h"
 #include "syscalls.h"
 
 #include <exception>
 #include <faabric/scheduler/ExecutorContext.h>
+#include <faabric/scheduler/FunctionCallServer.h>
 #include <faabric/snapshot/SnapshotRegistry.h>
 #include <faabric/state/State.h>
 #include <faabric/util/bytes.h>
@@ -277,26 +279,47 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
 
     bool callLocally = true;
     if (!call->forbidndp() && !config.isStorageNode) {
+        using namespace faasm;
         callLocally = false;
 
         std::vector<int32_t> wasmGlobals = thisModule->getGlobals();
 
         const int ndpCallId = faabric::util::generateGid() & 0xFFFF'FFFF;
 
+        faabric::scheduler::FunctionCallServer::registerNdpDeltaHandler(
+          ndpCallId, [thisModule, callId = call->id()]() {
+              auto zygoteSnapshotKV = thisModule->getZygoteSnapshot();
+              const std::span<const uint8_t> zygoteSnapshot{
+                  zygoteSnapshotKV->get(), zygoteSnapshotKV->size()
+              };
+              auto zygoteDelta = thisModule->deltaSnapshot(zygoteSnapshot);
+
+              SPDLOG_INFO("{} - NDP sending snapshot of {} bytes",
+                          callId,
+                          zygoteDelta.size());
+              return zygoteDelta;
+          });
+        faabric::scheduler::getScheduler().addLocalResultSlot(ndpCallId);
+
         // begin ceph aio
         flatbuffers::FlatBufferBuilder builder(256);
         {
-            namespace ndpmsg = faasm::ndpmsg;
             auto fBucket = builder.CreateString(call->user());
-            auto fKey = builder.CreateString(call->function());
+            auto fFunction = builder.CreateString(call->function());
+            auto fKey = builder.CreateString(keyStr);
             auto fObjInfo = ndpmsg::CreateObjectInfo(builder, fBucket, fKey);
 
             auto fPyPtr = builder.CreateString(pyFuncName);
             auto fGlobals = builder.CreateVector(wasmGlobals);
             auto fArgs =
               builder.CreateVector(extraArgs.data(), extraArgs.size());
-            auto fWasmInfo = ndpmsg::CreateWasmInfo(
-              builder, fBucket, fKey, wasmFuncPtr, fPyPtr, fGlobals, fArgs);
+            auto fWasmInfo = ndpmsg::CreateWasmInfo(builder,
+                                                    fBucket,
+                                                    fFunction,
+                                                    wasmFuncPtr,
+                                                    fPyPtr,
+                                                    fGlobals,
+                                                    fArgs);
 
             auto fOriginHost = builder.CreateString(config.endpointHost);
             auto ndpRequest = ndpmsg::CreateNdpRequest(
@@ -307,50 +330,87 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
         const std::span<const uint8_t> inputSpan(builder.GetBufferPointer(),
                                                  builder.GetSize());
 
-        auto cephCompletion = s3w.asyncNdpCall(
-          call->user(), keyStr, "faasm", "maybe_exec_wasm_ro", inputSpan);
+        std::vector<uint8_t> cephOutput(1024);
+        auto cephCompletion = s3w.asyncNdpCall(call->user(),
+                                               keyStr,
+                                               "faasm",
+                                               "maybe_exec_wasm_ro",
+                                               inputSpan,
+                                               cephOutput);
 
-        auto zygoteSnapshotKV = thisModule->getZygoteSnapshot();
-        const std::span<const uint8_t> zygoteSnapshot{
-            zygoteSnapshotKV->get(), zygoteSnapshotKV->size()
-        };
-        auto zygoteDelta = thisModule->deltaSnapshot(zygoteSnapshot);
-
-        SPDLOG_INFO("{} - NDP sending snapshot of {} bytes",
-                    call->id(),
-                    zygoteDelta.size());
-
-        faabric::Message ndpResult = awaitChainedCallMessage(ndpCallId);
-
-        if (ndpResult.returnvalue() != 0) {
-            call->set_outputdata(ndpResult.outputdata());
-            SPDLOG_DEBUG("Chained NDP resulted in error code {}",
-                         ndpResult.returnvalue());
-            return ndpResult.returnvalue();
+        while (!cephCompletion.isComplete()) {
+            cephCompletion.wait();
+        }
+        int cephEc = cephCompletion.getReturnValue();
+        if (cephEc < 0) {
+            SPDLOG_ERROR("Ceph NDP call {} for {}/{} failed with error {}",
+                         ndpCallId,
+                         call->user(),
+                         call->function(),
+                         strerror(-cephEc));
+            throw std::runtime_error("Ceph NDP call failed with an error.");
         }
 
-        {
-            // restore globals
-            for (int i = 0; i < ndpResult.wasmglobals_size(); i++) {
-                int32_t value = ndpResult.wasmglobals(i);
-                SPDLOG_DEBUG("Restoring global #{}: new {} <- old {}",
-                             i,
-                             value,
-                             wasmGlobals.at(i));
-                thisModule->updateGlobal(i, value);
+        verifyFlatbuf<ndpmsg::NdpResponse>(cephOutput);
+        const auto* ndpResponse =
+          flatbuffers::GetRoot<ndpmsg::NdpResponse>(cephOutput.data());
+        if (ndpResponse->call_id() != ndpCallId) {
+            throw std::runtime_error("Mismatched call ids in storage message!");
+        }
+        switch (ndpResponse->result()) {
+            case ndpmsg::NdpResult_Ok:
+                break;
+            case ndpmsg::NdpResult_Error: {
+                SPDLOG_ERROR("Ceph NDP call {} for {}/{} returned error {}",
+                             ndpCallId,
+                             call->user(),
+                             call->function(),
+                             ndpResponse->error_msg()->str());
+                throw std::runtime_error("Ceph NDP call returned an error.");
             }
+            case ndpmsg::NdpResult_ProcessLocally: {
+                callLocally = true;
+                break;
+            }
+            default:
+                throw std::runtime_error("Invalid NDP result code");
         }
+        if (!callLocally) {
+            faabric::Message ndpResult = awaitChainedCallMessage(ndpCallId);
 
-        SPDLOG_INFO("{} - NDP delta restore from {} bytes",
-                    call->id(),
-                    ndpResult.outputdata().size());
-        // faabric::util::writeBytesToFile(
-        //   "/usr/local/faasm/debug_shared_store/debug_delta.bin",
-        //   faabric::util::stringToBytes(ndpResult.outputdata()));
-        std::span<const uint8_t> memoryDelta =
-          std::span(BYTES_CONST(ndpResult.outputdata().data()),
-                    ndpResult.outputdata().size());
-        thisModule->deltaRestore(memoryDelta);
+            faabric::scheduler::FunctionCallServer::removeNdpDeltaHandler(
+              ndpCallId);
+
+            if (ndpResult.returnvalue() != 0) {
+                call->set_outputdata(ndpResult.outputdata());
+                SPDLOG_DEBUG("Chained NDP resulted in error code {}",
+                             ndpResult.returnvalue());
+                return ndpResult.returnvalue();
+            }
+
+            {
+                // restore globals
+                for (int i = 0; i < ndpResult.wasmglobals_size(); i++) {
+                    int32_t value = ndpResult.wasmglobals(i);
+                    SPDLOG_DEBUG("Restoring global #{}: new {} <- old {}",
+                                 i,
+                                 value,
+                                 wasmGlobals.at(i));
+                    thisModule->updateGlobal(i, value);
+                }
+            }
+
+            SPDLOG_INFO("{} - NDP delta restore from {} bytes",
+                        call->id(),
+                        ndpResult.outputdata().size());
+            // faabric::util::writeBytesToFile(
+            //   "/usr/local/faasm/debug_shared_store/debug_delta.bin",
+            //   faabric::util::stringToBytes(ndpResult.outputdata()));
+            std::span<const uint8_t> memoryDelta =
+              std::span(BYTES_CONST(ndpResult.outputdata().data()),
+                        ndpResult.outputdata().size());
+            thisModule->deltaRestore(memoryDelta);
+        }
     }
     if (callLocally) {
         ZoneScopedN("call locally");

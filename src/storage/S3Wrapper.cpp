@@ -685,7 +685,8 @@ RadosCompletion S3Wrapper::asyncNdpCall(const std::string& bucketName,
                                         const std::string& keyName,
                                         const std::string& funcClass,
                                         const std::string& funcName,
-                                        std::span<const uint8_t> inputData)
+                                        std::span<const uint8_t> inputData,
+                                        std::span<uint8_t> outputBuffer)
 {
     SPDLOG_TRACE(
       "Async Rados NDP call of {}:{} at {}/{} with {} bytes of input",
@@ -696,7 +697,6 @@ RadosCompletion S3Wrapper::asyncNdpCall(const std::string& bucketName,
       inputData.size());
     auto pool = RadosState::instance().getPool(bucketName);
     RadosCompletion completion(pool);
-    std::vector<uint8_t> outputBuf(1024);
     int ec = rados_aio_exec(pool->ioctx,
                             keyName.c_str(),
                             completion.completion,
@@ -704,8 +704,8 @@ RadosCompletion S3Wrapper::asyncNdpCall(const std::string& bucketName,
                             funcName.c_str(),
                             reinterpret_cast<const char*>(inputData.data()),
                             inputData.size(),
-                            reinterpret_cast<char*>(outputBuf.data()),
-                            outputBuf.size());
+                            reinterpret_cast<char*>(outputBuffer.data()),
+                            outputBuffer.size());
     if (ec < 0) {
         SPDLOG_ERROR("Key {}/{} cannot run {}:{}: {}",
                      bucketName,

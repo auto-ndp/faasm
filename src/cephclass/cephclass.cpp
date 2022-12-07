@@ -1,5 +1,7 @@
+#include <asm-generic/errno.h>
 #include <flatbuffers/buffer.h>
 #include <rados/buffer_fwd.h>
+#include <sys/poll.h>
 #define FMT_ENFORCE_COMPILE_STRING
 
 #include <cstdint>
@@ -130,6 +132,25 @@ int maybe_exec_wasm(cls_method_context_t hctx,
         ceph::buffer::list readBufferList;
         while (running) {
             readBufferList.clear();
+
+            struct pollfd pfd = runtime.getAcceptPollFd();
+            while (::poll(&pfd, 1, 30000) < 0) {
+                switch (errno) {
+                    case EAGAIN:
+                    case EINTR:
+                        continue;
+                    default:
+                        perror("Ceph-faasm socket poll error");
+                        return -errno;
+                }
+            }
+            if (pfd.revents == 0) {
+                // timed out
+                errorMsg = "Timed out waiting for Faasm-storage messages";
+                result = ndpmsg::NdpResult_Error;
+                running = false;
+            }
+
             const auto msgData = runtime.recvMessageVector();
             verifyFlatbuf<ndpmsg::StorageMessage>(msgData);
             const auto* topMsg =

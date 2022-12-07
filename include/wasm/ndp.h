@@ -1,7 +1,9 @@
 #pragma once
 
+#include "cephcomm_generated.h"
 #include <array>
 #include <cstdint>
+#include <flatbuffers/flatbuffer_builder.h>
 #include <functional>
 #include <span>
 #include <sstream>
@@ -14,6 +16,26 @@
 #include <faabric/util/bytes.h>
 
 namespace faasm {
+
+struct CephSocketCloser
+{
+  public:
+    CephSocketCloser() = default;
+    CephSocketCloser(const CephSocketCloser&) = delete;
+    CephSocketCloser& operator=(const CephSocketCloser&) = delete;
+    CephSocketCloser(CephSocketCloser&&) = default;
+    CephSocketCloser& operator=(CephSocketCloser&&) = default;
+    CephSocketCloser(std::shared_ptr<CephFaasmSocket> socket, uint64_t id)
+      : socket(std::move(socket))
+      , id(id)
+    {
+    }
+
+    ~CephSocketCloser();
+
+    std::shared_ptr<CephFaasmSocket> socket;
+    uint64_t id;
+};
 
 std::function<void(asio::io_context&)> getNdpEndpoint();
 

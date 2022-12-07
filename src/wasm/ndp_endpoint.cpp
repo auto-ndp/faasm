@@ -122,6 +122,7 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
                       ndpRequest->wasm()->user()->str(),
                       ndpRequest->wasm()->function()->str());
                     msg.set_id(ndpRequest->call_id());
+                    msg.set_appid(ndpRequest->call_id());
 
                     msg.set_funcptr(ndpRequest->wasm()->fptr());
                     msg.set_ispython(ndpRequest->wasm()->pyptr()->size() > 0);
@@ -139,8 +140,11 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
                       ndpRequest->wasm()->args()->cend());
                     msg.set_ndpcallobjectname(
                       ndpRequest->object()->key()->str());
-                    sch.callFunction(msg, true);
-
+                    sch.callFunction(msg,
+                                     true,
+                                     {},
+                                     std::make_shared<CephSocketCloser>(
+                                       connection, ndpRequest->call_id()));
                 } catch (std::exception& e) {
                     ndpError = e.what();
                     SPDLOG_ERROR(
@@ -320,6 +324,33 @@ tl::expected<std::vector<uint8_t>, std::exception_ptr> awaitNdpResponse(
             sock->lastMessageFlag.clear();
             return std::move(sock->lastMessage);
         }
+    }
+}
+
+CephSocketCloser::~CephSocketCloser()
+{
+    if (socket != nullptr) {
+        SPDLOG_DEBUG("Closing Ceph socket for {}", id);
+        flatbuffers::FlatBufferBuilder builder(64);
+        auto endField = ndpmsg::CreateNdpEnd(builder);
+        auto endMsg = ndpmsg::CreateStorageMessage(
+          builder, id, ndpmsg::TypedStorageMessage_NdpEnd, endField.Union());
+        builder.Finish(endMsg);
+        socket->sendMessage(builder.GetBufferPointer(), builder.GetSize());
+        socket = nullptr;
+    }
+}
+
+CephSocketCloser createSocketCloser(uint64_t id)
+{
+    auto weak = ndpSocketMap.get(id).value_or(std::weak_ptr<NdpConnection>());
+    if (auto strong = weak.lock(); strong != nullptr) {
+        CephSocketCloser closer;
+        closer.id = id;
+        closer.socket = strong->connection;
+        return closer;
+    } else {
+        return CephSocketCloser();
     }
 }
 

@@ -1,5 +1,6 @@
 #include "WAVM/Runtime/Runtime.h"
 #include "syscalls.h"
+#include "wasm/ndp.h"
 
 #include <absl/debugging/symbolize.h>
 #include <algorithm>
@@ -305,7 +306,8 @@ WAVMWasmModule::WAVMWasmModule() {}
 
 WAVMWasmModule::WAVMWasmModule(int threadPoolSizeIn)
   : WasmModule(threadPoolSizeIn)
-{}
+{
+}
 
 WAVMWasmModule& WAVMWasmModule::operator=(const WAVMWasmModule& other)
 {
@@ -1155,8 +1157,9 @@ int32_t WAVMWasmModule::executeFunction(faabric::Message& msg)
                 }
                 case (1): {
                     // NOTE - when we've got a function pointer that takes a
-	                // single argument we assume the message input data contains an
-	                // argument that is an integer to be passed to the function
+                    // single argument we assume the message input data contains
+                    // an argument that is an integer to be passed to the
+                    // function
                     if (msg.inputdata().empty()) {
                         invokeArgs = { 0 };
                     } else {
@@ -1821,10 +1824,11 @@ void WAVMWasmModule::executeWasmConstructorsFunction(Runtime::Instance* module)
 
     Runtime::Function* wasmCtorsFunction = getWasmConstructorsFunction(module);
     if (wasmCtorsFunction == nullptr) {
-        SPDLOG_ERROR("Did not find __wasm_call_ctors function for {}/{}",
+        SPDLOG_ERROR("Did not find {} function for {}/{}",
+                     WASM_CTORS_FUNC_NAME,
                      boundUser,
                      boundFunction);
-        throw std::runtime_error("Did not find __wasm_call_ctors");
+        throw std::runtime_error("Did not find " WASM_CTORS_FUNC_NAME);
     }
 
     IR::UntaggedValue result;

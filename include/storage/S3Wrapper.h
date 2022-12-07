@@ -127,7 +127,8 @@ class S3Wrapper
                                  const std::string& keyName,
                                  const std::string& funcClass,
                                  const std::string& funcName,
-                                 std::span<const uint8_t> inputData);
+                                 std::span<const uint8_t> inputData,
+                                 std::span<uint8_t> outputBuffer);
 
     /**
      * Calls setBufferLength(size) with the read size, and then writes to

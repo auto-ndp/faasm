@@ -539,6 +539,14 @@ int32_t WasmModule::executeTask(
     if (!zygoteDelta.empty()) {
         this->zygoteDeltaRestore(
           std::span(BYTES_CONST(zygoteDelta.data()), zygoteDelta.size()));
+    } else if (msg.isstorage()) {
+        ZoneNamedN(_zone_fetch, "Fetch NDP delta", true);
+        auto recvDelta = faabric::scheduler::getScheduler()
+                           .getFunctionCallClient(msg.directresulthost())
+                           ->requestNdpDelta(msg.id());
+        ZoneNamedN(_zone_apply, "Apply NDP delta", true);
+        this->zygoteDeltaRestore(std::span(
+          BYTES_CONST(recvDelta.delta().data()), recvDelta.delta().size()));
     }
 
     // Ignore stacks and guard pages in snapshot if present
