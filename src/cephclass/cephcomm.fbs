@@ -23,6 +23,12 @@ table NdpRequest {
     origin_host: string;
 }
 
+// (Second) Storage Ceph -> Storage Faasm
+table CephNdpRequest {
+    request: [ubyte] (nested_flatbuffer: "NdpRequest");
+    osd_name: string;
+}
+
 enum NdpResult: ubyte {
     // Processed remotely, data is a memory delta
     Ok = 0,

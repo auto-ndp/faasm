@@ -2,6 +2,7 @@
 #include <flatbuffers/buffer.h>
 #include <rados/buffer_fwd.h>
 #include <sys/poll.h>
+#include <unistd.h>
 #define FMT_ENFORCE_COMPILE_STRING
 
 #include <cstdint>
@@ -26,6 +27,7 @@ cls_handle_t h_class;
 cls_method_handle_t h_maybe_exec_wasm_ro;
 cls_method_handle_t h_maybe_exec_wasm_rw;
 cls_method_handle_t h_maybe_exec_wasm_wo;
+std::string myHostname;
 
 int maybe_exec_wasm_ro(cls_method_context_t hctx,
                        ceph::buffer::list* in,
@@ -61,6 +63,11 @@ CLS_INIT(faasm)
                             CLS_METHOD_WR,
                             maybe_exec_wasm_wo,
                             &h_maybe_exec_wasm_wo);
+
+    char hostnameBuf[256] = { 0 };
+    ::gethostname(hostnameBuf, sizeof(hostnameBuf));
+    myHostname =
+      std::string(hostnameBuf, ::strnlen(hostnameBuf, sizeof(hostnameBuf)));
 }
 
 namespace faasm {
@@ -110,7 +117,22 @@ int maybe_exec_wasm(cls_method_context_t hctx,
         CLS_LOG(5,
                 "Forwarding call request %llu to the Faasm runtime",
                 static_cast<unsigned long long>(callId));
-        runtime.sendMessage(input.data(), input.size());
+        fbs::FlatBufferBuilder fwdBuilder(input.size() + 128);
+        {
+            auto reqOffset = fwdBuilder.CreateVector(input);
+            auto hnOffset = fwdBuilder.CreateString(myHostname);
+            auto ndpOffset =
+              ndpmsg::CreateCephNdpRequest(fwdBuilder, reqOffset, hnOffset);
+            fwdBuilder.Finish(ndpOffset);
+        }
+        runtime.sendMessage(fwdBuilder.GetBufferPointer(),
+                            fwdBuilder.GetSize());
+
+        if (!runtime.pollFor(POLLIN, 5000)) {
+            // timed out
+            return -ETIMEDOUT;
+        }
+
         const auto initialRuntimeResponseData = runtime.recvMessageVector();
         verifyFlatbuf<ndpmsg::NdpResponse>(initialRuntimeResponseData);
         const auto* initialRuntimeResponse =
