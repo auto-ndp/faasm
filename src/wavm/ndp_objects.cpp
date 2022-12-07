@@ -151,9 +151,10 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
     U32* outDataLen = &Runtime::memoryRef<U32>(memoryPtr, (Uptr)outDataLenPtr);
     *outDataLen = 0;
 
-    SPDLOG_DEBUG("S - __faasmndp_getMmap - {} {} {:x} {}",
+    SPDLOG_DEBUG("S - __faasmndp_getMmap - {} {} key=`{}` {:x} {}",
                  keyPtr,
                  keyLen,
+                 keyStr,
                  maxRequestedLen,
                  outDataLenPtr);
 
@@ -195,9 +196,12 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
             auto maybeResponse = awaitNdpResponse(executingCall->id());
             if (maybeResponse.has_value()) {
                 const auto& response = maybeResponse.value();
+                SPDLOG_DEBUG("NDP Read response of size {}", response.size());
                 setBufferLength(response.size());
+                actualLength = response.size();
                 std::memcpy(bufferStart, response.data(), response.size());
             } else {
+                SPDLOG_DEBUG("NDP Read response error");
                 std::rethrow_exception(maybeResponse.error());
             }
         } else {
@@ -343,11 +347,26 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
         }
         int cephEc = cephCompletion.getReturnValue();
         if (cephEc < 0) {
-            SPDLOG_ERROR("Ceph NDP call {} for {}/{} failed with error {}",
-                         ndpCallId,
-                         call->user(),
-                         call->function(),
-                         strerror(-cephEc));
+            std::string cephErrStr = "<? ";
+            try {
+                verifyFlatbuf<ndpmsg::NdpResponse>(cephOutput);
+                const auto* ndpResponse =
+                  flatbuffers::GetRoot<ndpmsg::NdpResponse>(cephOutput.data());
+                cephErrStr = ndpResponse->error_msg()->str();
+            } catch (std::exception& e) {
+                cephErrStr = fmt::format(
+                  "<? could not decode {} bytes: {}>",
+                  cephOutput.size() -
+                    std::count(cephOutput.cbegin(), cephOutput.cend(), 0),
+                  e.what());
+            }
+            SPDLOG_ERROR(
+              "Ceph NDP call {} for {}/{} failed with error `{}`: {}",
+              ndpCallId,
+              call->user(),
+              call->function(),
+              strerror(-cephEc),
+              cephErrStr);
             throw std::runtime_error("Ceph NDP call failed with an error.");
         }
 

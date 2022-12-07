@@ -5,7 +5,6 @@
 #include <boost/system/detail/error_code.hpp>
 #include <condition_variable>
 #include <exception>
-#include <fcntl.h>
 #include <flatbuffers/flatbuffer_builder.h>
 #include <functional>
 #include <future>
@@ -39,19 +38,8 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
       , endpoint(std::move(endpoint))
       , sockConn(asio::make_strand(ioc))
     {
-        // Make the socket non-blocking
-        int flags = ::fcntl(connection->getFd(), F_GETFL);
-        if (flags < 0) {
-            perror("Couldn't get ndp connection flags");
-            throw std::runtime_error("Couldn't get ndp connection flags");
-        }
-        flags &= ~O_NONBLOCK;
-        int ec = ::fcntl(connection->getFd(), F_SETFL, flags);
-        if (ec < 0) {
-            perror("Couldn't unset O_NONBLOCK on the ndp connection flags");
-            throw std::runtime_error(
-              "Couldn't unset O_NONBLOCK on the ndp connection flags");
-        }
+        // Make the socket blocking
+        connection->setBlocking(true);
         // Pass to Asio
         sockConn.assign(asio::local::stream_protocol{}, connection->getFd());
     }
@@ -231,18 +219,7 @@ class NdpEndpoint : public std::enable_shared_from_this<NdpEndpoint>
       , sockAccept(asio::make_strand(ioc))
     {
         // Make the socket non-blocking
-        int flags = ::fcntl(socket.getFd(), F_GETFL);
-        if (flags < 0) {
-            perror("Couldn't get ndp socket flags");
-            throw std::runtime_error("Couldn't get ndp socket flags");
-        }
-        flags |= O_NONBLOCK;
-        int ec = ::fcntl(socket.getFd(), F_SETFL, flags);
-        if (ec < 0) {
-            perror("Couldn't set O_NONBLOCK on the ndp socket flags");
-            throw std::runtime_error(
-              "Couldn't set O_NONBLOCK on the ndp socket flags");
-        }
+        socket.setBlocking(false);
         // Pass to Asio
         sockAccept.assign(asio::local::stream_protocol{}, socket.getFd());
     }
@@ -283,6 +260,7 @@ class NdpEndpoint : public std::enable_shared_from_this<NdpEndpoint>
                 }
                 throw;
             }
+            doAccept();
         } else {
             SPDLOG_ERROR("Error waiting for accept on the ndp endpoint: {}",
                          ec.to_string());

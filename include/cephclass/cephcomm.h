@@ -7,6 +7,7 @@
 #include <memory>
 #include <string_view>
 
+#include <fcntl.h>
 #include <stdexcept>
 #include <sys/poll.h>
 #include <sys/socket.h>
@@ -99,15 +100,29 @@ class CephFaasmSocket
                 break;
             }
             case SocketType::connect: {
+                setBlocking(false);
                 if (::connect(fd,
                               reinterpret_cast<const sockaddr*>(&addr),
                               sizeof(addr)) < 0) {
-                    ::perror("Couldn't connect the ceph-faasm socket");
-                    ::close(fd);
-                    fd = -1;
-                    throw std::runtime_error(
-                      "Couldn't connect the ceph-faasm socket");
+                    if (errno == EINPROGRESS) {
+                        if (!pollFor(POLLOUT, 5000)) {
+                            ::close(fd);
+                            fd = -1;
+                            throw std::runtime_error(
+                              "Timeout trying to connect to the ceph-faasm "
+                              "socket");
+                        }
+                    } else {
+                        int ec = errno;
+                        ::perror("Couldn't connect the ceph-faasm socket");
+                        ::close(fd);
+                        fd = -1;
+                        errno = ec;
+                        throw std::runtime_error(
+                          "Couldn't connect the ceph-faasm socket");
+                    }
                 }
+                setBlocking(true);
             }
         }
     }
@@ -135,13 +150,44 @@ class CephFaasmSocket
 
     int getFd() const { return fd; }
 
-    struct pollfd getAcceptPollFd() const
+    void setBlocking(bool blocking)
+    {
+        int flags = ::fcntl(fd, F_GETFL);
+        if (flags < 0) {
+            perror("Couldn't get ndp connection flags");
+            throw std::runtime_error("Couldn't get ndp connection flags");
+        }
+        if (blocking) {
+            flags &= ~O_NONBLOCK;
+        } else {
+            flags |= O_NONBLOCK;
+        }
+        int ec = ::fcntl(fd, F_SETFL, flags);
+        if (ec < 0) {
+            perror("Couldn't modify O_NONBLOCK on the ndp connection flags");
+            throw std::runtime_error(
+              "Couldn't modify O_NONBLOCK on the ndp connection flags");
+        }
+    }
+
+    // Returns: false if timed out, true if ready
+    bool pollFor(int event, int timeoutMs)
     {
         pollfd pfd = {};
         pfd.fd = fd;
-        pfd.events = POLLIN;
+        pfd.events = event;
         pfd.revents = 0;
-        return pfd;
+        while (::poll(&pfd, 1, timeoutMs) < 0) {
+            switch (errno) {
+                case EAGAIN:
+                case EINTR:
+                    continue;
+                default:
+                    perror("Ceph-faasm socket poll error");
+                    return -errno;
+            }
+        }
+        return pfd.revents != 0;
     }
 
     CephFaasmSocket accept() const

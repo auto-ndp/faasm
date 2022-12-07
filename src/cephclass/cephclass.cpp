@@ -133,22 +133,12 @@ int maybe_exec_wasm(cls_method_context_t hctx,
         while (running) {
             readBufferList.clear();
 
-            struct pollfd pfd = runtime.getAcceptPollFd();
-            while (::poll(&pfd, 1, 30000) < 0) {
-                switch (errno) {
-                    case EAGAIN:
-                    case EINTR:
-                        continue;
-                    default:
-                        perror("Ceph-faasm socket poll error");
-                        return -errno;
-                }
-            }
-            if (pfd.revents == 0) {
+            if (!runtime.pollFor(POLLIN, 30000)) {
                 // timed out
                 errorMsg = "Timed out waiting for Faasm-storage messages";
                 result = ndpmsg::NdpResult_Error;
                 running = false;
+                break;
             }
 
             const auto msgData = runtime.recvMessageVector();
@@ -161,10 +151,12 @@ int maybe_exec_wasm(cls_method_context_t hctx,
             }
             switch (topMsg->message_type()) {
                 case ndpmsg::TypedStorageMessage_NdpEnd: {
+                    CLS_LOG(5, "Received NDP end");
                     running = false;
                     break;
                 }
                 case ndpmsg::TypedStorageMessage_NdpRead: {
+                    CLS_LOG(5, "Received NDP read");
                     const auto* msg = topMsg->message_as_NdpRead();
                     int ec = cls_cxx_read(
                       hctx, msg->offset(), msg->upto_length(), &readBufferList);
@@ -178,6 +170,7 @@ int maybe_exec_wasm(cls_method_context_t hctx,
                     break;
                 }
                 case ndpmsg::TypedStorageMessage_NdpWrite: {
+                    CLS_LOG(5, "Received NDP write");
                     const auto* msg = topMsg->message_as_NdpWrite();
                     // Const cast safety: we do not modify the data in the
                     // buffer.
@@ -206,16 +199,18 @@ int maybe_exec_wasm(cls_method_context_t hctx,
     } catch (const std::exception& e) {
         result = ndpmsg::NdpResult_Error;
         errorMsg = fmt::format(
-          FMT_STRING("Exception caught in maybe_exec_wasm call {}: {}"),
+          FMT_STRING(
+            "Exception caught in maybe_exec_wasm call {}: {}; errno={}"),
           callId,
-          e.what());
+          e.what(),
+          strerror(errno));
         CLS_LOG(1, "%s", errorMsg.c_str());
     } catch (...) {
         result = ndpmsg::NdpResult_Error;
-        errorMsg = fmt::format(
-          FMT_STRING(
-            "Unknown exception type caught in maybe_exec_wasm call {}"),
-          callId);
+        errorMsg = fmt::format(FMT_STRING("Unknown exception type caught in "
+                                          "maybe_exec_wasm call {}; errno={}"),
+                               callId,
+                               strerror(errno));
         CLS_LOG(1, "%s", errorMsg.c_str());
     }
 
@@ -233,7 +228,7 @@ int maybe_exec_wasm(cls_method_context_t hctx,
       reinterpret_cast<const char*>(builder.GetBufferPointer()),
       builder.GetSize());
 
-    return (result == ndpmsg::NdpResult_Ok) ? 0 : -EFAULT;
+    return 0;
 }
 
 }
