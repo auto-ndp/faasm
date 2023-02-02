@@ -34,17 +34,28 @@ Update submodules:
 git submodule update --init --recursive
 ```
 
+Rebuild critical components in debug mode:
+```bash
+source bin/cluster_env.sh
+source bin/workon.sh
+
+./bin/refresh_local.sh
+./bin/cli.sh faasm
+inv dev.cmake
+inv dev.cc faasm_dev_tools
+```
+
 Start a Faasm cluster locally using `docker compose`:
 
 ```bash
-docker compose up -d --scale worker=2 nginx
+./deploy/local/dev_cluster.sh
 ```
 
 To compile, upload and invoke a C++ function using this local cluster you can
 use the [faasm/cpp](https://github.com/faasm/cpp) container:
 
 ```bash
-docker compose run --rm cpp /bin/bash
+./bin/cli.sh cpp
 
 # Compile the demo function
 inv func demo hello
@@ -54,6 +65,29 @@ inv func.upload demo hello
 
 # Invoke the function
 inv func.invoke demo hello
+
+inv func.upload ndp get
+inv func.upload ndp put
+inv func.upload ndp wordcount
+```
+
+```bash
+./bin/cli.sh faasm
+
+# Upload some simple data (hello -> hello world my world)
+inv invoke ndp put -i 'hello hello world my world'
+
+# Fetch the data back
+inv invoke ndp get -i 'hello'
+
+# Run wordcount with NDP offloading
+inv invoke ndp wordcount -i 'hello'
+
+# Run wordcount manually with NDP offloading via curl
+curl -X POST 'http://worker:8080/f/' -H "Content-Type: application/json" -d '{"async": false, "user": "ndp", "function": "wordcount", "input_data": "hello"}'
+
+# Run wordcount without NDP offloading, manually via curl
+curl -X POST 'http://worker:8080/f/' -H "Content-Type: application/json" -d '{"async": false, "user": "ndp", "function": "wordcount", "input_data": "hello", "forbid_ndp": true}'
 ```
 
 For more information on next steps you can look at the [getting started
