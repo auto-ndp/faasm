@@ -197,7 +197,7 @@ else ()
     # installation we are linking against, as there may be more than one on the
     # system
     # set(LLVM_DIR "/usr/lib/llvm-10/cmake" CACHE STRING "" FORCE)
-    find_package(LLVM 11.1 REQUIRED CONFIG)
+    find_package(LLVM 13 REQUIRED CONFIG)
 endif ()
 
 # Separate LLVM vars into CMake-friendly lists
