@@ -44,6 +44,10 @@ Rebuild critical components in debug mode:
 ```bash
 ./bin/refresh_local.sh
 ./bin/cli.sh faasm
+
+# only need to run this once
+pip install -r requirements.txt
+
 inv dev.cmake
 inv dev.cc faasm_dev_tools
 ```
@@ -59,6 +63,10 @@ use the [faasm/cpp](https://github.com/faasm/cpp) container:
 
 ```bash
 ./bin/cli.sh cpp
+
+# only need to run this once
+pip install -r requirements.txt
+cp WasiToolchain.cmake /usr/local/faasm/toolchain/tools/WasiToolchain.cmake
 
 # Compile the demo function
 inv func demo hello
