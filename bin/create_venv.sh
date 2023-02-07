@@ -9,7 +9,7 @@ PROJ_ROOT=${THIS_DIR}/..
 # mounting the code in a development container
 VENV_PATH="undetected"
 if [[ -z "$FAASM_DOCKER" ]]; then
-    VENV_PATH="${PROJ_ROOT}/venv-bm"
+    VENV_PATH="${PROJ_ROOT}/venv"
 else
     VENV_PATH="${PROJ_ROOT}/venv"
 fi

@@ -1,0 +1,8 @@
+black==22.3.0
+flake8==4.0.1
+invoke==1.7.1
+requests==2.25.1
+networkx==3.0
+pyGithub==1.57
+./faasmcli
+./clients/cpp
