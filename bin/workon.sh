@@ -10,7 +10,7 @@ THIS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]:-${(%):-%x}}" )" >/dev/null 2>&1 &
 PROJ_ROOT="${THIS_DIR}/.."
 MODE="undetected"
 if [[ -z "$FAASM_DOCKER" ]]; then
-    VENV_PATH="${PROJ_ROOT}/venv-bm"
+    VENV_PATH="${PROJ_ROOT}/venv"
     # Normal terminal
     MODE="terminal"
 else

@@ -34,11 +34,14 @@ Update submodules:
 git submodule update --init --recursive
 ```
 
-Rebuild critical components in debug mode:
+First set up the environment:
 ```bash
 source bin/cluster_env.sh
 source bin/workon.sh
+```
 
+Rebuild critical components in debug mode:
+```bash
 ./bin/refresh_local.sh
 ./bin/cli.sh faasm
 inv dev.cmake
