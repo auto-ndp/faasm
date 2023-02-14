@@ -1,0 +1,235 @@
+version: "3"
+
+services:
+  # Storage
+  redis-state:
+    image: kubasz51/faasm-redis:${REDIS_VERSION}
+    ports:
+      - "6379:6379"
+
+  # Storage
+  # minio:
+  #   image: kubasz51/faasm-minio:${FAASM_VERSION}
+  #   ports:
+  #     - "9000:9000"
+  #   environment:
+  #     MINIO_ROOT_USER: minio
+  #     MINIO_ROOT_PASSWORD: minio123
+  #   extra_hosts:
+  #     - "luna-fast:192.168.3.10"
+  #     - "saturno-fast:192.168.3.20"
+  #     - "kone-fast:192.168.3.30"
+  #   volumes:
+  #     - ./dev/minio/data:/data/minio
+  #   healthcheck:
+  #     test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
+  #     interval: 5s
+  #     timeout: 3s
+  #     retries: 3
+
+  ceph-mon1:
+    image: kubasz51/faasm-ceph:${FAASM_VERSION}
+    hostname: ceph-mon1
+    entrypoint: ["/usr/bin/tini-static", "/bin/bash", "/usr/local/code/faasm/bin/run_ceph_mon.sh"]
+    volumes:
+      - ./:/usr/local/code/faasm/
+      - ./deploy/conf/ceph/ceph.conf:/etc/ceph/ceph.conf:ro
+      - ${FAASM_BUILD_DIR}:${FAASM_BUILD_MOUNT}
+      - ${FAASM_BUILD_DIR}/lib/libfaasm_ceph.so:/usr/lib/x86_64-linux-gnu/rados-classes/libcls_faasm.so:ro
+      - ./dev/faasm-local/:/usr/local/faasm/
+      - ./dev/dev-run/:/run/faasm
+      - /sys/kernel/debug:/sys/kernel/debug
+      - /sys/kernel/debug/tracing:/sys/kernel/debug/tracing
+    restart: on-failure
+
+  ceph-osd1: &ceph-osd1
+    image: kubasz51/faasm-ceph:${FAASM_VERSION}
+    hostname: ceph-osd1
+    entrypoint: ["/usr/bin/tini-static", "/bin/bash", "/usr/local/code/faasm/bin/run_ceph_osd.sh"]
+    depends_on:
+      - ceph-mon1
+    volumes:
+      - ./:/usr/local/code/faasm/
+      - ./deploy/conf/ceph/ceph.conf:/etc/ceph/ceph.conf:ro
+      - ${FAASM_BUILD_DIR}:${FAASM_BUILD_MOUNT}
+      - ${FAASM_BUILD_DIR}/lib/libfaasm_ceph.so:/usr/lib/x86_64-linux-gnu/rados-classes/libcls_faasm.so:ro
+      - ./dev/faasm-local/:/usr/local/faasm/
+      - ./dev/dev-run/:/run/faasm
+      - /sys/kernel/debug:/sys/kernel/debug
+      - /sys/kernel/debug/tracing:/sys/kernel/debug/tracing
+      - /dev:/dev
+    restart: on-failure
+
+  ceph-osd2:
+    <<: *ceph-osd1
+    hostname: ceph-osd2
+
+  ceph-osd3:
+    <<: *ceph-osd1
+    hostname: ceph-osd3
+
+  # Storage
+  upload:
+    image: kubasz51/faasm-upload:${FAASM_VERSION}
+    ports:
+      - "8002:8002"
+    depends_on:
+      - redis-state
+      - ceph-mon1
+      - ceph-osd1
+      - ceph-osd2
+      - ceph-osd3
+    restart: on-failure
+    volumes:
+      - ./:/usr/local/code/faasm/
+      - ${FAASM_BUILD_DIR}:${FAASM_BUILD_MOUNT}
+      - ./dev/faasm-local/:${FAASM_LOCAL_MOUNT}
+      - ./deploy/conf/ceph/ceph.conf:/etc/ceph/ceph.conf:ro
+      - ./dev/faasm-local/wasm/:/usr/local/faasm/wasm
+      - ./dev/faasm-local/object/:/usr/local/faasm/object
+      - ./bin/entrypoint_upload.sh:/entrypoint.sh
+      - /sys/kernel/debug:/sys/kernel/debug
+      - /sys/kernel/debug/tracing:/sys/kernel/debug/tracing
+    environment:
+      - CODEGEN_TARGETS=x86_64:skylake;aarch64:thunderx2t99
+      - DELTA_SNAPSHOT_ENCODING=pages=64
+      - LOG_LEVEL=${LOG_LEVEL:-debug}
+      - PYTHON_CODEGEN=${PYTHON_CODEGEN:-off}
+      - REDIS_QUEUE_HOST=${COMPUTE_NODE}
+      - REDIS_STATE_HOST=${STORAGE_NODE}
+      - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
+      - WASM_VM=${WASM_VM:-wavm}
+    extra_hosts:
+      - "luna-fast:192.168.3.10"
+      - "saturno-fast:192.168.3.20"
+      - "kone-fast:192.168.3.30"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8002/ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Storage
+  worker-storage:
+    image: kubasz51/faasm-worker:${FAASM_VERSION}
+    security_opt:
+      - seccomp:unconfined
+    # Allows for tracy thread&ctx switch tracking to work better
+    pid: "host"
+    ulimits:
+      nofile:
+        soft: 16384
+        hard: 16384
+    depends_on:
+      - upload
+    ports:
+      - "8080:8080"
+      - "5000:5000"
+      - "8003-8010:8003-8010"
+      - "8086:8086"
+    privileged: true
+    volumes:
+      - ./:/usr/local/code/faasm/
+      - /tmp/faasm-monitor:/var/faasm-monitor
+      - ./deploy/conf/ceph/ceph.conf:/etc/ceph/ceph.conf:ro
+      - ${FAASM_BUILD_DIR}:${FAASM_BUILD_MOUNT}
+      - ./dev/faasm-local/:${FAASM_LOCAL_MOUNT}
+      - ./dev/dev-run/:/run/faasm
+      - ./dev/container/shared_store/:/usr/local/faasm/debug_shared_store/
+      - ./bin/entrypoint_worker.sh:/entrypoint.sh
+      - /sys/kernel/debug:/sys/kernel/debug
+      - /sys/kernel/debug/tracing:/sys/kernel/debug/tracing
+    environment:
+      - IS_STORAGE_NODE=1
+      - TINI_SUBREAPER=1
+      - CODEGEN_TARGETS=x86_64:skylake;aarch64:thunderx2t99
+      - CAPTURE_STDOUT=on
+      - CGROUP_MODE=off
+      - DELTA_SNAPSHOT_ENCODING=pages=64
+      - GLOBAL_MESSAGE_TIMEOUT=30000
+      - LOG_LEVEL=${LOG_LEVEL:-debug}
+      - NETNS_MODE=off
+      - REDIS_QUEUE_HOST=${COMPUTE_NODE}
+      - REDIS_STATE_HOST=${STORAGE_NODE}
+      - SCHEDULER_MONITOR_FILE=/var/faasm-monitor
+      - STATE_MODE=redis
+      - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
+      - ENDPOINT_HOST=${STORAGE_NODE}
+      - ENDPOINT_NUM_THREADS=4
+      - OVERRIDE_CPU_COUNT=${OVERRIDE_CPU_COUNT:-12}
+      - VM_ARENA_MODE=${VM_ARENA_MODE:-}
+    extra_hosts:
+      - "luna-fast:192.168.3.10"
+      - "saturno-fast:192.168.3.20"
+      - "kone-fast:192.168.3.30"
+
+  # Both
+  cpp:
+    image: ${CPP_CLI_IMAGE}
+    working_dir: /code/cpp
+    stdin_open: true
+    tty: true
+    depends_on:
+      - upload
+    environment:
+      - UPLOAD_HOST=${STORAGE_NODE}
+      - INVOKE_HOST=${COMPUTE_NODE}
+    extra_hosts:
+      - "luna-fast:192.168.3.10"
+      - "saturno-fast:192.168.3.20"
+      - "kone-fast:192.168.3.30"
+    volumes:
+      - ./clients/cpp:/code/cpp
+      - ./dev/faasm-local/:${FAASM_LOCAL_MOUNT}
+      - ./deploy/conf/ceph/ceph.conf:/etc/ceph/ceph.conf:ro
+
+  # Both
+  python:
+    image: ${PYTHON_CLI_IMAGE}
+    init: true
+    working_dir: /code/python
+    stdin_open: true
+    tty: true
+    depends_on:
+      - upload
+    environment:
+      - UPLOAD_HOST=${STORAGE_NODE}
+      - INVOKE_HOST=${COMPUTE_NODE}
+    extra_hosts:
+      - "luna-fast:192.168.3.10"
+      - "saturno-fast:192.168.3.20"
+      - "kone-fast:192.168.3.30"
+    volumes:
+      - ./clients/python:/code/python
+      - ./dev/faasm-local/:${FAASM_LOCAL_MOUNT}
+      - ./deploy/conf/ceph/ceph.conf:/etc/ceph/ceph.conf:ro
+
+  # --- Local cluster dev ---
+  # The following containers are only needed for local cluster dev
+  # Both
+  faasm-cli:
+    image: ${FAASM_CLI_IMAGE}
+    working_dir: /usr/local/code/faasm
+    stdin_open: true
+    tty: true
+    privileged: true
+    depends_on:
+      - worker-storage
+    environment:
+      - UPLOAD_HOST=${STORAGE_NODE}
+      - INVOKE_HOST=${COMPUTE_NODE}
+      - LOG_LEVEL=${LOG_LEVEL:-debug}
+      - REDIS_QUEUE_HOST=${COMPUTE_NODE}
+      - REDIS_STATE_HOST=${STORAGE_NODE}
+      - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
+      - WASM_VM=${WASM_VM:-wavm}
+    extra_hosts:
+      - "luna-fast:192.168.3.10"
+      - "saturno-fast:192.168.3.20"
+      - "kone-fast:192.168.3.30"
+    volumes:
+      - ./:/usr/local/code/faasm/
+      - ${FAASM_BUILD_DIR}:${FAASM_BUILD_MOUNT}
+      - ./dev/faasm-local/:${FAASM_LOCAL_MOUNT}
+      - ./deploy/conf/ceph/ceph.conf:/etc/ceph/ceph.conf:ro
+      - ${CONAN_CACHE_MOUNT_SOURCE:-./dev/faasm/conan/}:/root/.conan
