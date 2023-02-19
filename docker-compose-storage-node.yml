@@ -30,6 +30,8 @@ services:
   ceph-mon1:
     image: kubasz51/faasm-ceph:${FAASM_VERSION}
     hostname: ceph-mon1
+    ports:
+      - "6789:6789"
     entrypoint: ["/usr/bin/tini-static", "/bin/bash", "/usr/local/code/faasm/bin/run_ceph_mon.sh"]
     volumes:
       - ./:/usr/local/code/faasm/
