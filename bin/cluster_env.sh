@@ -4,9 +4,6 @@ PROJ_ROOT=${THIS_DIR}/..
 
 set -o allexport
 source ${PROJ_ROOT}/.env
-if [ -f ${PROJ_ROOT}/.exptcfg ]; then
-  source ${PROJ_ROOT}/.exptcfg
-fi
 set +o allexport
 
 # Mount our local build into the local cluster

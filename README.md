@@ -47,8 +47,6 @@ Rebuild critical components in debug mode:
 
 # only need to run this once
 pip install -r requirements.txt
-pip install -e ./faasmcli
-pip install -e ./clients/cpp
 
 inv dev.cmake
 inv dev.cc faasm_dev_tools

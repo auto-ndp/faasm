@@ -39,4 +39,3 @@ mkdir -p /var/lib/ceph/mgr/"ceph-$(hostname -s)"
 ceph auth get-or-create mgr."$(hostname -s)" mon 'allow profile mgr' osd 'allow *' mds 'allow *' > /var/lib/ceph/mgr/"ceph-$(hostname -s)"/keyring
 chown -R ceph:ceph /var/lib/ceph/mgr/"ceph-$(hostname -s)"/
 exec /usr/bin/ceph-mgr -f --cluster "ceph" --id "$(hostname -s)" --setuser ceph --setgroup ceph
-

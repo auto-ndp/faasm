@@ -137,6 +137,3 @@ callgrind.*
 
 # Flamegraph
 *.svg
-
-# Experiment Configuration
-.exptcfg
