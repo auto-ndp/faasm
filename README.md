@@ -104,6 +104,47 @@ curl -X POST 'http://worker:8080/f/' -H "Content-Type: application/json" -d '{"a
 For more information on next steps you can look at the [getting started
 docs](https://faasm.readthedocs.io/en/latest/source/getting_started.html)
 
+## Multi-Node Experiments
+
+We shall use [docker swarm](https://docs.docker.com/engine/swarm/) to manage our containers running as services. 
+
+On a manager node, initialize the swarm
+```
+docker swarm init --advertise-addr <MANAGER-IP>
+```
+The above command should successfully return an output containing a `docker swarm join` command which must be run on all the other nodes in the cluster. Once this is done theb list of nodes in the swarm can be seen via `docker node ls`.
+
+Now deploy the services as 
+```
+docker stack deploy --compose-file docker-compose.yml faasm
+```
+Scale the services as per the following example
+```
+docker service scale faasm_cpp=2
+```
+Rebuild critical components
+```bash
+./bin/refresh_local
+docker exec -it <faasm-cli container ID> /bin/bash
+
+# in faasm-cli container
+inv dev.cmake
+inv dev.cc faasm_dev_tools
+exit
+
+# back on host terminal
+docker service update faasm_worker
+docker service update faasm_worker-storage
+docker service update faasm_upload
+docker service update faasm_nginx
+```
+Service-to-node placement can be manipulated with [placement options](https://docs.docker.com/engine/swarm/services/#placement-preferences).
+
+The stack can be removed via 
+```
+docker stack rm faasm
+```
+
 ## Acknowledgements
 
 This project has received funding from the European Union's Horizon 2020
