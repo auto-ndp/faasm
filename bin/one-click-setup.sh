@@ -1,8 +1,7 @@
 #!/bin/bash
 
+THIS_DIR=$(dirname $(readlink -f $0))
 export PROJ_ROOT=${THIS_DIR}/../..
-
-sudo -Es /bin/bash
 cd ${PROJ_ROOT} 
 
 apt-get -y update
@@ -17,7 +16,7 @@ apt-get -y update
 apt-get -y install python3-venv
 apt-get -y install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
-# not needed since 'sudo'
+# not needed since running as 'sudo'
 # sudo groupadd docker
 # sudo usermod -aG docker $USER
 # newgrp docker

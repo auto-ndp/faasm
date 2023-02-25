@@ -146,9 +146,9 @@ The stack can be removed via
 ```
 docker stack rm faasm
 ```
-## One-Click Setup
+## One-Click Setup for CloudLab
 
-After cloning the repo to home directory and entering it, run the following to install all dependencies, pull all containers and build all components.
+After cloning the repo to home directory and entering it, run the following to install all dependencies, pull all containers and build all components as root user running bash.
 
 ```bash
 source ./bin/one-click-setup.sh
