@@ -152,6 +152,18 @@ After cloning the repo to home directory and entering it, run the following to i
 
 ```bash
 source ./bin/one-click-setup.sh
+./bin/cli.sh build-faasm
+
+# inside faasm-cli container
+inv dev.cmake
+sed -i 's/54/53/g' /root/.conan/data/libbacktrace/cci.20210118/_/_/export/conanfile.py
+inv dev.cmake
+inv dev.cc faasm_dev_tools
+exit
+# back to terminal
+
+./deploy/local/dev_cluster.sh
+docker compose down
 ```
 _Ensure that all the contents of `dev/faasm-local/ceph-ceph-mon1` at the node running ceph-mon1 is copied to the same folder on all nodes via scp._
 
