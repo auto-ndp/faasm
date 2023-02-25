@@ -1,8 +1,9 @@
 #!/bin/bash
 
-sudo -s /bin/bash
-PROJ_ROOT=~/faasm
-cd ${PROJ_ROOT} # assumed PROJ_ROOT (env vars may be lost since we became sudo)
+export PROJ_ROOT=${THIS_DIR}/../..
+
+sudo -Es /bin/bash
+cd ${PROJ_ROOT} 
 
 apt-get -y update
 apt-get -y install ca-certificates curl gnupg lsb-release
@@ -26,6 +27,6 @@ source ./bin/workon.sh
 ./bin/refresh_local.sh
 ./bin/cli.sh build-faasm
 
-./deploy/local/dev_cluster.sh
+./deploy/local/dev_cluster.sh docker-compose-cloudlab.yml
 
 docker compose down

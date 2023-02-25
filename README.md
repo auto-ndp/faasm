@@ -140,17 +140,22 @@ docker service update faasm_nginx
 ```
 Service-to-node placement can be manipulated with [placement options](https://docs.docker.com/engine/swarm/services/#placement-preferences).
 
+_Ensure that all the contents of `dev/faasm-local/ceph-ceph-mon1` at the node running ceph-mon1 is copied to the same folder on all nodes._
+
 The stack can be removed via 
 ```
 docker stack rm faasm
 ```
 ## One-Click Setup
 
-After cloning the repo to home directory (set the `PROJ_ROOT` variable in `bin/one-click-setup.sh` accordingly if some other path is used) and entering it, run the following to install all dependencies, pull all containers and build all components.
+After cloning the repo to home directory and entering it, run the following to install all dependencies, pull all containers and build all components.
 
 ```bash
 source ./bin/one-click-setup.sh
 ```
+_Ensure that all the contents of `dev/faasm-local/ceph-ceph-mon1` at the node running ceph-mon1 is copied to the same folder on all nodes via scp._
+
+Now start `docker swarm` deployment.
 
 ## Acknowledgements
 
