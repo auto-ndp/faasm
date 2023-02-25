@@ -1,7 +1,8 @@
 #!/bin/bash
+set -e
 
-THIS_DIR=$(dirname $(readlink -f $0))
-export PROJ_ROOT=${THIS_DIR}/../..
+THIS_DIR=$(dirname $(readlink -f ${BASH_SOURCE[0]:-${(%):-%x}}))
+PROJ_ROOT=${THIS_DIR}/..
 cd ${PROJ_ROOT} 
 
 apt-get -y update
