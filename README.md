@@ -144,6 +144,13 @@ The stack can be removed via
 ```
 docker stack rm faasm
 ```
+## One-Click Setup
+
+After cloning the repo to home directory (set the `PROJ_ROOT` variable in `bin/one-click-setup.sh` accordingly if some other path is used) and entering it, run the following to install all dependencies, pull all containers and build all components.
+
+```bash
+source ./bin/one-click-setup.sh
+```
 
 ## Acknowledgements
 

@@ -42,37 +42,43 @@ function start_sgx_aesmd_socket() {
         aesmd
 }
 
+# This is how we ensure the development mode is on, mounting our local
+# directories into the containers to override what's already there
+export FAASM_BUILD_MOUNT=/build/faasm
+export FAASM_LOCAL_MOUNT=/usr/local/faasm
+
 if [[ -z "$1" ]]; then
     usage
     exit 1
 elif [[ "$1" == "faasm" ]]; then
     CLI_CONTAINER="faasm-cli"
+    INNER_SHELL="/bin/bash"
+elif [[ "$1" == "build-faasm" ]]; then
+    CLI_CONTAINER="faasm-cli"
+    INNER_SHELL="/usr/local/code/faasm/bin/buildfaasm.sh"
 elif [[ "$1" == "faasm-sgx-sim" ]]; then
     CLI_CONTAINER="faasm-cli"
     export FAASM_CLI_IMAGE=${FAASM_SGX_CLI_IMAGE:-faasm/cli-sgx-sim:$(cat ${PROJ_ROOT}/VERSION)}
     export FAASM_WORKER_IMAGE=faasm/worker-sgx-sim:$(cat ${PROJ_ROOT}/VERSION)
     export WASM_VM=sgx
+    INNER_SHELL="/bin/bash"
 elif [[ "$1" == "faasm-sgx" ]]; then
     CLI_CONTAINER="faasm-cli"
     export FAASM_CLI_IMAGE=${FAASM_SGX_CLI_IMAGE:-faasm/cli-sgx:$(cat ${PROJ_ROOT}/VERSION)}
     export FAASM_WORKER_IMAGE=faasm/worker-sgx:$(cat ${PROJ_ROOT}/VERSION)
     export WASM_VM=sgx
     start_sgx_aesmd_socket
+    INNER_SHELL="/bin/bash"
 elif [[ "$1" == "cpp" ]]; then
     CLI_CONTAINER="cpp"
+    INNER_SHELL="/bin/bash"
 elif [[ "$1" == "python" ]]; then
     CLI_CONTAINER="python"
+    INNER_SHELL="/bin/bash"
 else
     usage
     exit 1
 fi
-
-INNER_SHELL="/bin/bash"
-
-# This is how we ensure the development mode is on, mounting our local
-# directories into the containers to override what's already there
-export FAASM_BUILD_MOUNT=/build/faasm
-export FAASM_LOCAL_MOUNT=/usr/local/faasm
 
 # Make sure the CLI is running already in the background (avoids creating a new
 # container every time)
