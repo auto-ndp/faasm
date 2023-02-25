@@ -28,7 +28,7 @@ services:
     entrypoint: ["/usr/bin/tini-static", "/bin/bash", "/usr/local/code/faasm/bin/run_ceph_mon.sh"]
     deploy:
       placement:
-        constraints: [ node.label == storage ]
+        constraints: [ node.labels.rank == leader ]
     volumes:
       - ./:/usr/local/code/faasm/
       - ./deploy/conf/ceph/ceph.conf:/etc/ceph/ceph.conf:ro
@@ -48,7 +48,7 @@ services:
       - ceph-mon1
     deploy:
       placement:
-        constraints: [ node.label == storage ]
+        constraints: [ node.labels.type == storage ]
     volumes:
       - ./:/usr/local/code/faasm/
       - ./deploy/conf/ceph/ceph.conf:/etc/ceph/ceph.conf:ro
@@ -93,7 +93,7 @@ services:
     restart: on-failure
     deploy:
       placement: 
-        constraints: [ node.label == storage ]
+        constraints: [ node.labels.rank == leader ]
     volumes:
       - ./:/usr/local/code/faasm/
       - ${FAASM_BUILD_DIR}:${FAASM_BUILD_MOUNT}
@@ -142,7 +142,7 @@ services:
     deploy:
       replicas: 2
       placement:
-        constraints: [ node.label == compute ]
+        constraints: [ node.labels.type == compute ]
     volumes:
       - ./:/usr/local/code/faasm/
       - /tmp/faasm-monitor:/var/faasm-monitor
@@ -200,7 +200,7 @@ services:
     deploy:
       replicas: 5
       placement:
-        constraints: [ node.label == storage ]
+        constraints: [ node.labels.type == storage ]
     volumes:
       - ./:/usr/local/code/faasm/
       - /tmp/faasm-monitor-storage:/var/faasm-monitor
@@ -251,7 +251,7 @@ services:
     tty: true
     deploy:
       placement:
-        constraints: [ node.label == loadgen ]
+        constraints: [ node.labels.type == loadgen ]
     volumes:
       - ./clients/cpp:/code/cpp
       - ./dev/faasm-local/:${FAASM_LOCAL_MOUNT}

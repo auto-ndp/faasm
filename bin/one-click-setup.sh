@@ -1,5 +1,4 @@
 #!/bin/bash
-set -e
 
 THIS_DIR=$(dirname $(readlink -f ${BASH_SOURCE[0]:-${(%):-%x}}))
 PROJ_ROOT=${THIS_DIR}/..
@@ -17,7 +16,7 @@ apt-get -y update
 apt-get -y install python3-venv
 apt-get -y install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
-# not needed since running as 'sudo'
+# not needed since running as 'root'
 # sudo groupadd docker
 # sudo usermod -aG docker $USER
 # newgrp docker
@@ -27,6 +26,6 @@ source ./bin/workon.sh
 ./bin/refresh_local.sh
 ./bin/cli.sh build-faasm
 
-./deploy/local/dev_cluster.sh docker-compose-cloudlab.yml
+./deploy/local/dev_cluster.sh
 
 docker compose down
