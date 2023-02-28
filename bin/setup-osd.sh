@@ -15,7 +15,7 @@ function setup {
     mkdir -p /mnt/ceph${id}
     mount -o user_xattr /dev/loop3${id} /mnt/ceph${id}
   done
-  rm dev/faasm-local/ceph-ceph-mon1/*
+  rm ${PROJ_ROOT}/dev/faasm-local/ceph-ceph-mon1/*
 }
 
 # setup worker
