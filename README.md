@@ -152,7 +152,7 @@ After cloning the repo to home directory and entering it, run the following to i
 
 ```bash
 source ./bin/one-click-setup.sh
-./bin/cli.sh build-faasm
+./bin/cli.sh faasm
 
 # inside faasm-cli container
 inv dev.cmake

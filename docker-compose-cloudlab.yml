@@ -48,7 +48,7 @@ services:
       - ceph-mon1
     deploy:
       placement:
-        constraints: [ node.labels.type == storage ]
+        constraints: [ node.labels.name == storage0 ]
     volumes:
       - ./:/usr/local/code/faasm/
       - ./deploy/conf/ceph/ceph.conf:/etc/ceph/ceph.conf:ro
@@ -69,18 +69,30 @@ services:
   ceph-osd2:
     <<: *ceph-osd1
     hostname: ceph-osd2
+    deploy:
+      placement:
+        constraints: [ node.labels.name == storage1 ]
 
   ceph-osd3:
     <<: *ceph-osd1
     hostname: ceph-osd3
+    deploy:
+      placement:
+        constraints: [ node.labels.name == storage2 ]
 
   ceph-osd4:
     <<: *ceph-osd1
     hostname: ceph-osd4
+    deploy:
+      placement:
+        constraints: [ node.labels.name == storage3 ]
 
   ceph-osd5:
     <<: *ceph-osd1
     hostname: ceph-osd5
+    deploy:
+      placement:
+        constraints: [ node.labels.name == storage4 ]
 
   upload:
     image: kubasz51/faasm-upload:${FAASM_VERSION}
