@@ -28,9 +28,9 @@ function setup {
 # }
 
 # execute from leader node AFTER initial deployment on each node 
-function sync {
+function syncleader {
   LEADERHOST=$(docker node ls --format "{{.Hostname}}" --filter node.label=rank=leader)
-  for host in $(docker node ls --format "{{.Hostname}}" --filter node.label=type=storage)
+  for host in $(docker node ls --format "{{.Hostname}}")
   do
     if [[ ${host} != ${LEADERHOST} ]]
     then
@@ -38,10 +38,16 @@ function sync {
       for id in 0 1 2 3 4
       do
         # scp /ceph${id}.img ${host}:/ceph${id}.img
-        scp -r /mnt/ceph${id} ${host}:/mnt/ceph${id} 1>/dev/null && echo Sent OSD-${id} to ${host}
+        # scp -r /mnt/ceph${id} ${host}:/mnt/ceph${id} 1>/dev/null && echo Sent OSD-${id} to ${host}
+        scp /mnt/ceph${id}/fsid ${host}:${PROJ_ROOT}/.fsid.${id}
       done
     fi
   done
+}
+
+# execute on each worker AFTER sync called on leader node
+function syncworker {
+  python ${PROJ_ROOT}/bin/syncworker.py
 }
 
 function clean {
@@ -67,7 +73,12 @@ fi
 
 if [[ $1 == sync && ${NODE} == LEADER ]]
 then 
-  sync
+  syncleader
+fi
+
+if [[ $1 == sync && ${NODE} == WORKER ]]
+then 
+  syncworker
 fi
 
 if [ $1 == clean ]

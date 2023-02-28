@@ -137,3 +137,5 @@ callgrind.*
 
 # Flamegraph
 *.svg
+
+.fsid*
