@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 THIS_DIR=$(dirname $(readlink -f ${BASH_SOURCE[0]:-${(%):-%x}}))
 PROJ_ROOT=${THIS_DIR}/..
@@ -52,7 +53,7 @@ function clean {
   done
 }
 
-docker node ls
+docker node ls 1>/dev/null 2>/dev/null
 if [ $(echo $?) == 0 ]
 then
   NODE=LEADER
