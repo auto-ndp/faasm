@@ -21,7 +21,7 @@ def create_mapping():
   for i in range(NUM_OSD):
     mapping.append(get_cur_fsid(fsid[i]))
 
-  return mapping
+  return [mapping.index(i) for i in range(NUM_OSD)]
 
 def do_mounts_from_mapping(mapping):
   for i in range(NUM_OSD):
