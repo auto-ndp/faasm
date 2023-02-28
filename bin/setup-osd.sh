@@ -30,7 +30,7 @@ function setup {
 # execute from leader node AFTER initial deployment on each node 
 function sync {
   LEADERHOST=$(docker node ls --format "{{.Hostname}}" --filter node.label=rank=leader)
-  for host in $(docker node ls --format "{{.Hostname}}")
+  for host in $(docker node ls --format "{{.Hostname}}" --filter node.label=type=storage)
   do
     if [[ ${host} != ${LEADERHOST} ]]
     then
@@ -38,7 +38,7 @@ function sync {
       for id in 0 1 2 3 4
       do
         # scp /ceph${id}.img ${host}:/ceph${id}.img
-        scp -r /mnt/ceph${id} ${host}:/mnt/ceph${id}
+        scp -r /mnt/ceph${id} ${host}:/mnt/ceph${id} && echo Sent OSD-${id} to ${host}
       done
     fi
   done
