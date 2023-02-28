@@ -53,7 +53,7 @@ function clean {
 }
 
 docker node ls
-if [ echo $? == 0 ]
+if [ $(echo $?) == 0 ]
 then
   NODE=LEADER
 fi
