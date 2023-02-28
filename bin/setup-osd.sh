@@ -4,30 +4,33 @@ THIS_DIR=$(dirname $(readlink -f ${BASH_SOURCE[0]:-${(%):-%x}}))
 PROJ_ROOT=${THIS_DIR}/..
 NODE=WORKER
 
+OSDSIZE=100G
+
 # execute from each node before initial deployment
 function setup {
-  for id in 0 1 2 3 4
-  do
-    dd if=/dev/zero of=/ceph${id}.img bs=1 count=0 seek=100G
-    mkfs.ext4 /ceph${id}.img
-    losetup /dev/loop3${id} /ceph${id}.img
-    mkdir -p /mnt/ceph${id}
-    mount -o user_xattr /dev/loop3${id} /mnt/ceph${id}
-  done
+  dd if=/dev/zero of=/ceph0.img bs=1 count=0 seek=${OSDSIZE}
+  mkfs.ext4 /ceph0.img
+  losetup /dev/loop30 /ceph0.img
+  mkdir -p /mnt/ceph0
+  mount -o user_xattr /dev/loop30 /mnt/ceph0
+
+  ln -s /mnt/ceph0 /mnt/ceph1
+  ln -s /mnt/ceph0 /mnt/ceph2
+  ln -s /mnt/ceph0 /mnt/ceph3
+  ln -s /mnt/ceph0 /mnt/ceph4
+
+  # for id in 0 1 2 3 4
+  # do
+  #   dd if=/dev/zero of=/ceph${id}.img bs=1 count=0 seek=${OSDSIZE}
+  #   mkfs.ext4 /ceph${id}.img
+  #   losetup /dev/loop3${id} /ceph${id}.img
+  #   mkdir -p /mnt/ceph${id}
+  #   mount -o user_xattr /dev/loop3${id} /mnt/ceph${id}
+  # done
   rm ${PROJ_ROOT}/dev/faasm-local/ceph-ceph-mon1/*
 }
 
-# setup worker
-# function setupworker {
-#   for id in 0 1 2 3 4
-#   do
-#     losetup /dev/loop3${id} /ceph${id}.img
-#     mkdir -p /mnt/ceph${id}
-#     mount -o user_xattr /dev/loop3${id} /mnt/ceph${id}
-#   done
-# }
-
-# execute from leader node AFTER initial deployment on each node 
+# execute from leader node AFTER deploying docker stack
 function syncleader {
   LEADERHOST=$(docker node ls --format "{{.Hostname}}" --filter node.label=rank=leader)
   for host in $(docker node ls --format "{{.Hostname}}")
@@ -35,29 +38,24 @@ function syncleader {
     if [[ ${host} != ${LEADERHOST} ]]
     then
       scp ${PROJ_ROOT}/dev/faasm-local/ceph-ceph-mon1/* ${host}:${PROJ_ROOT}/dev/faasm-local/ceph-ceph-mon1/
-      for id in 0 1 2 3 4
-      do
-        # scp /ceph${id}.img ${host}:/ceph${id}.img
-        # scp -r /mnt/ceph${id} ${host}:/mnt/ceph${id} 1>/dev/null && echo Sent OSD-${id} to ${host}
-        scp /mnt/ceph${id}/fsid ${host}:${PROJ_ROOT}/.fsid.${id}
-      done
     fi
   done
 }
 
-# execute on each worker AFTER sync called on leader node
-function syncworker {
-  python ${PROJ_ROOT}/bin/syncworker.py
-}
-
 function clean {
-  for id in 0 1 2 3 4
-  do
-    umount /mnt/ceph${id}
-    rm -r /mnt/ceph${id}
-    losetup -d /dev/loop3${id}
-    rm /ceph${id}.img
-  done
+  rm /mnt/ceph1 /mnt/ceph2 /mnt/ceph3 /mnt/ceph4
+  umount /mnt/ceph0
+  rm -r /mnt/ceph0
+  losetup -d /dev/loop30
+  rm /ceph0.img
+
+  # for id in 0 1 2 3 4
+  # do
+  #   umount /mnt/ceph${id}
+  #   rm -r /mnt/ceph${id}
+  #   losetup -d /dev/loop3${id}
+  #   rm /ceph${id}.img
+  # done
 }
 
 docker node ls 1>/dev/null 2>/dev/null
@@ -66,19 +64,9 @@ then
   NODE=LEADER
 fi
 
-# if [[ $1 == setup && ${NODE} == LEADER ]]
-# then 
-#   setupleader
-# fi
-
 if [[ $1 == sync && ${NODE} == LEADER ]]
 then 
   syncleader
-fi
-
-if [[ $1 == sync && ${NODE} == WORKER ]]
-then 
-  syncworker
 fi
 
 if [ $1 == clean ]

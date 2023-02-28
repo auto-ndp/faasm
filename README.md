@@ -146,9 +146,9 @@ The stack can be removed via
 ```
 docker stack rm faasm
 ```
-## One-Click Setup for CloudLab
+## Setup for CloudLab
 
-After cloning the repo to home directory and entering it, run the following to install all dependencies, pull all containers and build all components as root user running bash.
+For Cloudlab, instantiate the profile at [deploy/cloudlab_profile.py](https://auto-ndp/faasm/deploy/cloudlab_profile.py)
 
 ```bash
 source ./bin/one-click-setup.sh
