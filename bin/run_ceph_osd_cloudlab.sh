@@ -19,6 +19,7 @@ done
 if [[ ! -e "/osd_secret" ]]; then
     cp -a "${MON_CEPH_DIR}"/ceph.client.admin.keyring /etc/ceph/ceph.client.admin.keyring
     cp -a "${MON_CEPH_DIR}"/ceph.bootstrap-osd.keyring /var/lib/ceph/bootstrap-osd/ceph.keyring
+    HOST=$(hostname)
 
     OSD_UUID="$(uuidgen -n @dns -s -N $(hostname)-osd)"
     OSD_SECRET="$(ceph-authtool --gen-print-key)"
@@ -28,7 +29,7 @@ if [[ ! -e "/osd_secret" ]]; then
     echo CEPH-OSD3 "$(uuidgen -n @dns -s -N ceph-osd3-osd)"
     echo CEPH-OSD4 "$(uuidgen -n @dns -s -N ceph-osd4-osd)"
     echo CEPH-OSD5 "$(uuidgen -n @dns -s -N ceph-osd5-osd)"
-    OSD_UUID="$(cat /var/lib/ceph/osd/ceph-${hostname: -1}/fsid)"
+    OSD_UUID="$(cat /var/lib/ceph/osd/ceph-${HOST: -1}/fsid)"
     OSD_ID=$(echo "{\"cephx_secret\": \"$OSD_SECRET\"}" | ceph osd new $OSD_UUID -i - -n client.admin -k /etc/ceph/ceph.client.admin.keyring)
 
     echo "$OSD_UUID" > /osd_uuid
