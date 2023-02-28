@@ -1,5 +1,4 @@
 #!/bin/bash
-set -e
 
 THIS_DIR=$(dirname $(readlink -f ${BASH_SOURCE[0]:-${(%):-%x}}))
 PROJ_ROOT=${THIS_DIR}/..
