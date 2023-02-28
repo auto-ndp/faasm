@@ -38,7 +38,7 @@ function sync {
       for id in 0 1 2 3 4
       do
         # scp /ceph${id}.img ${host}:/ceph${id}.img
-        scp -r /mnt/ceph${id} ${host}:/mnt/ceph${id} && echo Sent OSD-${id} to ${host}
+        scp -r /mnt/ceph${id} ${host}:/mnt/ceph${id} 1>/dev/null && echo Sent OSD-${id} to ${host}
       done
     fi
   done
