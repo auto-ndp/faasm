@@ -29,10 +29,11 @@ if [[ ! -e "/osd_secret" ]]; then
     echo "$OSD_SECRET" > /osd_secret
     echo "$OSD_ID" > /osd_id
 
-    mkdir -p /var/lib/ceph/osd/ceph-$OSD_ID
-    dd if=/dev/zero of=/ceph-$OSD_ID.img bs=1 count=0 seek=100G
-    mkfs.ext4 /ceph-$OSD_ID.img
-    mount -o user_xattr /ceph-$OSD_ID.img /var/lib/ceph/osd/ceph-$OSD_ID
+    # mkdir -p /var/lib/ceph/osd/ceph-$OSD_ID
+    # dd if=/dev/zero of=/ceph-$OSD_ID.img bs=1 count=0 seek=100G
+    # mkfs.ext4 /ceph-$OSD_ID.img
+    # mount -o user_xattr /ceph-$OSD_ID.img /var/lib/ceph/osd/ceph-$OSD_ID
+    # mount /dev/loop2${OSD_ID} /var/lib/ceph/osd/ceph-$OSD_ID
 
     ceph-authtool --create-keyring /var/lib/ceph/osd/ceph-$OSD_ID/keyring --name osd.$OSD_ID --add-key $OSD_SECRET
     ceph-osd -i $OSD_ID --mkfs --osd-uuid $OSD_UUID

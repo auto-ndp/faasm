@@ -24,3 +24,13 @@ apt-get -y install docker-ce docker-ce-cli containerd.io docker-buildx-plugin do
 source ./bin/cluster_env.sh
 source ./bin/workon.sh
 ./bin/refresh_local.sh
+
+# OSD setup
+for id in 0 1 2 3 4
+do
+  dd if=/dev/zero of=/ceph${id}.img bs=1 count=0 seek=100G
+  mkfs.ext4 /ceph${id}.img
+  losetup /dev/loop3${id} /ceph${id}.img
+  mkdir -p /mnt/ceph${id}
+  mount -o user_xattr /dev/loop3${id} /mnt/ceph${id}
+done
