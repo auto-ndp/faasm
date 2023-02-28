@@ -43,7 +43,7 @@ services:
   ceph-osd1: &ceph-osd1
     image: kubasz51/faasm-ceph:${FAASM_VERSION}
     hostname: ceph-osd1
-    entrypoint: ["/usr/bin/tini-static", "/bin/bash", "/usr/local/code/faasm/bin/run_ceph_osd.sh"]
+    entrypoint: ["/usr/bin/tini-static", "/bin/bash", "/usr/local/code/faasm/bin/run_ceph_osd_cloudlab.sh"]
     depends_on:
       - ceph-mon1
     deploy:
