@@ -3,7 +3,7 @@
 # Ceph Quincy: 17.2 series
 # Follows https://docs.ceph.com/en/quincy/install/manual-deployment/
 
-set -ou pipefail
+set -eou pipefail
 
 NODE_CEPH_DIR="/usr/local/faasm/ceph-$(hostname)"
 MON_CEPH_DIR="/usr/local/faasm/ceph-ceph-mon1"
@@ -22,7 +22,7 @@ if [[ ! -e "/osd_secret" ]]; then
 
     OSD_UUID="$(uuidgen -n @dns -s -N $(hostname)-osd)"
     OSD_SECRET="$(ceph-authtool --gen-print-key)"
-
+    echo OSD UUID ${OSD_UUID}
     OSD_ID=$(echo "{\"cephx_secret\": \"$OSD_SECRET\"}" | ceph osd new $OSD_UUID -i - -n client.admin -k /etc/ceph/ceph.client.admin.keyring)
 
     echo "$OSD_UUID" > /osd_uuid
