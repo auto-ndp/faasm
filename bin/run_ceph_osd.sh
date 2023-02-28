@@ -3,7 +3,7 @@
 # Ceph Quincy: 17.2 series
 # Follows https://docs.ceph.com/en/quincy/install/manual-deployment/
 
-set -eou pipefail
+set -ou pipefail
 
 NODE_CEPH_DIR="/usr/local/faasm/ceph-$(hostname)"
 MON_CEPH_DIR="/usr/local/faasm/ceph-ceph-mon1"
