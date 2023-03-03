@@ -8,16 +8,16 @@ OSDSIZE=100G
 
 # execute from each node before initial deployment
 function setup {
-  dd if=/dev/zero of=/ceph0.img bs=1 count=0 seek=${OSDSIZE}
-  mkfs.ext4 /ceph0.img
-  losetup /dev/loop30 /ceph0.img
-  mkdir -p /mnt/ceph0
-  mount -o user_xattr /dev/loop30 /mnt/ceph0
+  dd if=/dev/zero of=/ceph.img bs=1 count=0 seek=${OSDSIZE}
+  mkfs.ext4 /ceph.img
+  losetup /dev/loop30 /ceph.img
+  mkdir -p /mnt/ceph
+  mount -o user_xattr /dev/loop30 /mnt/ceph
 
-  ln -s /mnt/ceph0 /mnt/ceph1
-  ln -s /mnt/ceph0 /mnt/ceph2
-  ln -s /mnt/ceph0 /mnt/ceph3
-  ln -s /mnt/ceph0 /mnt/ceph4
+  # ln -s /mnt/ceph /mnt/ceph1
+  # ln -s /mnt/ceph /mnt/ceph2
+  # ln -s /mnt/ceph /mnt/ceph3
+  # ln -s /mnt/ceph /mnt/ceph4
 
   # for id in 0 1 2 3 4
   # do
@@ -43,11 +43,11 @@ function syncleader {
 }
 
 function clean {
-  rm /mnt/ceph1 /mnt/ceph2 /mnt/ceph3 /mnt/ceph4
-  umount /mnt/ceph0
-  rm -r /mnt/ceph0
+  # rm /mnt/ceph1 /mnt/ceph2 /mnt/ceph3 /mnt/ceph4
+  umount /mnt/ceph
+  rm -r /mnt/ceph
   losetup -d /dev/loop30
-  rm /ceph0.img
+  rm /ceph.img
 
   # for id in 0 1 2 3 4
   # do
