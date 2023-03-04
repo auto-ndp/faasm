@@ -150,6 +150,7 @@ docker stack rm faasm
 
 For Cloudlab, instantiate the profile at [deploy/cloudlab_profile.py](https://auto-ndp/faasm/deploy/cloudlab_profile.py)
 
+First install dependencies and build all binaries
 ```bash
 source ./bin/one-click-setup.sh
 ./bin/cli.sh faasm
@@ -165,9 +166,32 @@ exit
 ./deploy/local/dev_cluster.sh
 docker compose down
 ```
-_Ensure that all the contents of `dev/faasm-local/ceph-ceph-mon1` at the node running ceph-mon1 is copied to the same folder on all nodes via scp._
-
 Now start `docker swarm` deployment.
+Here we shall see an example of an 8-node cluster (5 storage + 2 compute + 1 loadgen).
+Node 0 shall be given the label `rank=leader`.
+Nodes 0-4 shall be labeled `type=storage`, 5-6 shall be labeled `type=compute` while 7 shall be labeled `type=loadgen`
+Nodes 0-4 shall be labeled `name=storage0`, `name=storage1`,..., `name=storage4` respectively.
+
+Export the environment variable `OSDSIZE` to the size of the per-node OSD pool. Default value is `500G`.
+Now do the following on every storage node.
+```bash
+./bin/setup-osd setup 
+```
+Finally on the leader node (0) do
+```bash
+decker stack deploy --compose-file docker-compose-cloudlab.yml faasm
+./bin/setup-osd sync
+```
+On the loadgen node, fix one detail in the `cpp` container
+```bash
+cp WasiToolchain.cmake /usr/local/faasm/toolchain/tools/WasiToolchain.cmake
+```
+
+Finally turn down the stack
+```bash
+docker stack rm faasm
+./bin/setup-osd clean
+```
 
 ## Acknowledgements
 
