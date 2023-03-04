@@ -156,6 +156,7 @@ source ./bin/one-click-setup.sh
 ./bin/cli.sh faasm
 
 # inside faasm-cli container
+./bin/buildfaasm.sh
 inv dev.cmake
 sed -i 's/54/53/g' /root/.conan/data/libbacktrace/cci.20210118/_/_/export/conanfile.py
 inv dev.cmake

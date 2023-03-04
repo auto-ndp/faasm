@@ -13,7 +13,7 @@ cd ../clients/cpp
 pip install -e .
 cd ../..
 
-inv dev.cmake
+inv -r faasmcli/faasmcli dev.cmake
 sed -i 's/54/53/g' /root/.conan/data/libbacktrace/cci.20210118/_/_/export/conanfile.py
-inv dev.cmake
-inv dev.cc faasm_dev_tools
+inv -r faasmcli/faasmcli dev.cmake
+inv -r faasmcli/faasmcli dev.cc faasm_dev_tools
