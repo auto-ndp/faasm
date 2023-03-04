@@ -179,7 +179,7 @@ Now do the following on every storage node.
 ```
 Finally on the leader node (0) do
 ```bash
-decker stack deploy --compose-file docker-compose-cloudlab.yml faasm
+docker stack deploy --compose-file docker-compose-cloudlab.yml faasm
 ./bin/setup-osd sync
 ```
 On the loadgen node, fix one detail in the `cpp` container
