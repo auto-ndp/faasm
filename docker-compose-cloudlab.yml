@@ -38,6 +38,7 @@ services:
       - ./dev/dev-run/:/run/faasm
       - /sys/kernel/debug:/sys/kernel/debug
       - /sys/kernel/debug/tracing:/sys/kernel/debug/tracing
+      - ../gutenberg/data/raw:/data
     restart: on-failure
 
   ceph-osd1: &ceph-osd1
@@ -161,7 +162,7 @@ services:
     deploy:
       replicas: 2
       placement:
-        constraints: [ node.labels.type == compute ]
+        spread: [ node.labels.type == compute ]
     volumes:
       - ./:/usr/local/code/faasm/
       - /tmp/faasm-monitor:/var/faasm-monitor
@@ -199,6 +200,122 @@ services:
       - ASAN_OPTIONS=verbosity=1:halt_on_error=1
       - TSAN_OPTIONS=halt_on_error=1:suppressions=/usr/local/code/faasm/thread-sanitizer-ignorelist.txt:history_size=7:second_deadlock_stack=1
       - UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=1
+
+  # Distributed worker, used for executing as a local cluster
+  # worker-0:
+  #   image: kubasz51/faasm-worker:${FAASM_VERSION}
+  #   security_opt:
+  #     - seccomp:unconfined
+  #   # Allows for tracy thread&ctx switch tracking to work better
+  #   pid: "host"
+  #   depends_on:
+  #     - upload
+  #   expose:
+  #     - "8080"
+  #     - "5000"
+  #     - "8003-8010"
+  #   ports:
+  #     - "8080:8080"
+  #     - "8086:8086"
+  #   privileged: true
+  #   deploy:
+  #     placement:
+  #       constraints: [ node.labels.name == compute0 ]
+  #   volumes:
+  #     - ./:/usr/local/code/faasm/
+  #     - /tmp/faasm-monitor:/var/faasm-monitor
+  #     - ./deploy/conf/ceph/ceph.conf:/etc/ceph/ceph.conf:ro
+  #     - ${FAASM_BUILD_DIR}:${FAASM_BUILD_MOUNT}
+  #     - ./dev/faasm-local/:${FAASM_LOCAL_MOUNT}
+  #     - aesmd-socket:/var/run/aesmd
+  #     - ./dev/container/shared_store/:/usr/local/faasm/debug_shared_store/
+  #     - ${SGX_DEVICE_MOUNT_DIR:-./dev/faasm-local/sgx}:/dev/sgx
+  #     - ./bin/entrypoint_worker.sh:/entrypoint.sh
+  #     - /sys/kernel/debug:/sys/kernel/debug
+  #     - /sys/kernel/debug/tracing:/sys/kernel/debug/tracing
+  #   environment:
+  #     - TINI_SUBREAPER=1
+  #     - CODEGEN_TARGETS=x86_64:skylake;aarch64:thunderx2t99
+  #     - CAPTURE_STDOUT=on
+  #     # 02/11/2022 - Temporarily disable CGroup mode, to mitigate a potential
+  #     # mismatch between the host OS and the container image. Ubuntu 20.04
+  #     # uses CGroup v1, whereas Ubuntu 22.04 uses CGroup v2. This change will
+  #     # be reverted once we upgrade container images to 22.04
+  #     - CGROUP_MODE=off
+  #     - DELTA_SNAPSHOT_ENCODING=pages=64
+  #     - GLOBAL_MESSAGE_TIMEOUT=30000
+  #     - LOG_LEVEL=${LOG_LEVEL:-debug}
+  #     - NETNS_MODE=off
+  #     - REDIS_QUEUE_HOST=redis-queue
+  #     - REDIS_STATE_HOST=redis-state
+  #     - SCHEDULER_MONITOR_FILE=/var/faasm-monitor
+  #     - STATE_MODE=redis
+  #     - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
+  #     - ENDPOINT_HOST=worker-0
+  #     - ENDPOINT_NUM_THREADS=4
+  #     - OVERRIDE_CPU_COUNT=0
+  #     - VM_ARENA_MODE=${VM_ARENA_MODE:-}
+  #     - ASAN_OPTIONS=verbosity=1:halt_on_error=1
+  #     - TSAN_OPTIONS=halt_on_error=1:suppressions=/usr/local/code/faasm/thread-sanitizer-ignorelist.txt:history_size=7:second_deadlock_stack=1
+  #     - UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=1
+
+  # # Distributed worker, used for executing as a local cluster
+  # worker-1:
+  #   image: kubasz51/faasm-worker:${FAASM_VERSION}
+  #   security_opt:
+  #     - seccomp:unconfined
+  #   # Allows for tracy thread&ctx switch tracking to work better
+  #   pid: "host"
+  #   depends_on:
+  #     - upload
+  #   expose:
+  #     - "8080"
+  #     - "5000"
+  #     - "8003-8010"
+  #   ports:
+  #     - "8080:8080"
+  #     - "8086:8086"
+  #   privileged: true
+  #   deploy:
+  #     placement:
+  #       constraints: [ node.labels.name == compute1 ]
+  #   volumes:
+  #     - ./:/usr/local/code/faasm/
+  #     - /tmp/faasm-monitor:/var/faasm-monitor
+  #     - ./deploy/conf/ceph/ceph.conf:/etc/ceph/ceph.conf:ro
+  #     - ${FAASM_BUILD_DIR}:${FAASM_BUILD_MOUNT}
+  #     - ./dev/faasm-local/:${FAASM_LOCAL_MOUNT}
+  #     - aesmd-socket:/var/run/aesmd
+  #     - ./dev/container/shared_store/:/usr/local/faasm/debug_shared_store/
+  #     - ${SGX_DEVICE_MOUNT_DIR:-./dev/faasm-local/sgx}:/dev/sgx
+  #     - ./bin/entrypoint_worker.sh:/entrypoint.sh
+  #     - /sys/kernel/debug:/sys/kernel/debug
+  #     - /sys/kernel/debug/tracing:/sys/kernel/debug/tracing
+  #   environment:
+  #     - TINI_SUBREAPER=1
+  #     - CODEGEN_TARGETS=x86_64:skylake;aarch64:thunderx2t99
+  #     - CAPTURE_STDOUT=on
+  #     # 02/11/2022 - Temporarily disable CGroup mode, to mitigate a potential
+  #     # mismatch between the host OS and the container image. Ubuntu 20.04
+  #     # uses CGroup v1, whereas Ubuntu 22.04 uses CGroup v2. This change will
+  #     # be reverted once we upgrade container images to 22.04
+  #     - CGROUP_MODE=off
+  #     - DELTA_SNAPSHOT_ENCODING=pages=64
+  #     - GLOBAL_MESSAGE_TIMEOUT=30000
+  #     - LOG_LEVEL=${LOG_LEVEL:-debug}
+  #     - NETNS_MODE=off
+  #     - REDIS_QUEUE_HOST=redis-queue
+  #     - REDIS_STATE_HOST=redis-state
+  #     - SCHEDULER_MONITOR_FILE=/var/faasm-monitor
+  #     - STATE_MODE=redis
+  #     - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
+  #     - ENDPOINT_HOST=worker-1
+  #     - ENDPOINT_NUM_THREADS=4
+  #     - OVERRIDE_CPU_COUNT=0
+  #     - VM_ARENA_MODE=${VM_ARENA_MODE:-}
+  #     - ASAN_OPTIONS=verbosity=1:halt_on_error=1
+  #     - TSAN_OPTIONS=halt_on_error=1:suppressions=/usr/local/code/faasm/thread-sanitizer-ignorelist.txt:history_size=7:second_deadlock_stack=1
+  #     - UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=1
 
   worker-storage:
     image: kubasz51/faasm-worker:${FAASM_VERSION}
@@ -250,7 +367,7 @@ services:
       - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
       - ENDPOINT_HOST=worker-storage
       - ENDPOINT_NUM_THREADS=4
-      - OVERRIDE_CPU_COUNT=8
+      - OVERRIDE_CPU_COUNT=0
       - VM_ARENA_MODE=${VM_ARENA_MODE:-}
       - ASAN_OPTIONS=verbosity=1:halt_on_error=1
       - TSAN_OPTIONS=halt_on_error=1:suppressions=/usr/local/code/faasm/thread-sanitizer-ignorelist.txt:history_size=7:second_deadlock_stack=1

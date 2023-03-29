@@ -30,7 +30,7 @@ else
   CONTAINER=$2
   for host in $(docker node ls --format "{{.Hostname}}")
   do
-    ID=$(docker ps | grep ${CONTAINER} | awk '{print $1;}')
+    ID=$(ssh ${host} docker ps | grep ${CONTAINER} | awk '{print $1;}')
     ssh ${host} "docker exec ${ID} ${CMD}"
   done
 fi

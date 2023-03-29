@@ -155,14 +155,7 @@ First install dependencies and build all binaries
 source ./bin/one-click-setup.sh
 ./bin/cli.sh faasm
 
-# inside faasm-cli container
-./bin/buildfaasm.sh
-inv dev.cmake
-sed -i 's/54/53/g' /root/.conan/data/libbacktrace/cci.20210118/_/_/export/conanfile.py
-inv dev.cmake
-inv dev.cc faasm_dev_tools
-exit
-# back to terminal
+./bin/runcmd.sh "./bin/buildfaasm.sh" "faasm_faasm-cli"
 
 ./deploy/local/dev_cluster.sh
 docker compose down
@@ -176,7 +169,7 @@ Nodes 0-4 shall be labeled `name=storage0`, `name=storage1`,..., `name=storage4`
 Export the environment variable `OSDSIZE` to the size of the per-node OSD pool. Default value is `500G`.
 Now do the following on every storage node.
 ```bash
-./bin/setup-osd setup 
+./bin/setup-osd.sh setup 
 ```
 Finally on the leader node (0) do
 ```bash
@@ -185,6 +178,7 @@ docker stack deploy --compose-file docker-compose-cloudlab.yml faasm
 ```
 On the loadgen node, fix one detail in the `cpp` container
 ```bash
+rm -rf build
 cp WasiToolchain.cmake /usr/local/faasm/toolchain/tools/WasiToolchain.cmake
 ```
 
