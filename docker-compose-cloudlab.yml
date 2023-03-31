@@ -386,23 +386,24 @@ services:
     stdin_open: true
     tty: true
     deploy:
-      placement:
-        constraints: [ node.labels.type == loadgen ]
+      replicas: 8
+      # placement:
+      #   constraints: [ node.labels.type == loadgen ]
     volumes:
       - ./clients/cpp:/code/cpp
       - ./dev/faasm-local/:${FAASM_LOCAL_MOUNT}
       - ./deploy/conf/ceph/ceph.conf:/etc/ceph/ceph.conf:ro
 
   # Python functions
-  python:
-    image: ${PYTHON_CLI_IMAGE}
-    working_dir: /code/python
-    stdin_open: true
-    tty: true
-    volumes:
-      - ./clients/python:/code/python
-      - ./dev/faasm-local/:${FAASM_LOCAL_MOUNT}
-      - ./deploy/conf/ceph/ceph.conf:/etc/ceph/ceph.conf:ro
+  # python:
+  #   image: ${PYTHON_CLI_IMAGE}
+  #   working_dir: /code/python
+  #   stdin_open: true
+  #   tty: true
+  #   volumes:
+  #     - ./clients/python:/code/python
+  #     - ./dev/faasm-local/:${FAASM_LOCAL_MOUNT}
+  #     - ./deploy/conf/ceph/ceph.conf:/etc/ceph/ceph.conf:ro
 
   # Faasm dev
   faasm-cli:

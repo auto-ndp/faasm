@@ -124,7 +124,7 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
                                "__faasmndp_unmap",
                                I32,
                                __faasmndp_unmap,
-                               I64 offset,
+                               I32 offset,
                                I32 length)
 {
     SPDLOG_INFO("Unmapping at {} : {} bytes", offset, length);
