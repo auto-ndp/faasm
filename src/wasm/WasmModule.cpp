@@ -906,28 +906,7 @@ bool WasmModule::doGrowMemory(uint32_t pageChange)
 
 uint32_t WasmModule::shrinkMemory(size_t nBytes)
 {
-    if (!isWasmPageAligned(nBytes)) {
-        SPDLOG_ERROR("Shrink size not page aligned {}", nBytes);
-        throw std::runtime_error("New break not page aligned");
-    }
-
-    faabric::util::FullLock lock(moduleMutex);
-
-    uint32_t oldBrk = getMemorySizeBytes();
-
-    if (nBytes > oldBrk) {
-        SPDLOG_ERROR(
-          "Shrinking by more than current brk ({} > {})", nBytes, oldBrk);
-        throw std::runtime_error("Shrinking by more than current brk");
-    }
-
-    // Note - we don't actually free the memory, we just change the brk
-    uint32_t newBrk = oldBrk - nBytes;
-
-    SPDLOG_TRACE("MEM - shrinking memory {} -> {}", oldBrk, newBrk);
-    // TODO: doShrinkMemory
-
-    return oldBrk;
+    throw std::runtime_error("shrinkMemory not implemented");
 }
 
 uint32_t WasmModule::mmapMemory(size_t nBytes)

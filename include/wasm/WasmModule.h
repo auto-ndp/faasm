@@ -97,7 +97,7 @@ class WasmModule
 
     uint32_t growMemory(size_t nBytes);
 
-    uint32_t shrinkMemory(size_t nBytes);
+    virtual uint32_t shrinkMemory(size_t nBytes);
 
     uint32_t mmapMemory(size_t nBytes);
 

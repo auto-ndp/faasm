@@ -1473,6 +1473,63 @@ uint8_t* WAVMWasmModule::getMemoryBase()
     return memBase;
 }
 
+uint32_t WAVMWasmModule::shrinkMemory(size_t nBytes)
+{
+    if (!isWasmPageAligned(nBytes)) {
+        SPDLOG_ERROR("Shrink size not page aligned {}", nBytes);
+        throw std::runtime_error("New break not page aligned");
+    }
+
+    faabric::util::FullLock lock(moduleMutex);
+
+    uint32_t oldBrk = getMemorySizeBytes();
+
+    if (nBytes > oldBrk) {
+        SPDLOG_ERROR(
+          "Shrinking by more than current brk ({} > {})", nBytes, oldBrk);
+        throw std::runtime_error("Shrinking by more than current brk");
+    }
+
+    // Note - we don't actually free the memory, we just change the brk
+    // uint32_t newBrk = oldBrk - nBytes;
+    U32 newBrk = oldBrk - nBytes;
+    const size_t pageChange = getNumberOfWasmPagesForBytes(nBytes);
+
+    Uptr newNumPages{};
+    Runtime::GrowResult result = 
+      Runtime::shrinkMemory(defaultMemory, pageChange, &newNumPages);
+
+    if (result != Runtime::GrowResult::success) {
+        if (result == Runtime::GrowResult::outOfMemory) {
+            SPDLOG_ERROR("Committing new pages failed (errno={} ({})) "
+                         "(shrinking by {})",
+                         errno,
+                         strerror(errno),
+                         pageChange);
+            throw std::runtime_error("Unable to commit virtual pages");
+        }
+        if (result == Runtime::GrowResult::outOfMaxSize) {
+            SPDLOG_ERROR("No memory for mapping (shrinking by {})", pageChange);
+            throw std::runtime_error("Run out of memory to map");
+        }
+        if (result == Runtime::GrowResult::outOfQuota) {
+            SPDLOG_ERROR("Memory resource quota exceeded (shrinking by {})",
+                         pageChange);
+            throw std::runtime_error("Memory resource quota exceeded");
+        }
+        SPDLOG_ERROR("Unknown memory mapping error (shrinking by {})",
+                     pageChange);
+        throw std::runtime_error("Unknown memory mapping error");
+    }
+
+    SPDLOG_INFO("MEM - shrinking memory {} -> {}: now {} pages", 
+      oldBrk, newBrk, newNumPages);
+    // TODO: doShrinkMemory
+
+
+    return newNumPages * WASM_BYTES_PER_PAGE;
+}
+
 bool WAVMWasmModule::resolve(const std::string& moduleName,
                              const std::string& name,
                              IR::ExternType type,

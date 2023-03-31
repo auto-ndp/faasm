@@ -121,6 +121,23 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
 }
 
 WAVM_DEFINE_INTRINSIC_FUNCTION(env,
+                               "__faasmndp_unmap",
+                               I32,
+                               __faasmndp_unmap,
+                               I64 offset,
+                               I32 length)
+{
+    SPDLOG_INFO("Unmapping at {} : {} bytes", offset, length);
+    ZoneScopedN("__faasmndp_unmap");
+
+    WAVMWasmModule* module_ = static_cast<WAVMWasmModule*>(
+      getCurrentWasmExecutionContext()->executingModule);
+    module_->unmapMemory(offset, length);
+
+    return 0;
+}
+
+WAVM_DEFINE_INTRINSIC_FUNCTION(env,
                                "__faasmndp_getMmap",
                                I32,
                                __faasmndp_getMmap,
@@ -230,6 +247,8 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
         return 0;
     }
     module_->snapshotExcludedPtrLens.emplace_back(oldPagesEnd, allocLen);
+    SPDLOG_INFO("mmap buffer at {} : {} bytes", oldPagesEnd, allocLen);
+
     return oldPagesEnd;
 }
 

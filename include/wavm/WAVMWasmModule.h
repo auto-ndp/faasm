@@ -80,6 +80,8 @@ class WAVMWasmModule final
 
     uint8_t* getMemoryBase() override;
 
+    uint32_t shrinkMemory(size_t nBytes) override;
+
     // ----- Environment variables -----
     void writeWasmEnvToMemory(uint32_t envPointers,
                               uint32_t envBuffer) override;
