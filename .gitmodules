@@ -10,3 +10,6 @@
 [submodule "third-party/wavm"]
 	path = third-party/wavm
 	url = https://github.com/auto-ndp/WAVM.git
+[submodule "ceph"]
+	path = ceph
+	url = https://github.com/auto-ndp/autondp-ceph.git
