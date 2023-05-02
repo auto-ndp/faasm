@@ -166,7 +166,7 @@ Node 0 shall be given the label `rank=leader`.
 Nodes 0-4 shall be labeled `type=storage`, 5-6 shall be labeled `type=compute` while 7 shall be labeled `type=loadgen`
 Nodes 0-4 shall be labeled `name=storage0`, `name=storage1`,..., `name=storage4` respectively.
 
-Export the environment variable `OSDSIZE` to the size of the per-node OSD pool. Default value is `500G`.
+Export the environment variable `OSDSIZE` to the size of the per-node OSD pool. Default value is `50G`.
 Now do the following on every storage node.
 ```bash
 ./bin/setup-osd.sh setup 

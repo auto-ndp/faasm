@@ -649,15 +649,27 @@ ssize_t S3Wrapper::getKeyPartIntoBuf(
     setBufferLength(static_cast<ssize_t>(oSize));
     char* buffer = getBuffer();
     if (oSize > 0) {
-        err = rados_read(pool->ioctx, keyName.c_str(), buffer, oSize, offset);
-        if (err < 0) {
+        // err = rados_read(pool->ioctx, keyName.c_str(), buffer, oSize, offset);
+        size_t bytes_read;
+        int prval;
+
+        auto read_op = rados_create_read_op();
+        rados_read_op_read(read_op, offset, oSize, buffer, &bytes_read, &prval);
+        // rados_read_op_set_flags(read_op, LIBRADOS_OPERATION_BALANCE_READS);
+        err = rados_read_op_operate(read_op,
+                                    pool->ioctx,
+                                    keyName.c_str(),
+                                    LIBRADOS_OPERATION_BALANCE_READS);
+
+        if (err < 0 || prval < 0) {
             SPDLOG_ERROR("Key {}/{} cannot be read: {}",
                          bucketName,
                          keyName,
                          strerror(-err));
             throw std::runtime_error("Key cannot be read.");
         }
-        return err;
+        // return err;
+        return bytes_read;
     }
     return 0;
 }
