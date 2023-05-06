@@ -1,4 +1,5 @@
-FROM kubasz51/faasm-faabric-base:0.4.1
+# FROM kubasz51/faasm-faabric-base:0.4.1
+FROM alannair/faasm-faabric-base:latest
 ARG FAABRIC_VERSION
 
 # faabic-base image is not re-built often, so tag may be behind
@@ -14,6 +15,8 @@ RUN git clone \
     && git config --global --add safe.directory /code/faabric
 
 WORKDIR /code/faabric
+
+RUN pip install conan==1.54.0
 
 # Python set-up and code builds
 RUN ./bin/create_venv.sh \

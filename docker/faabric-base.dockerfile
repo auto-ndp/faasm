@@ -1,6 +1,10 @@
-FROM kubasz51/faasm-faabric-base-runtime:0.4.1
+# FROM kubasz51/faasm-faabric-base-runtime:0.4.1
+FROM alannair/faasm-faabric-base-runtime:latest
 
-RUN apt-get update \
+ARG TZ
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+RUN DEBIAN_FRONTEND=noninteractive apt-get update \
     && apt-get upgrade --yes --no-install-recommends \
     && apt-get install --yes --no-install-recommends \
     autoconf \
@@ -36,6 +40,7 @@ RUN apt-get update \
     llvm-11-dev \
     make \
     ninja-build \
+    python3-sphinx \
     && apt-get clean autoclean --yes \
     && apt-get autoremove --yes
 
