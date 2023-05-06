@@ -23,7 +23,8 @@ services:
   #     retries: 3
 
   ceph-mon1:
-    image: kubasz51/faasm-ceph:${FAASM_VERSION}
+    # image: kubasz51/faasm-ceph:${FAASM_VERSION}
+    image: alannair/faasm-ceph-base:latest
     hostname: ceph-mon1
     entrypoint: ["/usr/bin/tini-static", "/bin/bash", "/usr/local/code/faasm/bin/run_ceph_mon.sh"]
     volumes:
@@ -38,7 +39,8 @@ services:
     restart: on-failure
 
   ceph-osd1: &ceph-osd1
-    image: kubasz51/faasm-ceph:${FAASM_VERSION}
+    # image: kubasz51/faasm-ceph:${FAASM_VERSION}
+    image: alannair/faasm-ceph-base:latest
     hostname: ceph-osd1
     entrypoint: ["/usr/bin/tini-static", "/bin/bash", "/usr/local/code/faasm/bin/run_ceph_osd.sh"]
     depends_on:
@@ -72,7 +74,8 @@ services:
     hostname: ceph-osd5
 
   upload:
-    image: kubasz51/faasm-upload:${FAASM_VERSION}
+    # image: kubasz51/faasm-upload:${FAASM_VERSION}
+    image: alannair/faasm-upload:latest
     ports:
       - "8002:8002"
     expose:
@@ -117,7 +120,8 @@ services:
 
   # Distributed worker, used for executing as a local cluster
   worker:
-    image: kubasz51/faasm-worker:${FAASM_VERSION}
+    # image: kubasz51/faasm-worker:${FAASM_VERSION}
+    image: alannair/faasm-worker:latest
     security_opt:
       - seccomp:unconfined
     # Allows for tracy thread&ctx switch tracking to work better
@@ -171,7 +175,8 @@ services:
       - UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=1
 
   worker-storage:
-    image: kubasz51/faasm-worker:${FAASM_VERSION}
+    # image: kubasz51/faasm-worker:${FAASM_VERSION}
+    image: alannair/faasm-worker:latest
     security_opt:
       - seccomp:unconfined
     # Allows for tracy thread&ctx switch tracking to work better
