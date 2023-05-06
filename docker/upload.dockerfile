@@ -1,5 +1,13 @@
-ARG FAASM_VERSION
-FROM kubasz51/faasm-base-runtime:${FAASM_VERSION}
+# ARG FAASM_VERSION
+FROM kubasz51/faasm-base-runtime:0.9.1
+
+RUN apt-get update --yes \
+    && apt-get install --yes git libunwind-dev python3-sphinx
+
+RUN git clone https://github.com/auto-ndp/autondp-ceph.git /ceph \
+    && cd /ceph \
+    && git submodule update --init --recursive \
+    && ./install-deps.sh 
 
 # Build the upload and codegen targets
 WORKDIR /build/faasm
