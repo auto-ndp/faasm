@@ -1,21 +1,29 @@
-FROM alannair/faasm-ceph-base:latest
-ARG FAASM_VERSION
+FROM alannair/faasm-faabric-base:latest
 
-WORKDIR .
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update \
+    && apt-get upgrade --yes --no-install-recommends \
+    && apt-get install --yes --no-install-recommends \
+    ceph \
+    ceph-mds \
+    ceph-volume \
+    openssh-server \
+    tini \
+    libunwind-dev \
+    && apt-get clean autoclean --yes \
+    && apt-get autoremove --yes
 
-# copy our changes 
-COPY ./ceph/src ./ceph/src
-COPY ./bin/buildceph.sh .
-RUN chmod +x ./buildceph.sh && ./buildceph.sh
+# Flag to say we're in a container
+ENV FAASM_DOCKER="on"
 
-# WORKDIR /ceph
-# RUN rm -rf build \
-#     && ./do_cmake.sh \
-#     && cd build \
-#     && ninja \
-#     && ninja install
+COPY ./deploy/conf/ceph/ /etc/ceph/
+COPY ./bin/run_ceph_*.sh /
 
-# RUN cd /ceph/build && ninja && ninja install 
+RUN rm -rf /usr/local/code/faasm \
+    && git clone https://github.com/auto-ndp/faasm /usr/local/code/faasm \
+    && cd /usr/local/code/faasm \
+    && git submodule update --init --recursive ceph \
+    && cd ceph \
+    && ./install-deps.sh
 
-# after building save build folder to host to speed up the next docker build
-# docker cp -r <CONTAINER_ID>:/usr/local/code/faasm/ceph/build ./ceph/build
+SHELL [ "/bin/bash" ]

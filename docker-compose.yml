@@ -24,7 +24,7 @@ services:
 
   ceph-mon1:
     # image: kubasz51/faasm-ceph:${FAASM_VERSION}
-    image: alannair/faasm-ceph-base:latest
+    image: alannair/faasm-ceph:latest
     hostname: ceph-mon1
     entrypoint: ["/usr/bin/tini-static", "/bin/bash", "/usr/local/code/faasm/bin/run_ceph_mon.sh"]
     volumes:
@@ -40,7 +40,7 @@ services:
 
   ceph-osd1: &ceph-osd1
     # image: kubasz51/faasm-ceph:${FAASM_VERSION}
-    image: alannair/faasm-ceph-base:latest
+    image: alannair/faasm-ceph:latest
     hostname: ceph-osd1
     entrypoint: ["/usr/bin/tini-static", "/bin/bash", "/usr/local/code/faasm/bin/run_ceph_osd.sh"]
     depends_on:
