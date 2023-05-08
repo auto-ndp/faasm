@@ -1,10 +1,8 @@
-ARG FAASM_VERSION
 # Import build results
-FROM kubasz51/faasm-base:${FAASM_VERSION} AS builder
+FROM kubasz51/faasm-base:0.9.1 AS builder
 
 # Note - we don't often rebuild faabric-base so this dep may be behind
-FROM kubasz51/faasm-faabric-base-runtime:0.4.1
-ARG FAASM_VERSION
+FROM kubasz51/faasm-faabric-base:0.4.1
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \

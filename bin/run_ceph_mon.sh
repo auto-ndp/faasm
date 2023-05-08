@@ -5,9 +5,9 @@
 
 set -eou pipefail
 
-if [[ -e "/usr/local/code/faasm/ceph/build" ]]
+if [[ -e "/ceph/build" ]]
 then
-    cd /usr/local/code/faasm/ceph/build
+    cd /ceph/build
     ninja install
 fi
 
@@ -39,9 +39,9 @@ sudo -u ceph ceph-mon --cluster "ceph" --mkfs -i "$(hostname -s)" --monmap "${NO
 
 # Run ceph
 export TCMALLOC_MAX_TOTAL_THREAD_CACHE_BYTES=134217728
-/usr/bin/ceph-mon -f --cluster "ceph" --id "$(hostname -s)" --setuser ceph --setgroup ceph &
+ceph-mon -f --cluster "ceph" --id "$(hostname -s)" --setuser ceph --setgroup ceph &
 sleep 1;
 mkdir -p /var/lib/ceph/mgr/"ceph-$(hostname -s)"
 ceph auth get-or-create mgr."$(hostname -s)" mon 'allow profile mgr' osd 'allow *' mds 'allow *' > /var/lib/ceph/mgr/"ceph-$(hostname -s)"/keyring
 chown -R ceph:ceph /var/lib/ceph/mgr/"ceph-$(hostname -s)"/
-exec /usr/bin/ceph-mgr -f --cluster "ceph" --id "$(hostname -s)" --setuser ceph --setgroup ceph
+exec ceph-mgr -f --cluster "ceph" --id "$(hostname -s)" --setuser ceph --setgroup ceph

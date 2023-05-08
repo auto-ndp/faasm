@@ -5,9 +5,9 @@
 
 set -ou pipefail
 
-if [[ -e "/usr/local/code/faasm/ceph/build" ]]
+if [[ -e "/ceph/build" ]]
 then
-    cd /usr/local/code/faasm/ceph/build
+    cd /ceph/build
     ninja install
 fi
 
@@ -57,4 +57,4 @@ fi
 
 # # Run ceph
 export TCMALLOC_MAX_TOTAL_THREAD_CACHE_BYTES=134217728
-exec /usr/bin/ceph-osd -f --cluster "ceph" --id "${OSD_ID}" --setuser ceph --setgroup ceph
+exec ceph-osd -f --cluster "ceph" --id "${OSD_ID}" --setuser ceph --setgroup ceph

@@ -1,7 +1,15 @@
-FROM kubasz51/faasm-base-runtime:0.9.1
+FROM alannair/faasm-base-runtime:latest
 
 RUN apt-get update --yes \
-    && apt-get install --yes git libunwind-dev python3-sphinx
+    && apt-get install --yes --no-install-recommends \
+    git \
+    libunwind-dev \
+    python3-sphinx \
+    clang-13 \
+    clang-format-13 \
+    clang-tidy-13 \
+    clang-tools-13 \
+    cmake 
 
 RUN git clone --recursive https://github.com/ceph/ceph.git /usr/local/code/faasm/ceph \
     && cd /usr/local/code/faasm/ceph \
