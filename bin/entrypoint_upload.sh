@@ -2,6 +2,12 @@
 
 set -e
 
+if [[ -e "/ceph/build" ]]
+then
+    cd /ceph/build
+    ninja install
+fi
+
 MON_CEPH_DIR="/usr/local/faasm/ceph-ceph-mon1"
 
 while [[ ! -e "${MON_CEPH_DIR}/ceph.mon.keyring" ]]; do
