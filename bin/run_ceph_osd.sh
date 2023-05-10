@@ -5,11 +5,11 @@
 
 set -ou pipefail
 
-if [[ -e "/ceph/build" ]]
-then
-    cd /ceph/build
-    ninja install
-fi
+# if [[ -e "/ceph/build" ]]
+# then
+#     cd /ceph/build
+#     ninja install
+# fi
 
 NODE_CEPH_DIR="/usr/local/faasm/ceph-$(hostname)"
 MON_CEPH_DIR="/usr/local/faasm/ceph-ceph-mon1"

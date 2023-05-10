@@ -2,11 +2,11 @@
 
 set -e
 
-if [[ -e "/ceph/build" ]]
-then
-    cd /ceph/build
-    ninja install
-fi
+# if [[ -e "/ceph/build" ]]
+# then
+#     cd /ceph/build
+#     ninja install
+# fi
 
 MON_CEPH_DIR="/usr/local/faasm/ceph-ceph-mon1"
 
@@ -34,6 +34,12 @@ echo "Setting up namespaces"
 ./bin/netns.sh ${MAX_NET_NAMESPACES}
 
 popd >> /dev/null
+
+# if [[ -e "/ceph/build" ]]
+# then
+#     cd /ceph/build
+#     ninja install
+# fi
 
 # Continue with normal command
 exec "$@"

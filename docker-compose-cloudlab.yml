@@ -2,12 +2,12 @@ version: "3"
 
 services:
   redis-state:
-    # image: kubasz51/faasm-redis:${REDIS_VERSION}
-    image: alannair/faasm-redis:latest
+    image: kubasz51/faasm-redis:${REDIS_VERSION}
+    # image: alannair/faasm-redis:latest
 
   redis-queue:
-    # image: kubasz51/faasm-redis:${REDIS_VERSION}
-    image: alannair/faasm-redis:latest
+    image: kubasz51/faasm-redis:${REDIS_VERSION}
+    # image: alannair/faasm-redis:latest
 
   # minio:
   #   image: kubasz51/faasm-minio:${FAASM_VERSION}

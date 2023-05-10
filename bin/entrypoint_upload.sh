@@ -2,11 +2,11 @@
 
 set -e
 
-if [[ -e "/ceph/build" ]]
-then
-    cd /ceph/build
-    ninja install
-fi
+# if [[ -e "/ceph/build" ]]
+# then
+#     cd /ceph/build
+#     ninja install
+# fi
 
 MON_CEPH_DIR="/usr/local/faasm/ceph-ceph-mon1"
 
@@ -23,5 +23,11 @@ $THIS_DIR/entrypoint_codegen.sh
 
 # Start hoststats
 # nohup hoststats start > /var/log/hoststats.log 2>&1 &
+
+# if [[ -e "/ceph/build" ]]
+# then
+#     cd /ceph/build
+#     ninja install
+# fi
 
 exec "$@"
