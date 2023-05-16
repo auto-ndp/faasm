@@ -21,6 +21,8 @@ apt-get -y install docker-ce docker-ce-cli containerd.io docker-buildx-plugin do
 # sudo usermod -aG docker $USER
 # newgrp docker
 
+pip install psutil
+
 source ./bin/cluster_env.sh
 source ./bin/workon.sh
 ./bin/refresh_local.sh
