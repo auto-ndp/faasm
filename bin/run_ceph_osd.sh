@@ -22,7 +22,7 @@ while [[ ! -e "${MON_CEPH_DIR}/ceph.mon.keyring" ]]; do
     sleep 1
 done
 
-if [[ ! -e "/osd_secret" ]]; then
+if [[ ! -e "/osd/osd_secret" ]]; then
     cp -a "${MON_CEPH_DIR}"/ceph.client.admin.keyring /etc/ceph/ceph.client.admin.keyring
     cp -a "${MON_CEPH_DIR}"/ceph.bootstrap-osd.keyring /var/lib/ceph/bootstrap-osd/ceph.keyring
 
@@ -36,9 +36,9 @@ if [[ ! -e "/osd_secret" ]]; then
     echo CEPH-OSD5 "$(uuidgen -n @dns -s -N ceph-osd5-osd)"
     OSD_ID=$(echo "{\"cephx_secret\": \"$OSD_SECRET\"}" | ceph osd new $OSD_UUID -i - -n client.admin -k /etc/ceph/ceph.client.admin.keyring)
 
-    echo "$OSD_UUID" > /osd_uuid
-    echo "$OSD_SECRET" > /osd_secret
-    echo "$OSD_ID" > /osd_id
+    echo "$OSD_UUID" > /osd/osd_uuid
+    echo "$OSD_SECRET" > /osd/osd_secret
+    echo "$OSD_ID" > /osd/osd_id
 
     # mkdir -p /var/lib/ceph/osd/ceph-$OSD_ID
     # dd if=/dev/zero of=/ceph-$OSD_ID.img bs=1 count=0 seek=100G
@@ -50,9 +50,9 @@ if [[ ! -e "/osd_secret" ]]; then
     ceph-osd -i $OSD_ID --mkfs --osd-uuid $OSD_UUID
     chown -R ceph:ceph /var/lib/ceph/osd/ceph-$OSD_ID
 else
-    OSD_UUID="$(cat /osd_uuid)"
-    OSD_SECRET="$(cat /osd_secret)"
-    OSD_ID="$(cat /osd_id)"
+    OSD_UUID="$(cat /osd/osd_uuid)"
+    OSD_SECRET="$(cat /osd/osd_secret)"
+    OSD_ID="$(cat /osd/osd_id)"
 fi
 
 # # Run ceph
