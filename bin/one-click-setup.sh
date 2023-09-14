@@ -17,9 +17,9 @@ apt-get -y install python3-venv
 apt-get -y install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
 # not needed since running as 'root'
-# sudo groupadd docker
-# sudo usermod -aG docker $USER
-# newgrp docker
+sudo groupadd docker
+sudo usermod -aG docker $USER
+newgrp docker
 
 service docker start
 
