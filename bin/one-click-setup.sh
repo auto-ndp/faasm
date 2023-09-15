@@ -14,14 +14,15 @@ echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.
 
 apt-get -y update
 apt-get -y install python3-venv
-apt-get -y install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+apt-get -y install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin python3-pip
 
 # not needed since running as 'root'
-sudo groupadd docker
-sudo usermod -aG docker $USER
-newgrp docker
+# sudo groupadd docker
+# sudo usermod -aG docker $USER
+# newgrp docker
 
-service docker start
+systemctl start docker
+# service docker start
 
 pip install psutil
 
