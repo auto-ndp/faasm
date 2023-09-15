@@ -4,7 +4,7 @@ THIS_DIR=$(dirname $(readlink -f ${BASH_SOURCE[0]:-${(%):-%x}}))
 PROJ_ROOT=${THIS_DIR}/..
 NODE=WORKER
 
-OSDSIZE="${OSDSIZE:-50G}"
+OSDSIZE="${OSDSIZE:-80G}"
 
 # execute from each node before initial deployment
 function setup {
