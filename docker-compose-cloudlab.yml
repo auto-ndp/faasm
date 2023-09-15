@@ -114,8 +114,6 @@ services:
       - ceph-osd1
       - ceph-osd2
       - ceph-osd3
-      - ceph-osd4
-      - ceph-osd5
     restart: on-failure
     deploy:
       placement: 
@@ -540,8 +538,6 @@ services:
       - ceph-osd1
       - ceph-osd2
       - ceph-osd3
-      - ceph-osd4
-      - ceph-osd5
       - upload
     environment:
       - LD_LIBRARY_PATH=/usr/local/lib
