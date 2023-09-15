@@ -225,8 +225,8 @@ services:
       - "5000"
       - "8003-8010"
     ports:
-      - "8079:8080"
-      - "8085:8086"
+      - "8078:8080"
+      - "8084:8086"
     privileged: true
     deploy:
       placement:
@@ -285,8 +285,8 @@ services:
       - "5000"
       - "8003-8010"
     ports:
-      - "8080:8080"
-      - "8086:8086"
+      - "8079:8080"
+      - "8085:8086"
     privileged: true
     deploy:
       placement:
