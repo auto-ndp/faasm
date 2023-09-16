@@ -58,4 +58,6 @@ fi
 # Run ceph
 export TCMALLOC_MAX_TOTAL_THREAD_CACHE_BYTES=134217728
 echo "exec ceph-osd ${OSD_ID}" >> /osd/osd_log
+cat /osd/osd_log | tail -n 100
+
 exec ceph-osd -f --cluster "ceph" --id "${OSD_ID}" --setuser ceph --setgroup ceph
