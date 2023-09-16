@@ -14,7 +14,8 @@ function setup {
   mkdir -p /mnt/ceph
   mount -o user_xattr /dev/loop30 /mnt/ceph
 
-  rm ${PROJ_ROOT}/dev/faasm-local/ceph-ceph-mon1/*
+  rm -f ${PROJ_ROOT}/dev/faasm-local/ceph-ceph-mon1/*
+  rm -f ${PROJ_ROOT}/dev/container/shared_store/osd*
 }
 
 # execute from leader node AFTER deploying docker stack

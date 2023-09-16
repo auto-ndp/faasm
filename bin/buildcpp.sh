@@ -6,3 +6,5 @@ set -v
 
 pip install -r requirements.txt
 cp WasiToolchain.cmake /usr/local/faasm/toolchain/tools/WasiToolchain.cmake
+
+inv libfaasm
