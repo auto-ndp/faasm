@@ -20,6 +20,8 @@
 #include "cephclass/cephcomm.h"
 #include "cephcomm_generated.h"
 
+#include <faabric/util/logging.h>
+
 CLS_VER(1, 0)
 CLS_NAME(faasm)
 
@@ -91,6 +93,9 @@ int maybe_exec_wasm(cls_method_context_t hctx,
                     bool readAllowed,
                     bool writeAllowed)
 {
+    SPDLOG_INFO("maybe_exec_wasm {} {} {}", inBuffers->length(), 
+        readAllowed, writeAllowed);
+
     if (inBuffers == nullptr || outBuffers == nullptr ||
         !(readAllowed || writeAllowed)) {
         return -EINVAL;
