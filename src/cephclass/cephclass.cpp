@@ -20,7 +20,7 @@
 #include "cephclass/cephcomm.h"
 #include "cephcomm_generated.h"
 
-#include "faabric/util/logging.h"
+#include "../../faabric/include/faabric/util/logging.h"
 
 CLS_VER(1, 0)
 CLS_NAME(faasm)
