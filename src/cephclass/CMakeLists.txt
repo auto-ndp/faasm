@@ -16,4 +16,7 @@ target_link_libraries(faasm_ceph_comm INTERFACE flatbuffers::flatbuffers cephcla
 add_library(faasm::ceph_comm ALIAS faasm_ceph_comm)
 
 add_library(faasm_ceph SHARED cephclass.cpp)
-target_link_libraries(faasm_ceph PRIVATE faasm::ceph_comm fmt::fmt)
+target_link_libraries(faasm_ceph PRIVATE faasm::ceph_comm fmt::fmt spdlog::spdlog)
+target_compile_definitions(faasm_ceph INTERFACE
+    FMT_DEPRECATED= # Suppress warnings about use of deprecated api by spdlog
+)
