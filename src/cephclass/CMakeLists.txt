@@ -4,6 +4,8 @@ flatbuffers_generate_headers(
     SCHEMAS "cephcomm.fbs"
 )
 
+find_package(spdlog REQUIRED)
+
 # Ceph rados/objclass.h does not build in C++20 mode.
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED 17)

@@ -93,14 +93,13 @@ int maybe_exec_wasm(cls_method_context_t hctx,
                     bool readAllowed,
                     bool writeAllowed)
 {
-    SPDLOG_INFO("maybe_exec_wasm {} {} {}", inBuffers->length(), 
-        readAllowed, writeAllowed);
+    SPDLOG_INFO(fmt::format(FMT_STRING("maybe_exec_wasm called {} {} {}"), inBuffers->length(), readAllowed, writeAllowed));
 
     if (inBuffers == nullptr || outBuffers == nullptr ||
         !(readAllowed || writeAllowed)) {
         return -EINVAL;
     }
-    CLS_LOG(3, "maybe_exec_wasm called");
+    CLS_LOG(3, "");
 
     uint64_t callId = 0;
     ndpmsg::NdpResult result = ndpmsg::NdpResult_Ok;
