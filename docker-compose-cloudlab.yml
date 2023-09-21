@@ -126,7 +126,6 @@ services:
       - ./bin/entrypoint_upload.sh:/entrypoint.sh
       - /sys/kernel/debug:/sys/kernel/debug
       - /sys/kernel/debug/tracing:/sys/kernel/debug/tracing
-      - ../ceph:/ceph
     environment:
       - CODEGEN_TARGETS=x86_64:skylake;aarch64:thunderx2t99
       - DELTA_SNAPSHOT_ENCODING=pages=64
@@ -237,7 +236,6 @@ services:
       - ./bin/entrypoint_worker.sh:/entrypoint.sh
       - /sys/kernel/debug:/sys/kernel/debug
       - /sys/kernel/debug/tracing:/sys/kernel/debug/tracing
-      - ../ceph:/ceph
     environment:
       - TINI_SUBREAPER=1
       - CODEGEN_TARGETS=x86_64:skylake;aarch64:thunderx2t99
@@ -297,7 +295,6 @@ services:
       - ./bin/entrypoint_worker.sh:/entrypoint.sh
       - /sys/kernel/debug:/sys/kernel/debug
       - /sys/kernel/debug/tracing:/sys/kernel/debug/tracing
-      - ../ceph:/ceph
     environment:
       - TINI_SUBREAPER=1
       - CODEGEN_TARGETS=x86_64:skylake;aarch64:thunderx2t99
@@ -357,7 +354,6 @@ services:
       - ./bin/entrypoint_worker.sh:/entrypoint.sh
       - /sys/kernel/debug:/sys/kernel/debug
       - /sys/kernel/debug/tracing:/sys/kernel/debug/tracing
-      - ../ceph:/ceph
     environment:
       - TINI_SUBREAPER=1
       - CODEGEN_TARGETS=x86_64:skylake;aarch64:thunderx2t99
@@ -418,7 +414,6 @@ services:
       - ./bin/entrypoint_worker.sh:/entrypoint.sh
       - /sys/kernel/debug:/sys/kernel/debug
       - /sys/kernel/debug/tracing:/sys/kernel/debug/tracing
-      - ../ceph:/ceph
     environment:
       - IS_STORAGE_NODE=1
       - TINI_SUBREAPER=1
