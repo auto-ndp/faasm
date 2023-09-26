@@ -88,6 +88,8 @@ if [ -z "$PS1_old" ]; then
 fi
 export PS1="(faasm) $PS1_old"
 
+python -m pip install psutil
+
 # -----------------------------
 # Splash
 # -----------------------------
