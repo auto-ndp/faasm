@@ -123,7 +123,14 @@ class S3Wrapper
     std::string getKeyStr(const std::string& bucketName,
                           const std::string& keyName);
 
-    RadosCompletion asyncNdpCall(const std::string& bucketName,
+    // RadosCompletion asyncNdpCall(const std::string& bucketName,
+    //                              const std::string& keyName,
+    //                              const std::string& funcClass,
+    //                              const std::string& funcName,
+    //                              std::span<const uint8_t> inputData,
+    //                              std::span<uint8_t> outputBuffer);
+
+    int asyncNdpCall(const std::string& bucketName,
                                  const std::string& keyName,
                                  const std::string& funcClass,
                                  const std::string& funcName,
