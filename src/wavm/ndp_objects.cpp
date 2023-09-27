@@ -354,17 +354,28 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
                                                  builder.GetSize());
 
         std::vector<uint8_t> cephOutput(1024);
-        auto cephCompletion = s3w.asyncNdpCall(call->user(),
-                                               keyStr,
-                                               "faasm",
-                                               "maybe_exec_wasm_ro",
-                                               inputSpan,
-                                               cephOutput);
 
-        while (!cephCompletion.isComplete()) {
-            cephCompletion.wait();
-        }
-        int cephEc = cephCompletion.getReturnValue();
+        // auto cephCompletion = s3w.asyncNdpCall(call->user(),
+        //                                        keyStr,
+        //                                        "faasm",
+        //                                        "maybe_exec_wasm_ro",
+        //                                        inputSpan,
+        //                                        cephOutput);
+
+        // while (!cephCompletion.isComplete()) {
+        //     cephCompletion.wait();
+        // }
+        // int cephEc = cephCompletion.getReturnValue();
+
+        int cephEc = s3w.asyncNdpCall(call->user(),
+                                      keyStr,
+                                      "faasm",
+                                      "maybe_exec_wasm_ro",
+                                      inputSpan,
+                                      cephOutput);
+
+        SPDLOG_DEBUG("asyncNdpCall returned {}", cephEc);
+
         if (cephEc < 0) {
             std::string cephErrStr = "<? ";
             try {

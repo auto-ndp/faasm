@@ -700,7 +700,7 @@ RadosCompletion S3Wrapper::asyncNdpCall(const std::string& bucketName,
                                         std::span<const uint8_t> inputData,
                                         std::span<uint8_t> outputBuffer)
 {
-    SPDLOG_TRACE(
+    SPDLOG_DEBUG(
       "Async Rados NDP call of {}:{} at {}/{} with {} bytes of input",
       funcClass,
       funcName,
@@ -709,15 +709,24 @@ RadosCompletion S3Wrapper::asyncNdpCall(const std::string& bucketName,
       inputData.size());
     auto pool = RadosState::instance().getPool(bucketName);
     RadosCompletion completion(pool);
-    int ec = rados_aio_exec(pool->ioctx,
-                            keyName.c_str(),
-                            completion.completion,
-                            funcClass.c_str(),
-                            funcName.c_str(),
-                            reinterpret_cast<const char*>(inputData.data()),
-                            inputData.size(),
-                            reinterpret_cast<char*>(outputBuffer.data()),
-                            outputBuffer.size());
+    // int ec = rados_aio_exec(pool->ioctx,
+    //                         keyName.c_str(),
+    //                         completion.completion,
+    //                         funcClass.c_str(),
+    //                         funcName.c_str(),
+    //                         reinterpret_cast<const char*>(inputData.data()),
+    //                         inputData.size(),
+    //                         reinterpret_cast<char*>(outputBuffer.data()),
+    //                         outputBuffer.size());
+
+    int ec = rados_exec(pool->ioctx,
+                        keyName.c_str(),
+                        funcClass.c_str(),
+                        funcName.c_str(),
+                        reinterpret_cast<const char*>(inputData.data()),
+                        inputData.size(),
+                        reinterpret_cast<char*>(outputBuffer.data()),
+                        outputBuffer.size());
     if (ec < 0) {
         SPDLOG_ERROR("Key {}/{} cannot run {}:{}: {}",
                      bucketName,
@@ -727,6 +736,7 @@ RadosCompletion S3Wrapper::asyncNdpCall(const std::string& bucketName,
                      strerror(-ec));
         throw std::runtime_error("Key cannot run an NDP call.");
     }
-    return completion;
+    // return completion;
+    return ec;
 }
 }
