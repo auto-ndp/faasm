@@ -86,6 +86,7 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
     // Handles one message
     void onFirstReceivable(const boost::system::error_code& ec)
     {
+        SPDLOG_DEBUG("DING DONG");
         namespace fbs = flatbuffers;
         if (!ec) {
             auto msgData = connection->recvMessageVector();
