@@ -2,9 +2,12 @@
 <img src="https://raw.githubusercontent.com/faasm/faasm/main/faasm_logo.png"></img>
 </div>
 
-# Faasm [![Tests](https://github.com/faasm/faasm/workflows/Tests/badge.svg?branch=main)](https://github.com/faasm/faasm/actions)  [![License](https://img.shields.io/github/license/faasm/faasm.svg)](https://github.com/faasm/faasm/blob/main/LICENSE.md)  [![Release](https://img.shields.io/github/release/faasm/faasm.svg)](https://github.com/faasm/faasm/releases/)  [![Contributors](https://img.shields.io/github/contributors/faasm/faasm.svg)](https://github.com/faasm/faasm/graphs/contributors/)
+# AutoNDP-Faasm [![Tests](https://github.com/faasm/faasm/workflows/Tests/badge.svg?branch=main)](https://github.com/faasm/faasm/actions)  [![License](https://img.shields.io/github/license/faasm/faasm.svg)](https://github.com/faasm/faasm/blob/main/LICENSE.md)  [![Release](https://img.shields.io/github/release/faasm/faasm.svg)](https://github.com/faasm/faasm/releases/)  [![Contributors](https://img.shields.io/github/contributors/faasm/faasm.svg)](https://github.com/faasm/faasm/graphs/contributors/)
 
-Faasm is a high-performance stateful serverless runtime.
+
+### Faasm
+
+This work is built atop Faasm, a high-performance serverless runtime.
 
 Faasm provides multi-tenant isolation, yet allows functions to share regions of
 memory. These shared memory regions give low-latency concurrent access to data,
@@ -20,177 +23,200 @@ Faasm defines a custom host interface that extends [WASI](https://wasi.dev/) to
 include function inputs and outputs, chaining functions, managing state,
 accessing the distributed filesystem, dynamic linking, pthreads, OpenMP and MPI.
 
-Our paper from Usenix ATC '20 on Faasm can be found
-[here](https://www.usenix.org/conference/atc20/presentation/shillaker).
+You can find the Usenix ATC '20 paper on Faasm [here](https://www.usenix.org/conference/atc20/presentation/shillaker).
 
 Please see the [full documentation](https://faasm.readthedocs.io/en/latest/) for
-more details on the code and architecture.
+more details on the code and architecture pertaining to Faasm.
 
-## Quick start
+### Near-Storage Offloading
 
-Update submodules:
+Our work introduces an efficient migration mechanism for Serverless Functions across machines to move I/O-intensive parts of Functions to the relevant storage node, with minimal code changes. 
+This allows Functions to perform arbitrary computations on storage nodes, benefiting from the locality of data, whilst maintaining compute-storage disaggregation.
 
-```bash
-git submodule update --init --recursive
-```
+## Cloudlab
 
-First set up the environment:
-```bash
-source bin/cluster_env.sh
-source bin/workon.sh
-```
+Within the *autoNDP* project, instantiate the *test-offloading* profile. 
+Pick a cluster with at least 10 GB/s ethernet speed, and 256 GB of disk storage.
+Instantiate an experiement with 7 nodes (Nodes 0-2 are Storage Nodes, 3-5 are Compute Nodes, and Node 6 is the Load-Generator).
+You may pick a different configuration, but ensure that you modify the `docker-compose-cloudlab.yml` file accordingly.
 
-Rebuild critical components in debug mode:
-```bash
-./bin/refresh_local.sh
-./bin/cli.sh faasm
+## Setup
 
-# only need to run this once
-pip install -r requirements.txt
-
-inv dev.cmake
-inv dev.cc faasm_dev_tools
-```
-
-Start a Faasm cluster locally using `docker compose`:
+First ssh into every node, and `sudo su` to become root user.
+Now clone this repository, and `cd` into it.
+Then run this on each node.
 
 ```bash
-./deploy/local/dev_cluster.sh
+git submodule update --init --recursive # clone the submodules
+source ./bin/one-click-setup.sh # install deps, download containers, and enter work env
 ```
 
-To compile, upload and invoke a C++ function using this local cluster you can
-use the [faasm/cpp](https://github.com/faasm/cpp) container:
-
-```bash
-./bin/cli.sh cpp
-
-# only need to run this once
-pip install -r requirements.txt
-cp WasiToolchain.cmake /usr/local/faasm/toolchain/tools/WasiToolchain.cmake
-
-# Compile the demo function
-inv func demo hello
-
-# Upload the demo "hello" function
-inv func.upload demo hello
-
-# Invoke the function
-inv func.invoke demo hello
-
-inv func.upload ndp get
-inv func.upload ndp put
-inv func.upload ndp wordcount
-```
-
+Now build everything once for the first time
 ```bash
 ./bin/cli.sh faasm
-
-# Upload some simple data (hello -> hello world my world)
-inv invoke ndp put -i 'hello hello world my world'
-
-# Fetch the data back
-inv invoke ndp get -i 'hello'
-
-# Run wordcount with NDP offloading
-inv invoke ndp wordcount -i 'hello'
-
-# Run wordcount manually with NDP offloading via curl
-curl -X POST 'http://worker:8080/f/' -H "Content-Type: application/json" -d '{"async": false, "user": "ndp", "function": "wordcount", "input_data": "hello"}'
-
-# Run wordcount without NDP offloading, manually via curl
-curl -X POST 'http://worker:8080/f/' -H "Content-Type: application/json" -d '{"async": false, "user": "ndp", "function": "wordcount", "input_data": "hello", "forbid_ndp": true}'
-```
-
-For more information on next steps you can look at the [getting started
-docs](https://faasm.readthedocs.io/en/latest/source/getting_started.html)
-
-## Multi-Node Experiments
-
-We shall use [docker swarm](https://docs.docker.com/engine/swarm/) to manage our containers running as services. 
-
-On a manager node, initialize the swarm
-```
-docker swarm init --advertise-addr <MANAGER-IP>
-```
-The above command should successfully return an output containing a `docker swarm join` command which must be run on all the other nodes in the cluster. Once this is done theb list of nodes in the swarm can be seen via `docker node ls`.
-
-Now deploy the services as 
-```
-docker stack deploy --compose-file docker-compose.yml faasm
-```
-Scale the services as per the following example
-```
-docker service scale faasm_cpp=2
-```
-Rebuild critical components
-```bash
-./bin/refresh_local
-docker exec -it <faasm-cli container ID> /bin/bash
-
-# in faasm-cli container
-inv dev.cmake
-inv dev.cc faasm_dev_tools
-exit
-
-# back on host terminal
-docker service update faasm_worker
-docker service update faasm_worker-storage
-docker service update faasm_upload
-docker service update faasm_nginx
-```
-Service-to-node placement can be manipulated with [placement options](https://docs.docker.com/engine/swarm/services/#placement-preferences).
-
-_Ensure that all the contents of `dev/faasm-local/ceph-ceph-mon1` at the node running ceph-mon1 is copied to the same folder on all nodes._
-
-The stack can be removed via 
-```
-docker stack rm faasm
-```
-## Setup for CloudLab
-
-For Cloudlab, instantiate the profile at [deploy/cloudlab_profile.py](https://auto-ndp/faasm/deploy/cloudlab_profile.py)
-
-First install dependencies and build all binaries
-```bash
-source ./bin/one-click-setup.sh
-./bin/cli.sh faasm
-
-./bin/runcmd.sh "./bin/buildfaasm.sh" "faasm_faasm-cli"
-
-./deploy/local/dev_cluster.sh
+# Now you have entered the faasm-cli container
+(faasm-cli)$ ./bin/buildfaasm.sh # Build all binaries for the first time
+(faasm-cli)$ exit
+# Now back on host
+./deploy/local/dev_cluster.sh # download and start all containers for the first time
 docker compose down
 ```
-Now start `docker swarm` deployment.
-Here we shall see an example of an 8-node cluster (5 storage + 2 compute + 1 loadgen).
-Node 0 shall be given the label `rank=leader`.
-Nodes 0-4 shall be labeled `type=storage`, 5-6 shall be labeled `type=compute` while 7 shall be labeled `type=loadgen`
-Nodes 0-4 shall be labeled `name=storage0`, `name=storage1`,..., `name=storage4` respectively.
+We use *docker swarm* to manage all containers across the cluster.
 
-Export the environment variable `OSDSIZE` to the size of the per-node OSD pool. Default value is `50G`.
-Now do the following on every storage node.
+On **Node 0** run the following command.
 ```bash
-./bin/setup-osd.sh setup 
-```
-Finally on the leader node (0) do
-```bash
-docker stack deploy --compose-file docker-compose-cloudlab.yml faasm
-./bin/setup-osd sync
-```
-On the loadgen node, fix one detail in the `cpp` container
-```bash
-rm -rf build
-cp WasiToolchain.cmake /usr/local/faasm/toolchain/tools/WasiToolchain.cmake
+docker swarm init --advertise-addr 10.0.1.1
 ```
 
-Finally turn down the stack
+Copy the command (eg. `docker swarm join --token ABCDEFGHIJKLMNOP`) and run it on all the other nodes.
+Nodes 1-6 should have joined the swarm as *workers* while Node 0 is the *manager*.
+Now attach labels to the nodes. to identify them.
+
+```bash
+node0=$(docker node ls | grep node-0)
+node1=$(docker node ls | grep node-1)
+node2=$(docker node ls | grep node-2)
+node3=$(docker node ls | grep node-3)
+node4=$(docker node ls | grep node-4)
+node5=$(docker node ls | grep node-5)
+node6=$(docker node ls | grep node-6)
+
+docker node update --label-add rank=leader ${node0}
+docker node update --label-add type=storage ${node0}
+docker node update --label-add name=storage0 ${node0}
+
+docker node update --label-add type=storage ${node1}
+docker node update --label-add name=storage1 ${node1}
+
+docker node update --label-add type=storage ${node2}
+docker node update --label-add name=storage2 ${node2}
+
+docker node update --label-add type=compute ${node3}
+docker node update --label-add name=compute0 ${node3}
+
+docker node update --label-add type=compute ${node4}
+docker node update --label-add name=compute1 ${node4}
+
+docker node update --label-add type=compute ${node5}
+docker node update --label-add name=compute2 ${node5}
+
+docker node update --label-add type=loadgen ${node6}
+```
+## Offloading
+
+In the following commands, substitute `${FAASM_ROOT}` for the location where `faasm` is installed (eg. `/users/alannair/faasm`).
+
+On **Node 0** (manager) run the following command to setup some necessary deps for the Ceph OSD (Object Storage Daemons) on every node in the swarm.
+The `bin/runcmd.sh` script uses `ssh` to run commands on the worker nodes, so the first time it tries to connect to the workers, it will ask for confirmation for each worker.
+
+```bash
+./bin/runcmd.sh "cd ${FAASM_ROOT} && ./bin/setup-osd.sh setup"
+```
+Finally on **Node 0** do
+```bash
+docker stack deploy --compose-file docker-compose-cloudlab.yml faasm # deploy the swarm
+./bin/setup-osd.sh sync # update the keys required by OSDs on all storage nodes
+```
+
+Check that all services are running well.
+On Manager Node (**Node 0**) do `docker service ls`.
+On each node, do `docker ps` to see the containers running on that node.
+
+Rebuild the binaries (optional - do this if you have made modifications to the source code).
+On **each node** do
+```bash
+docker exec -it $(docker ps | grep faasm_faasm-cli | awk '{print $1;}') # enter faasm-cli
+(faasm-cli)$ ./bin/buildfaasm.sh
+(faasm-cli)$ exit
+
+docker exec -it $(docker ps | grep faasm_faasm-cpp | awk '{print $1;}') # enter faasm-cpp
+(cpp)$ ./bin/buildcpp.sh
+(cpp)$ exit
+```
+
+## Run Offloading Experiments
+
+Now let us see offloading in action.
+The `clients/cpp/func/ndp` directory contains some example functions that make use of offloading.
+We shall look at `wordcount.cpp` as a representative example.
+
+On the *loadgen* node (client node), first build and upload the functions bytecodes.
+```bash
+docker exec -it $(docker ps | grep faasm_faasm-cpp | awk '{print $1;}') # enter faasm-cpp
+
+(cpp)$ inv func ndp get # build get.cpp
+(cpp)$ inv func ndp put # build put.cpp
+(cpp)$ inv func ndp wordcount # build wordcount.cpp
+
+# upload the bytecodes (to the upload service running on Leader Node)
+(cpp)$ inv func.upload ndp get
+(cpp)$ inv func.upload ndp put
+(cpp)$ inv func.upload ndp wordcount
+
+# the following steps can be performed from either the faasm-cli or the cpp container on the loadgen node
+
+# put a key-value object {'key': 'v1 v2 v3'} into the storage backend
+(cpp)$ curl -X POST 'http://worker-0:8080/f/' -H "Content-Type: application/json" -d '{"async": false, "user": "ndp", "function": "put", "input_data": "key v1 v2 v3"}'
+
+# get the same to test that it works
+(cpp)$ curl -X POST 'http://worker-0:8080/f/' -H "Content-Type: application/json" -d '{"async": false, "user": "ndp", "function": "get", "input_data": "key"}'
+
+# run wordcount with offloading
+(cpp)$ curl -X POST 'http://worker-0:8080/f/' -H "Content-Type: application/json" -d '{"async": false, "user": "ndp", "function": "wordcount", "input_data": "key"}'
+
+# run wordcount without offloading
+(cpp)$ curl -X POST 'http://worker-0:8080/f/' -H "Content-Type: application/json" -d '{"async": false, "user": "ndp", "function": "wordcount", "input_data": "key", "forbid_ndp": true}'
+```
+In the above example we tested `worker-0`.
+Similarly test `worker-1` and `worker-2` as well.
+
+## Restarting the Swarm
+
+### Simple Restart
+
+First turn down the swarm. On **Node 0** do
 ```bash
 docker stack rm faasm
-./bin/setup-osd clean
+./bin/runcmd.sh "cd ${FAASM_ROOT} && ./bin/setup-osd.sh clean"
+```
+Now redo all the steps in the **Ofloading** section above.
+
+### Clean Restart
+
+If you need a fresh restart, some more steps are needed.
+
+First turn down the swarm. On **Node 0** do
+```bash
+docker stack rm faasm
+./bin/runcmd.sh "cd ${FAASM_ROOT} && ./bin/setup-osd.sh clean"
 ```
 
-## Acknowledgements
+Now on **each node** do
+```bash
+./bin/refresh_local.sh -d
+```
 
-This project has received funding from the European Union's Horizon 2020
-research and innovation programme under grant agreement No 825184 (CloudButton),
-the UK Engineering and Physical Sciences Research Council (EPSRC) award 1973141,
-and a gift from Intel Corporation under the TFaaS project.
+Next, do vanilla setup (to setup some directory structures appropriately as needed)
+
+```bash
+./bin/cli.sh faasm
+# Now you have entered the faasm-cli container
+(faasm-cli)$ ./bin/buildfaasm.sh # Build all binaries for the first time
+(faasm-cli)$ exit
+# now back on host
+./deploy/local/dev_cluster.sh # download and start all containers for the first time
+docker compose down
+```
+
+Now redo all the steps in the **Ofloading** section above.
+
+## Logging back in
+
+If you log in to a node that already has a running swarm, you need to enter the working environment.
+```bash
+source ./bin/cluster_env.sh
+source ./bin/workon.sh
+```
+
+This command updates some of your session variables.
+In the earlier setup, this command was executed from with `bin/one-click-setup.sh`.
