@@ -102,6 +102,12 @@ docker node update --label-add name=compute2 ${node5}
 
 docker node update --label-add type=loadgen ${node6}
 ```
+
+Inspect the node labels to see if they have been labelled correctly.
+```bash
+docker node ls -q | xargs docker node inspect \
+  -f '{{ .ID }} [{{ .Description.Hostname }}]: {{ range $k, $v := .Spec.Labels }}{{ $k }}={{ $v }} {{end}}'
+```
 ## Offloading
 
 In the following commands, substitute `${FAASM_ROOT}` for the location where `faasm` is installed (eg. `/users/alannair/faasm`).
