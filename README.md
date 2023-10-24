@@ -73,13 +73,13 @@ Nodes 1-6 should have joined the swarm as *workers* while Node 0 is the *manager
 Now attach labels to the nodes. to identify them.
 
 ```bash
-node0=$(docker node ls | grep node-0)
-node1=$(docker node ls | grep node-1)
-node2=$(docker node ls | grep node-2)
-node3=$(docker node ls | grep node-3)
-node4=$(docker node ls | grep node-4)
-node5=$(docker node ls | grep node-5)
-node6=$(docker node ls | grep node-6)
+node0=$(docker node ls | grep node-0 | awk '{print $1;}')
+node1=$(docker node ls | grep node-1 | awk '{print $1;}')
+node2=$(docker node ls | grep node-2 | awk '{print $1;}')
+node3=$(docker node ls | grep node-3 | awk '{print $1;}')
+node4=$(docker node ls | grep node-4 | awk '{print $1;}')
+node5=$(docker node ls | grep node-5 | awk '{print $1;}')
+node6=$(docker node ls | grep node-6 | awk '{print $1;}')
 
 docker node update --label-add rank=leader ${node0}
 docker node update --label-add type=storage ${node0}
