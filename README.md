@@ -131,11 +131,11 @@ On each node, do `docker ps` to see the containers running on that node.
 Rebuild the binaries (optional - do this if you have made modifications to the source code).
 On **each node** do
 ```bash
-docker exec -it $(docker ps | grep faasm_faasm-cli | awk '{print $1;}') # enter faasm-cli
+docker exec -it $(docker ps | grep faasm_faasm-cli | awk '{print $1;}') /bin/bash # enter faasm-cli
 (faasm-cli)$ ./bin/buildfaasm.sh
 (faasm-cli)$ exit
 
-docker exec -it $(docker ps | grep faasm_faasm-cpp | awk '{print $1;}') # enter faasm-cpp
+docker exec -it $(docker ps | grep faasm_faasm-cpp | awk '{print $1;}') /bin/bash # enter faasm-cpp
 (cpp)$ ./bin/buildcpp.sh
 (cpp)$ exit
 ```
@@ -148,7 +148,7 @@ We shall look at `wordcount.cpp` as a representative example.
 
 On the *loadgen* node (client node), first build and upload the functions bytecodes.
 ```bash
-docker exec -it $(docker ps | grep faasm_faasm-cpp | awk '{print $1;}') # enter faasm-cpp
+docker exec -it $(docker ps | grep faasm_faasm-cpp | awk '{print $1;}') /bin/bash # enter faasm-cpp
 
 (cpp)$ inv func ndp get # build get.cpp
 (cpp)$ inv func ndp put # build put.cpp
