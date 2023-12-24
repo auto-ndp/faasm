@@ -259,49 +259,51 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
                             std::span<I32> extraArgs)
 {
     ZoneScopedN("storageCallAndAwaitImpl");
+
+
     static storage::S3Wrapper s3w;
-    if (keyPtr <= 0 || keyLen <= 0) {
-        return 0;
-    }
-    const faabric::util::SystemConfig& config =
-      faabric::util::getSystemConfig();
+    if (keyPtr <= 0 || keyLen <= 0) { return 0; }
+    const faabric::util::SystemConfig& config = faabric::util::getSystemConfig();
+
+    // Extract python function name
     const bool isPython = pyFuncNamePtr != 0;
-    const std::string pyFuncName =
-      isPython ? getStringFromWasm(pyFuncNamePtr) : "";
+    const std::string pyFuncName = isPython ? getStringFromWasm(pyFuncNamePtr) : "";
     SPDLOG_DEBUG("S - storageCallAndAwaitImpl - {} {} #{}",
                  wasmFuncPtr,
                  pyFuncName,
                  extraArgs.size());
 
-    faabric::Message* call =
-      &faabric::scheduler::ExecutorContext::get()->getMsg();
-
-    WAVMWasmModule* thisModule = static_cast<WAVMWasmModule*>(
-      getCurrentWasmExecutionContext()->executingModule);
+    faabric::Message* call = &faabric::scheduler::ExecutorContext::get()->getMsg();
+    WAVMWasmModule* thisModule = static_cast<WAVMWasmModule*>(getCurrentWasmExecutionContext()->executingModule); // ptr to current WASM Module
 
     Runtime::Memory* memoryPtr = thisModule->defaultMemory;
-    U8* key =
-      Runtime::memoryArrayPtr<U8>(memoryPtr, (Uptr)keyPtr, (Uptr)keyLen);
+    U8* key = Runtime::memoryArrayPtr<U8>(memoryPtr, (Uptr)keyPtr, (Uptr)keyLen);
     std::string keyStr(reinterpret_cast<char*>(key), keyLen);
 
     // Validate function signature
     if (!isPython) {
         auto* funcInstance = thisModule->getFunctionFromPtr(wasmFuncPtr);
         auto funcType = Runtime::getFunctionType(funcInstance);
-        if (funcType.results().size() != 1 ||
-            funcType.params().size() != extraArgs.size()) {
-            throw std::invalid_argument(
-              "Wrong function signature for storageCallAndAwait");
+
+        // If extracted function signature does not match the actual function signature
+        if (funcType.results().size() != 1 || funcType.params().size() != extraArgs.size())
+        {
+            throw std::invalid_argument("Wrong function signature for storageCallAndAwait");
         }
-        for (const auto& param : funcType.params()) {
-            if (param != IR::ValueType::i32) {
+
+        // Ensure function argument are i32's
+        for (const auto& param : funcType.params())
+        {
+            if (param != IR::ValueType::i32)
+            {
                 throw std::invalid_argument("Function argument not i32");
             }
         }
     }
 
-    bool callLocally = true;
+    bool callLocally = true; // flag set to true when function should be called on current node, false when offloaded
     if (!call->forbidndp() && !config.isStorageNode) {
+        SPDLOG_INFO("NDP Call detected, offloading funclets to the relevant storage node");
         using namespace faasm;
         callLocally = false;
 
@@ -309,12 +311,10 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
 
         const int ndpCallId = faabric::util::generateGid() & 0xFFFF'FFFF;
 
-        faabric::scheduler::FunctionCallServer::registerNdpDeltaHandler(
+        faabric::scheduler::FunctionCallServer::registerNdpDeltaHandler(s
           ndpCallId, [thisModule, callId = call->id()]() {
-              auto zygoteSnapshotKV = thisModule->getZygoteSnapshot();
-              const std::span<const uint8_t> zygoteSnapshot{
-                  zygoteSnapshotKV->get(), zygoteSnapshotKV->size()
-              };
+              std::shared_ptr<faabric::state::StateKeyValue> zygoteSnapshotKV = thisModule->getZygoteSnapshot();
+              const std::span<const uint8_t> zygoteSnapshot{ zygoteSnapshotKV->get(), zygoteSnapshotKV->size() };
               auto zygoteDelta = thisModule->deltaSnapshot(zygoteSnapshot);
 
               SPDLOG_INFO("{} - NDP sending snapshot of {} bytes",
@@ -327,15 +327,14 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
         // begin ceph aio
         flatbuffers::FlatBufferBuilder builder(256);
         {
-            auto fBucket = builder.CreateString(call->user());
+            auto fBucket   = builder.CreateString(call->user());
             auto fFunction = builder.CreateString(call->function());
-            auto fKey = builder.CreateString(keyStr);
-            auto fObjInfo = ndpmsg::CreateObjectInfo(builder, fBucket, fKey);
+            auto fKey      = builder.CreateString(keyStr);
+            auto fObjInfo  = ndpmsg::CreateObjectInfo(builder, fBucket, fKey);
 
-            auto fPyPtr = builder.CreateString(pyFuncName);
-            auto fGlobals = builder.CreateVector(wasmGlobals);
-            auto fArgs =
-              builder.CreateVector(extraArgs.data(), extraArgs.size());
+            auto fPyPtr    = builder.CreateString(pyFuncName);
+            auto fGlobals  = builder.CreateVector(wasmGlobals);
+            auto fArgs     = builder.CreateVector(extraArgs.data(), extraArgs.size());
             auto fWasmInfo = ndpmsg::CreateWasmInfo(builder,
                                                     fBucket,
                                                     fFunction,
@@ -345,9 +344,7 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
                                                     fArgs);
 
             auto fOriginHost = builder.CreateString(config.endpointHost);
-            auto ndpRequest = ndpmsg::CreateNdpRequest(
-              builder, ndpCallId, fWasmInfo, fObjInfo, fOriginHost);
-
+            auto ndpRequest  = ndpmsg::CreateNdpRequest(builder, ndpCallId, fWasmInfo, fObjInfo, fOriginHost);
             builder.Finish(ndpRequest);
         }
         const std::span<const uint8_t> inputSpan(builder.GetBufferPointer(),
@@ -408,6 +405,7 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
         }
         switch (ndpResponse->result()) {
             case ndpmsg::NdpResult_Ok:
+                SPDLOG_INFO("Ceph NDP result returned OK");
                 break;
             case ndpmsg::NdpResult_Error: {
                 SPDLOG_ERROR("Ceph NDP call {} for {}/{} returned error {}",
@@ -460,12 +458,14 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
                         ndpResult.outputdata().size());
             thisModule->deltaRestore(memoryDelta);
         }
-    }
+    } // endif s
     if (callLocally) {
         ZoneScopedN("call locally");
         if (isPython) {
             return -0x12345678;
         }
+
+        // Initialise function with arguments
         auto* funcInstance = thisModule->getFunctionFromPtr(wasmFuncPtr);
         auto funcType = Runtime::getFunctionType(funcInstance);
         std::vector<IR::UntaggedValue> funcArgs;
@@ -475,11 +475,14 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
         }
         funcArgs.push_back(0);
         IR::UntaggedValue result;
+
+        // Invoke function on the current faasm runtime
         Runtime::invokeFunction(thisModule->executionContext,
                                 funcInstance,
                                 funcType,
                                 funcArgs.data(),
                                 &result);
+                                
         return result.i32;
     }
 
