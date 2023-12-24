@@ -282,8 +282,8 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
 
     // Validate function signature
     if (!isPython) {
-        auto* funcInstance = thisModule->getFunctionFromPtr(wasmFuncPtr);
-        auto funcType = Runtime::getFunctionType(funcInstance);
+        Runtime::Function* funcInstance = thisModule->getFunctionFromPtr(wasmFuncPtr);
+        FunctionType funcType = Runtime::getFunctionType(funcInstance);
 
         // If extracted function signature does not match the actual function signature
         if (funcType.results().size() != 1 || funcType.params().size() != extraArgs.size())
@@ -311,17 +311,16 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
 
         const int ndpCallId = faabric::util::generateGid() & 0xFFFF'FFFF;
 
-        faabric::scheduler::FunctionCallServer::registerNdpDeltaHandler(s
-          ndpCallId, [thisModule, callId = call->id()]() {
-              std::shared_ptr<faabric::state::StateKeyValue> zygoteSnapshotKV = thisModule->getZygoteSnapshot();
-              const std::span<const uint8_t> zygoteSnapshot{ zygoteSnapshotKV->get(), zygoteSnapshotKV->size() };
-              auto zygoteDelta = thisModule->deltaSnapshot(zygoteSnapshot);
-
-              SPDLOG_INFO("{} - NDP sending snapshot of {} bytes",
-                          callId,
-                          zygoteDelta.size());
-              return zygoteDelta;
-          });
+        auto ndp_handler_function = [thisModule, callId = call->id()]()
+        {
+            std::shared_ptr<faabric::state::StateKeyValue> zygoteSnapshotKV = thisModule->getZygoteSnapshot();
+            const std::span<const uint8_t> zygoteSnapshot{ zygoteSnapshotKV->get(), zygoteSnapshotKV->size() };
+            std::vector<uint_8> zygoteDelta = thisModule->deltaSnapshot(zygoteSnapshot);
+            SPDLOG_INFO("{} - NDP sending snapshot of {} bytes", callId, zygoteDelta.size());
+            return zygoteDelta;
+        }
+        
+        faabric::scheduler::FunctionCallServer::registerNdpDeltaHandler(ndpCallId, ndp_handler_function);
         faabric::scheduler::getScheduler().addLocalResultSlot(ndpCallId);
 
         // begin ceph aio
@@ -373,12 +372,11 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
 
         SPDLOG_DEBUG("asyncNdpCall returned {}", cephEc);
 
-        if (cephEc < 0) {
+        if (cephEc < 0) { // if error occurred
             std::string cephErrStr = "<? ";
             try {
                 verifyFlatbuf<ndpmsg::NdpResponse>(cephOutput);
-                const auto* ndpResponse =
-                  flatbuffers::GetRoot<ndpmsg::NdpResponse>(cephOutput.data());
+                const auto* ndpResponse = flatbuffers::GetRoot<ndpmsg::NdpResponse>(cephOutput.data());
                 cephErrStr = ndpResponse->error_msg()->str();
             } catch (std::exception& e) {
                 cephErrStr = fmt::format(
@@ -398,11 +396,13 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
         }
 
         verifyFlatbuf<ndpmsg::NdpResponse>(cephOutput);
-        const auto* ndpResponse =
-          flatbuffers::GetRoot<ndpmsg::NdpResponse>(cephOutput.data());
-        if (ndpResponse->call_id() != ndpCallId) {
+        const auto* ndpResponse = flatbuffers::GetRoot<ndpmsg::NdpResponse>(cephOutput.data()); // Construct response based on Ceph output buffer
+        if (ndpResponse->call_id() != ndpCallId) 
+        {
             throw std::runtime_error("Mismatched call ids in storage message!");
         }
+
+        // State Machine for NDP Response codes
         switch (ndpResponse->result()) {
             case ndpmsg::NdpResult_Ok:
                 SPDLOG_INFO("Ceph NDP result returned OK");
@@ -422,16 +422,16 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
             default:
                 throw std::runtime_error("Invalid NDP result code");
         }
-        if (!callLocally) {
+
+        if (!callLocally) { // if code needs to be called on the storage node
             faabric::Message ndpResult = awaitChainedCallMessage(ndpCallId);
 
-            faabric::scheduler::FunctionCallServer::removeNdpDeltaHandler(
-              ndpCallId);
+            faabric::scheduler::FunctionCallServer::removeNdpDeltaHandler(ndpCallId); // clear after function called
 
-            if (ndpResult.returnvalue() != 0) {
+            if (ndpResult.returnvalue() != 0) // error occurred
+            {
                 call->set_outputdata(ndpResult.outputdata());
-                SPDLOG_DEBUG("Chained NDP resulted in error code {}",
-                             ndpResult.returnvalue());
+                SPDLOG_DEBUG("Chained NDP resulted in error code {}", ndpResult.returnvalue());
                 return ndpResult.returnvalue();
             }
 
@@ -447,9 +447,7 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
                 }
             }
 
-            SPDLOG_INFO("{} - NDP delta restore from {} bytes",
-                        call->id(),
-                        ndpResult.outputdata().size());
+            SPDLOG_INFO("{} - NDP delta restore from {} bytes", call->id(), ndpResult.outputdata().size());
             // faabric::util::writeBytesToFile(
             //   "/usr/local/faasm/debug_shared_store/debug_delta.bin",
             //   faabric::util::stringToBytes(ndpResult.outputdata()));
@@ -458,7 +456,9 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
                         ndpResult.outputdata().size());
             thisModule->deltaRestore(memoryDelta);
         }
-    } // endif s
+    }
+
+    // if calling locally
     if (callLocally) {
         ZoneScopedN("call locally");
         if (isPython) {
@@ -466,11 +466,12 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
         }
 
         // Initialise function with arguments
-        auto* funcInstance = thisModule->getFunctionFromPtr(wasmFuncPtr);
-        auto funcType = Runtime::getFunctionType(funcInstance);
+        Runtime::Function* funcInstance = thisModule->getFunctionFromPtr(wasmFuncPtr);
+        FunctionType funcType = Runtime::getFunctionType(funcInstance);
         std::vector<IR::UntaggedValue> funcArgs;
         funcArgs.reserve(extraArgs.size() + 1);
-        for (I32 param : extraArgs) {
+        for (I32 param : extraArgs) 
+        {
             funcArgs.push_back(param);
         }
         funcArgs.push_back(0);
@@ -486,7 +487,8 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
         return result.i32;
     }
 
-    return 0;
+    SPDLOG_ERROR("storageCallAndAwaitImpl reached a point where it was neither offloaded nor performed locally. Returned 0");
+    return 0; // shouldn't reach this point
 }
 
 WAVM_DEFINE_INTRINSIC_FUNCTION(env,
