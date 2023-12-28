@@ -17,6 +17,7 @@
 #include <faabric/util/snapshot.h>
 #include <faabric/util/timing.h>
 #include <memory>
+
 #include <stdexcept>
 #include <storage/S3Wrapper.h>
 #include <wasm/WasmExecutionContext.h>
@@ -260,7 +261,7 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
 {
     ZoneScopedN("storageCallAndAwaitImpl");
 
-
+    SPDLOG_DEBUG("DJ - ndp_objects::storageCallAndAwaitImpl entered");
     static storage::S3Wrapper s3w;
     if (keyPtr <= 0 || keyLen <= 0) { return 0; }
     const faabric::util::SystemConfig& config = faabric::util::getSystemConfig();
@@ -283,7 +284,7 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
     // Validate function signature
     if (!isPython) {
         Runtime::Function* funcInstance = thisModule->getFunctionFromPtr(wasmFuncPtr);
-        FunctionType funcType = Runtime::getFunctionType(funcInstance);
+        WAVM::IR::FunctionType funcType = Runtime::getFunctionType(funcInstance);
 
         // If extracted function signature does not match the actual function signature
         if (funcType.results().size() != 1 || funcType.params().size() != extraArgs.size())
@@ -303,24 +304,21 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
 
     bool callLocally = true; // flag set to true when function should be called on current node, false when offloaded
     if (!call->forbidndp() && !config.isStorageNode) {
-        SPDLOG_INFO("NDP Call detected, offloading funclets to the relevant storage node");
+        SPDLOG_INFO("DJ - NDP Call detected, offloading funclets to the relevant storage node");
         using namespace faasm;
         callLocally = false;
 
         std::vector<int32_t> wasmGlobals = thisModule->getGlobals();
 
-        const int ndpCallId = faabric::util::generateGid() & 0xFFFF'FFFF;
-
-        auto ndp_handler_function = [thisModule, callId = call->id()]()
+        const int ndpCallId = faabric::util::generateGid() & 0xFFFF'FFFF;        
+        faabric::scheduler::FunctionCallServer::registerNdpDeltaHandler(ndpCallId, [thisModule, callId = call->id()]()
         {
             std::shared_ptr<faabric::state::StateKeyValue> zygoteSnapshotKV = thisModule->getZygoteSnapshot();
             const std::span<const uint8_t> zygoteSnapshot{ zygoteSnapshotKV->get(), zygoteSnapshotKV->size() };
-            std::vector<uint_8> zygoteDelta = thisModule->deltaSnapshot(zygoteSnapshot);
+            std::vector<uint8_t> zygoteDelta = thisModule->deltaSnapshot(zygoteSnapshot);
             SPDLOG_INFO("{} - NDP sending snapshot of {} bytes", callId, zygoteDelta.size());
             return zygoteDelta;
-        }
-        
-        faabric::scheduler::FunctionCallServer::registerNdpDeltaHandler(ndpCallId, ndp_handler_function);
+        });
         faabric::scheduler::getScheduler().addLocalResultSlot(ndpCallId);
 
         // begin ceph aio
@@ -467,7 +465,7 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
 
         // Initialise function with arguments
         Runtime::Function* funcInstance = thisModule->getFunctionFromPtr(wasmFuncPtr);
-        FunctionType funcType = Runtime::getFunctionType(funcInstance);
+        WAVM::IR::FunctionType funcType = Runtime::getFunctionType(funcInstance);
         std::vector<IR::UntaggedValue> funcArgs;
         funcArgs.reserve(extraArgs.size() + 1);
         for (I32 param : extraArgs) 
