@@ -283,8 +283,8 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
 
     // Validate function signature
     if (!isPython) {
-        Runtime::Function* funcInstance = thisModule->getFunctionFromPtr(wasmFuncPtr);
-        WAVM::IR::FunctionType funcType = Runtime::getFunctionType(funcInstance);
+        auto* funcInstance = thisModule->getFunctionFromPtr(wasmFuncPtr);
+        auto funcType = Runtime::getFunctionType(funcInstance);
 
         // If extracted function signature does not match the actual function signature
         if (funcType.results().size() != 1 || funcType.params().size() != extraArgs.size())
@@ -464,8 +464,8 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
         }
 
         // Initialise function with arguments
-        Runtime::Function* funcInstance = thisModule->getFunctionFromPtr(wasmFuncPtr);
-        WAVM::IR::FunctionType funcType = Runtime::getFunctionType(funcInstance);
+        auto* funcInstance = thisModule->getFunctionFromPtr(wasmFuncPtr);
+        auto funcType = Runtime::getFunctionType(funcInstance);
         std::vector<IR::UntaggedValue> funcArgs;
         funcArgs.reserve(extraArgs.size() + 1);
         for (I32 param : extraArgs) 
