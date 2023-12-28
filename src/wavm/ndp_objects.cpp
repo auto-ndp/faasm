@@ -260,7 +260,7 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
                             std::span<I32> extraArgs)
 {
     ZoneScopedN("storageCallAndAwaitImpl");
-
+    SPDLOG_DEBUG(" ========= EXECUTING STORAGE CALL AND AWAIT IMPL =========");
     SPDLOG_DEBUG("DJ - ndp_objects::storageCallAndAwaitImpl entered");
     static storage::S3Wrapper s3w;
     if (keyPtr <= 0 || keyLen <= 0) { return 0; }
@@ -283,6 +283,7 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
 
     // Validate function signature
     if (!isPython) {
+        SPDLOG_DEBUG(" DJ - Extracting function signature for C++ program");
         auto* funcInstance = thisModule->getFunctionFromPtr(wasmFuncPtr);
         auto funcType = Runtime::getFunctionType(funcInstance);
 
@@ -318,6 +319,7 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
             std::vector<uint8_t> zygoteDelta = thisModule->deltaSnapshot(zygoteSnapshot);
             SPDLOG_INFO("{} - NDP sending snapshot of {} bytes", callId, zygoteDelta.size());
             return zygoteDelta;
+            SPDLOG_DEBUG(" ========= EXITING storageCallAndAwaitImpl =========");
         });
         faabric::scheduler::getScheduler().addLocalResultSlot(ndpCallId);
 
@@ -483,6 +485,7 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
                                 &result);
                                 
         return result.i32;
+            SPDLOG_DEBUG(" ========= EXITING STORAGE CALL AND AWAIT IMPL =========");
     }
 
     SPDLOG_ERROR("storageCallAndAwaitImpl reached a point where it was neither offloaded nor performed locally. Returned 0");
