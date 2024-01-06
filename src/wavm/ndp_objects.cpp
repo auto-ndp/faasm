@@ -364,6 +364,7 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
         // int cephEc = cephCompletion.getReturnValue();
 
         SPDLOG_DEBUG("[ndp_objects] Making async NDP call to Ceph");
+        SPDLOG_DEBUG("[ndp_objects] S3 Args: user=faasm, key={}, bucket={}, function=maybe_exec_wasm_ro", keyStr, call->user());
         int cephEc = s3w.asyncNdpCall(call->user(),
                                       keyStr,
                                       "faasm",
@@ -425,6 +426,7 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
         }
 
         if (!callLocally) { // if code needs to be called on the storage node
+            SPDLOG_DEBUG("[ndp_objects] Awaiting chained NDP call");
             faabric::Message ndpResult = awaitChainedCallMessage(ndpCallId);
 
             faabric::scheduler::FunctionCallServer::removeNdpDeltaHandler(ndpCallId); // clear after function called
@@ -488,10 +490,8 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
         return result.i32;
             SPDLOG_DEBUG(" ========= EXITING STORAGE CALL AND AWAIT IMPL =========");
     }
-
-    SPDLOG_ERROR("storageCallAndAwaitImpl reached a point where it was neither offloaded nor performed locally. Returned 0");
     SPDLOG_DEBUG(" ========= EXITING storageCallAndAwaitImpl =========");
-    return 0; // shouldn't reach this point
+    return 0;
 }
 
 WAVM_DEFINE_INTRINSIC_FUNCTION(env,
