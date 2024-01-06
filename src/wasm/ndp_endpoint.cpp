@@ -204,9 +204,6 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
                                     flatBuilder.GetSize());
 
             SPDLOG_DEBUG("[ndp_endpoint::onFirstReceivable] hasCapacity: {}", hasCapacity);
-            SPDLOG_DEBUG("[ndp_endpoint::onFirstReceivable] ndpResult: {}", ndpResult);
-            SPDLOG_DEBUG("[ndp_endpoint::onFirstReceivable] responseError: {}", responseError);
-            SPDLOG_DEBUG("[ndp_endpoint::onFirstReceivable] responseOffset: {}", responseOffset);
 
             if (hasCapacity) {
                 doRecv();
