@@ -340,18 +340,8 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
                                                     fPyPtr,
                                                     fGlobals,
                                                     fArgs);
-
-            SPDLOG_DEBUG("[ndp_objects] - {} {} {} {} {} {} {} {}",
-                         call->user(),
-                         call->function(),
-                         keyStr,
-                         wasmFuncPtr,
-                         pyFuncName,
-                         wasmGlobals.size(),
-                         extraArgs.size(),
-                         fWasmInfo.o,
-                         fObjInfo.o);
-
+            
+            SPDLOG_DEBUG("[ndp_objects] Making NDP request with call id {}", ndpCallId);
             auto fOriginHost = builder.CreateString(config.endpointHost);
             auto ndpRequest  = ndpmsg::CreateNdpRequest(builder, ndpCallId, fWasmInfo, fObjInfo, fOriginHost);
             builder.Finish(ndpRequest);
