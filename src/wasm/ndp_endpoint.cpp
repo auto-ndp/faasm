@@ -7,6 +7,7 @@
 #include <boost/system/detail/error_code.hpp>
 #include <condition_variable>
 #include <exception>
+#include <faabric/util/logging.h>
 #include <flatbuffers/flatbuffer_builder.h>
 #include <functional>
 #include <future>
@@ -86,7 +87,8 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
     // Handles one message
     void onFirstReceivable(const boost::system::error_code& ec)
     {
-        SPDLOG_DEBUG("DING DONG");
+        SPDLOG_DEBUG("[ndp_endpoint] DING DONG");
+        SPDLOG_DEBUG("[ndp_endpoint] onFirstReceivable [{}]", ec.message());
         namespace fbs = flatbuffers;
         if (!ec) {
             auto msgData = connection->recvMessageVector();
@@ -117,7 +119,7 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
                       ndpRequest->request_nested_root()
                         ->wasm()
                         ->function()
-                        ->str());
+                        ->str());                
                     msg.set_id(ndpRequest->request_nested_root()->call_id());
                     msg.set_appid(ndpRequest->request_nested_root()->call_id());
 
@@ -160,6 +162,14 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
                                                 ->object()
                                                 ->key()
                                                 ->str());
+
+
+                    SPDLOG_DEBUG("[ndp_endpoint::onFirstReceivable] msg id: {}", msg.id());
+                    SPDLOG_DEBUG("[ndp_endpoint::onFirstReceivable] msg user: {}", msg.user());
+                    SPDLOG_DEBUG("[ndp_endpoint::onFirstReceivable] msg function: {}", msg.function());
+                    SPDLOG_DEBUG("[ndp_endpoint::onFirstReceivable] msg isasync: {}", msg.isasync());
+                    SPDLOG_DEBUG("[ndp_endpoint::onFirstReceivable] msg isstorage: {}", msg.isstorage());
+                            
                     sch.callFunction(
                       msg,
                       true,

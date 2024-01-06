@@ -489,6 +489,7 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
     }
 
     SPDLOG_ERROR("storageCallAndAwaitImpl reached a point where it was neither offloaded nor performed locally. Returned 0");
+    SPDLOG_DEBUG(" ========= EXITING storageCallAndAwaitImpl =========");
     return 0; // shouldn't reach this point
 }
 
