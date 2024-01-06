@@ -169,7 +169,8 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
                     SPDLOG_DEBUG("[ndp_endpoint::onFirstReceivable] msg function: {}", msg.function());
                     SPDLOG_DEBUG("[ndp_endpoint::onFirstReceivable] msg isasync: {}", msg.isasync());
                     SPDLOG_DEBUG("[ndp_endpoint::onFirstReceivable] msg isstorage: {}", msg.isstorage());
-                            
+
+                    SPDLOG_DEBUG("[ndp_endpoint::onFirstReceivable] Schduling NDP function");
                     sch.callFunction(
                       msg,
                       true,
@@ -201,6 +202,11 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
             flatBuilder.Finish(responseOffset);
             connection->sendMessage(flatBuilder.GetBufferPointer(),
                                     flatBuilder.GetSize());
+
+            SPDLOG_DEBUG("[ndp_endpoint::onFirstReceivable] hasCapacity: {}", hasCapacity);
+            SPDLOG_DEBUG("[ndp_endpoint::onFirstReceivable] ndpResult: {}", ndpResult);
+            SPDLOG_DEBUG("[ndp_endpoint::onFirstReceivable] responseError: {}", responseError);
+            SPDLOG_DEBUG("[ndp_endpoint::onFirstReceivable] responseOffset: {}", responseOffset);
 
             if (hasCapacity) {
                 doRecv();

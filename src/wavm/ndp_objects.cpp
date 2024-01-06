@@ -319,7 +319,6 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
             std::vector<uint8_t> zygoteDelta = thisModule->deltaSnapshot(zygoteSnapshot);
             SPDLOG_INFO("{} - NDP sending snapshot of {} bytes", callId, zygoteDelta.size());
             return zygoteDelta;
-            SPDLOG_DEBUG(" ========= EXITING storageCallAndAwaitImpl =========");
         });
         faabric::scheduler::getScheduler().addLocalResultSlot(ndpCallId);
 
@@ -342,6 +341,17 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
                                                     fGlobals,
                                                     fArgs);
 
+            SPDLOG_DEBUG("[ndp_objects] - {} {} {} {} {} {} {} {}",
+                         call->user(),
+                         call->function(),
+                         keyStr,
+                         wasmFuncPtr,
+                         pyFuncName,
+                         wasmGlobals.size(),
+                         extraArgs.size(),
+                         fWasmInfo.o,
+                         fObjInfo.o);
+
             auto fOriginHost = builder.CreateString(config.endpointHost);
             auto ndpRequest  = ndpmsg::CreateNdpRequest(builder, ndpCallId, fWasmInfo, fObjInfo, fOriginHost);
             builder.Finish(ndpRequest);
@@ -363,6 +373,7 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
         // }
         // int cephEc = cephCompletion.getReturnValue();
 
+        SPDLOG_DEBUG("[ndp_objects] Making async NDP call to Ceph");
         int cephEc = s3w.asyncNdpCall(call->user(),
                                       keyStr,
                                       "faasm",

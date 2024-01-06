@@ -192,12 +192,16 @@ IR::Module& IRModuleCache::getMainModule(const std::string& user,
             storage::FileLoader& functionLoader = storage::getFileLoader();
 
             faabric::Message msg = faabric::util::messageFactory(user, func);
+            
+            SPDLOG_DEBUG("[IRModuleCache.cpp] Loading function wasm bytes");
             std::vector<uint8_t> wasmBytes =
               functionLoader.loadFunctionWasm(msg);
 
+            SPDLOG_DEBUG("[IRModuleCache.cpp] Loading module from KV map");
             IR::Module& module = getModuleFromMap(key);
 
             if (faabric::util::isWasm(wasmBytes)) {
+                SPDLOG_DEBUG("[IRModuleCache.cpp] Loading binary WASM module");
                 WASM::LoadError loadError;
                 WASM::loadBinaryModule(
                   wasmBytes.data(), wasmBytes.size(), module, &loadError);
