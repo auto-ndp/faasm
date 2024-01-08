@@ -278,7 +278,7 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
 
     faabric::Message* call = &faabric::scheduler::ExecutorContext::get()->getMsg();
     WAVMWasmModule* thisModule = static_cast<WAVMWasmModule*>(
-        ()->executingModule); // ptr to current WASM Module
+        getCurrentWasmExecutionContext()->executingModule); // ptr to current WASM Module
 
     Runtime::Memory* memoryPtr = thisModule->defaultMemory;
     U8* key = Runtime::memoryArrayPtr<U8>(memoryPtr, (Uptr)keyPtr, (Uptr)keyLen);
@@ -409,7 +409,7 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
         }
 
         // State Machine for NDP Response codes
-        switch (ndp->result()) {
+        switch (ndpResponse->result()) {
             case ndpmsg::NdpResult_Ok:
                 SPDLOG_INFO("Ceph NDP result for {}/{} returned OK", call->user(), call->function());
                 break;
