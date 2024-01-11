@@ -310,6 +310,7 @@ class NdpEndpoint : public std::enable_shared_from_this<NdpEndpoint>
 
     void onAcceptable(const boost::system::error_code& ec)
     {
+        // If no error occurs
         if (!ec) {
             try {
                 auto connection =

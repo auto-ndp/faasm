@@ -97,6 +97,7 @@ int maybe_exec_wasm(cls_method_context_t hctx,
 
     if (inBuffers == nullptr || outBuffers == nullptr ||
         !(readAllowed || writeAllowed)) {
+        SPDLOG_ERROR("Invalid arguments to maybe_exec_wasm");
         return -EINVAL;
     }
     CLS_LOG(3, "");
@@ -116,11 +117,13 @@ int maybe_exec_wasm(cls_method_context_t hctx,
         callId = req->call_id();
         // Connect to the Faasm runtime
         CLS_LOG(5, "Connecting to Faasm runtime UDS");
+        SPDLOG_DEBUG("Connecting to Faasm runtime UDS");
         CephFaasmSocket runtime(SocketType::connect);
         // Forward the NDP request
         CLS_LOG(5,
                 "Forwarding call request %llu to the Faasm runtime",
                 static_cast<unsigned long long>(callId));
+        SPDLOG_DEBUG("Forwarding call request to the Faasm runtime");
         fbs::FlatBufferBuilder fwdBuilder(input.size() + 128);
         {
             auto reqOffset = fwdBuilder.CreateVector(input);
@@ -134,6 +137,7 @@ int maybe_exec_wasm(cls_method_context_t hctx,
 
         if (!runtime.pollFor(POLLIN, 5000)) {
             // timed out
+            SPDLOG_ERROR("Timed out waiting for Faasm-storage messages");
             return -ETIMEDOUT;
         }
 
