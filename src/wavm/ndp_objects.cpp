@@ -422,7 +422,7 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
                 throw std::runtime_error("Ceph NDP call returned an error.");
             }
             case ndpmsg::NdpResult_ProcessLocally: {
-                SPDLOG_INGO("Ceph NDP call returned ProcessLocally, calling locally");
+                SPDLOG_INFO("Ceph NDP call returned ProcessLocally, calling locally");
                 callLocally = true;
                 break;
             }
