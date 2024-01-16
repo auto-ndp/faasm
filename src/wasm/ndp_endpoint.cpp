@@ -84,6 +84,41 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
                           this->shared_from_this()));
     }
 
+    double getCPUUtilisation()
+    {
+      std::ifstream cpuinfo("/proc/stat");
+      std::string line;
+      if (!cpuinfo.is_open()) {
+        throw std::runtime_error("Unable to open /proc/stat");
+      }
+
+      std::getline(cpuinfo, line);
+      std::istringstream ss(line);
+      std::string cpu;
+      ss >> cpu;
+      if (cpu != "cpu") {
+        throw std::runtime_error("Unexpected first line in /proc/stat");
+      }
+
+      std::vector<uint64_t> cpuTimes;
+      uint64_t time;
+      while (ss >> time) {
+        cpuTimes.push_back(time);
+      }
+
+      if (cpuTimes.size() < 4) {
+        throw std::runtime_error("Unexpected number of fields in /proc/stat");
+      }
+
+      uint64_t idleTime = cpuTimes[3];
+      uint64_t totalTime = 0;
+      for (int i = 0; i < 3; i++) {
+        totalTime += cpuTimes[i];
+      }
+
+      return 1.0 - (idleTime / (double)totalTime);
+    }
+    
     // Handles one message
     void onFirstReceivable(const boost::system::error_code& ec)
     {
@@ -101,7 +136,8 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
             const bool hasCapacity = sch.executionSlotsSemaphore.try_acquire();
 
             // Fetch CPU utilisation
-            
+            auto cpu_utilisation = getCPUUtilisation();
+            SPDLOG_INFO("[ndp_endpoint::onFirstReceivable] CPU utilisation: {}", cpu_utilisation);
             // Fetch RAM utilisation
 
             // Fetch disk utilisation
