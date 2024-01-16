@@ -99,6 +99,21 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
 
             auto& sch = faabric::scheduler::getScheduler();
             const bool hasCapacity = sch.executionSlotsSemaphore.try_acquire();
+
+            // Fetch CPU utilisation
+            
+            // Fetch RAM utilisation
+
+            // Fetch disk utilisation
+
+            // Fetch network utilisation
+
+            // Fetch storage utilisation
+
+            // Combine utilisation into score of overall predicted utilisation
+
+            // If score is below threshold, return NdpResult_ProcessLocally
+
             auto ndpResult = hasCapacity ? ndpmsg::NdpResult_Ok
                                          : ndpmsg::NdpResult_ProcessLocally;
             std::string ndpError;
@@ -313,8 +328,8 @@ class NdpEndpoint : public std::enable_shared_from_this<NdpEndpoint>
         // If no error occurs
         if (!ec) {
             try {
-                auto connection =
-                  std::make_shared<CephFaasmSocket>(socket.accept());
+                // Accept the connection and launch the session
+                auto connection = std::make_shared<CephFaasmSocket>(socket.accept());
                 std::shared_ptr connHandler = std::make_shared<NdpConnection>(
                   ioc, std::move(connection), this->shared_from_this());
                 connHandler->run();

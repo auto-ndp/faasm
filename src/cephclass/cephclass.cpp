@@ -94,7 +94,7 @@ int maybe_exec_wasm(cls_method_context_t hctx,
                     bool writeAllowed)
 {
     SPDLOG_INFO(fmt::format(FMT_STRING("maybe_exec_wasm called {} {} {}"), inBuffers->length(), readAllowed, writeAllowed));
-
+    
     if (inBuffers == nullptr || outBuffers == nullptr ||
         !(readAllowed || writeAllowed)) {
         SPDLOG_ERROR("Invalid arguments to maybe_exec_wasm");
@@ -107,23 +107,22 @@ int maybe_exec_wasm(cls_method_context_t hctx,
     std::string errorMsg;
 
     try {
-        CLS_LOG(5,
-                "Received NDP call request of size %d bytes",
-                (int)inBuffers->length());
+        CLS_LOG(5,"Received NDP call request of size %d bytes",(int)inBuffers->length());
         auto input = cephBufferToVecU8(*inBuffers);
         verifyFlatbuf<ndpmsg::NdpRequest>(input);
-        const auto* req =
-          flatbuffers::GetRoot<ndpmsg::NdpRequest>(input.data());
+        const auto* req = flatbuffers::GetRoot<ndpmsg::NdpRequest>(input.data());
         callId = req->call_id();
+
         // Connect to the Faasm runtime
         CLS_LOG(5, "Connecting to Faasm runtime UDS");
         SPDLOG_DEBUG("Connecting to Faasm runtime UDS");
         CephFaasmSocket runtime(SocketType::connect);
+
         // Forward the NDP request
-        CLS_LOG(5,
-                "Forwarding call request %llu to the Faasm runtime",
-                static_cast<unsigned long long>(callId));
+        CLS_LOG(5,"Forwarding call request %llu to the Faasm runtime",static_cast<unsigned long long>(callId));
         SPDLOG_DEBUG("Forwarding call request to the Faasm runtime");
+
+        // Create request to NDP from Storage Ceph to Storage Faasm
         fbs::FlatBufferBuilder fwdBuilder(input.size() + 128);
         {
             auto reqOffset = fwdBuilder.CreateVector(input);
@@ -132,8 +131,9 @@ int maybe_exec_wasm(cls_method_context_t hctx,
               ndpmsg::CreateCephNdpRequest(fwdBuilder, reqOffset, hnOffset);
             fwdBuilder.Finish(ndpOffset);
         }
-        runtime.sendMessage(fwdBuilder.GetBufferPointer(),
-                            fwdBuilder.GetSize());
+       
+        // Send message over the FAASM UDS
+        runtime.sendMessage(fwdBuilder.GetBufferPointer(), fwdBuilder.GetSize());
 
         if (!runtime.pollFor(POLLIN, 5000)) {
             // timed out
@@ -141,19 +141,17 @@ int maybe_exec_wasm(cls_method_context_t hctx,
             return -ETIMEDOUT;
         }
 
+        // Receive response from the FAASM UDS
         const auto initialRuntimeResponseData = runtime.recvMessageVector();
         verifyFlatbuf<ndpmsg::NdpResponse>(initialRuntimeResponseData);
-        const auto* initialRuntimeResponse =
-          flatbuffers::GetRoot<ndpmsg::NdpResponse>(
-            initialRuntimeResponseData.data());
+        const auto* initialRuntimeResponse =flatbuffers::GetRoot<ndpmsg::NdpResponse>(initialRuntimeResponseData.data());
+
         if (initialRuntimeResponse->call_id() != callId) {
             throw std::runtime_error("Mismatched call ids!");
         }
         if (initialRuntimeResponse->result() != ndpmsg::NdpResult_Ok) {
             // Forward the error and finish.
-            outBuffers->append(
-              reinterpret_cast<const char*>(initialRuntimeResponseData.data()),
-              initialRuntimeResponseData.size());
+            outBuffers->append(reinterpret_cast<const char*>(initialRuntimeResponseData.data()), initialRuntimeResponseData.size());
             return 0;
         }
 
@@ -173,8 +171,7 @@ int maybe_exec_wasm(cls_method_context_t hctx,
 
             const auto msgData = runtime.recvMessageVector();
             verifyFlatbuf<ndpmsg::StorageMessage>(msgData);
-            const auto* topMsg =
-              flatbuffers::GetRoot<ndpmsg::StorageMessage>(msgData.data());
+            const auto* topMsg = flatbuffers::GetRoot<ndpmsg::StorageMessage>(msgData.data());
             if (topMsg->call_id() != callId) {
                 throw std::runtime_error(
                   "Mismatched call ids in storage message!");
@@ -244,7 +241,7 @@ int maybe_exec_wasm(cls_method_context_t hctx,
         CLS_LOG(1, "%s", errorMsg.c_str());
     }
 
-    // Construct response
+    // Construct response to Compute Faasm runtime
     flatbuffers::FlatBufferBuilder builder(256);
     auto errorField = builder.CreateString(errorMsg);
     ndpmsg::NdpResponseBuilder respBuilder(builder);
