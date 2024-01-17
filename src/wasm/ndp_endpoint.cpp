@@ -12,6 +12,10 @@
 #include <functional>
 #include <future>
 #include <memory>
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <fstream>
 #include <stdexcept>
 
 #include <cephcomm_generated.h>
@@ -86,6 +90,7 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
 
     double getCPUUtilisation()
     {
+      SPDLOG_INFO("[ndp_endpoint::getCPUUtilisation] Getting CPU utilisation");
       std::ifstream cpuinfo("/proc/stat");
       std::string line;
       if (!cpuinfo.is_open()) {
@@ -118,7 +123,38 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
 
       return 1.0 - (idleTime / (double)totalTime);
     }
-    
+
+    double getMemoryUtilisation()
+    {
+      std::ifstream meminfo("/proc/meminfo");
+      std::string line;
+      if (!meminfo.is_open()) {
+        throw std::runtime_error("Unable to open /proc/meminfo");
+      }
+
+      std::getline(meminfo, line);
+      std::istringstream ss(line);
+      std::string mem;
+      ss >> mem;
+      if (mem != "MemTotal:") {
+        throw std::runtime_error("Unexpected first line in /proc/meminfo");
+      }
+
+      uint64_t totalMem;
+      ss >> totalMem;
+
+      std::getline(meminfo, line);
+      ss = std::istringstream(line);
+      ss >> mem;
+      if (mem != "MemAvailable:") {
+        throw std::runtime_error("Unexpected second line in /proc/meminfo");
+      }
+
+      uint64_t availableMem;
+      ss >> availableMem;
+
+      return 1.0 - (availableMem / (double)totalMem);
+    }
     // Handles one message
     void onFirstReceivable(const boost::system::error_code& ec)
     {
@@ -138,7 +174,10 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
             // Fetch CPU utilisation
             auto cpu_utilisation = getCPUUtilisation();
             SPDLOG_INFO("[ndp_endpoint::onFirstReceivable] CPU utilisation: {}", cpu_utilisation);
+          
             // Fetch RAM utilisation
+            auto ram_utilisation = getMemoryUtilisation();
+            SPDLOG_INFO("[ndp_endpoint::onFirstReceivable] RAM utilisation: {}", ram_utilisation);
 
             // Fetch disk utilisation
 
@@ -153,7 +192,7 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
             auto ndpResult = hasCapacity ? ndpmsg::NdpResult_Ok
                                          : ndpmsg::NdpResult_ProcessLocally;
             std::string ndpError;
-            if (hasCapacity) {
+            if (hasCapacity && cpu_utilisation < 0.5 && ram_utilisation < 0.5) {
                 // TODO: Keep a token until claimed by the runtime to prevent
                 // oversubscription
                 sch.executionSlotsSemaphore.release();
