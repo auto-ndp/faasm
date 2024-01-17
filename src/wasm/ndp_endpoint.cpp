@@ -101,18 +101,11 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
       std::istringstream ss(line);
       std::string cpu;
       ss >> cpu;
-      if (cpu != "cpu") {
-        throw std::runtime_error("Unexpected first line in /proc/stat");
-      }
 
       std::vector<uint64_t> cpuTimes;
       uint64_t time;
       while (ss >> time) {
         cpuTimes.push_back(time);
-      }
-
-      if (cpuTimes.size() < 4) {
-        throw std::runtime_error("Unexpected number of fields in /proc/stat");
       }
 
       uint64_t idleTime = cpuTimes[3];
@@ -136,9 +129,6 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
       std::istringstream ss(line);
       std::string mem;
       ss >> mem;
-      if (mem != "MemTotal:") {
-        throw std::runtime_error("Unexpected first line in /proc/meminfo");
-      }
 
       uint64_t totalMem;
       ss >> totalMem;
@@ -146,9 +136,6 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
       std::getline(meminfo, line);
       ss = std::istringstream(line);
       ss >> mem;
-      if (mem != "MemAvailable:") {
-        throw std::runtime_error("Unexpected second line in /proc/meminfo");
-      }
 
       uint64_t availableMem;
       ss >> availableMem;
@@ -198,7 +185,7 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
                 sch.executionSlotsSemaphore.release();
                 try {
 
-                    if (!ndpSocketMap.tryEmplace(
+                  if (!ndpSocketMap.tryEmplace(
                           ndpRequest->request_nested_root()->call_id(),
                           this->shared_from_this())) {
                         throw std::runtime_error("Duplicate NDP call id");
