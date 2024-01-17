@@ -98,23 +98,20 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
       }
 
       std::getline(cpuinfo, line);
-      std::istringstream ss(line);
-      std::string cpu;
-      ss >> cpu;
+      // Extract CPU utilization information from the line
+      std::istringstream iss(line);
+      std::string cpuLabel;
+      long user, nice, system, idle, iowait, irq, softirq, steal, guest, guest_nice;
 
-      std::vector<uint64_t> cpuTimes;
-      uint64_t time;
-      while (ss >> time) {
-        cpuTimes.push_back(time);
-      }
+      iss >> cpuLabel >> user >> nice >> system >> idle >> iowait >> irq >> softirq >> steal >> guest >> guest_nice;
 
-      uint64_t idleTime = cpuTimes[3];
-      uint64_t totalTime = 0;
-      for (int i = 0; i < 3; i++) {
-        totalTime += cpuTimes[i];
-      }
+      // Calculate total CPU time
+      long totalCpuTime = user + nice + system + idle + iowait + irq + softirq + steal + guest + guest_nice;
 
-      return 1.0 - (idleTime / (double)totalTime);
+      // Calculate CPU utilization as a percentage
+      float cpuUtilization = (totalCpuTime - idle) / totalCpuTime;
+
+      return cpuUtilization;
     }
 
     double getMemoryUtilisation()
