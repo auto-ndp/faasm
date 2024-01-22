@@ -4,8 +4,16 @@ import time
 import sys
 
 def send_request(worker_url):
+    headers = {'Content-Type': 'application/json'}
+    data = {
+        'async': False,
+        'user': 'ndp',
+        'function': 'wordcount',
+        'input_data': 'key'
+    }
+
     try:
-        response = requests.get(worker_url)
+        response = response = requests.post(worker_url, headers=headers, json=data)
         if response.status_code == 200:
             return response.elapsed.total_seconds()  # Latency in seconds
         else:
@@ -31,8 +39,8 @@ def run_wordcount_benchmark(worker_url, request_frequency, duration):
     
 
 if __name__ == "__main__":
-    worker_url = sys.argv[1]
-    request_frequency = sys.argv[2]
-    duration = sys.argv[3]
+    worker_url = "http://worker-0:8080/f/"
+    request_frequency = 10
+    duration = 30
     run_wordcount_benchmark(worker_url, request_frequency, duration)
     
