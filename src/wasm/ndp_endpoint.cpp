@@ -128,8 +128,12 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
 
       // Calculate total CPU time
       long totalCpuTime = user + nice + system + idle + iowait + irq + softirq + steal + guest + guest_nice;
-      return CPUStats{totalCpuTime, idle};
+      CPUStats stats;
+      stats.totalCpuTime = totalCpuTime;
+      stats.idleCpuTime = idle;
+      return stats;
     }
+
 
     double getMemoryUtilisation()
     {
@@ -180,15 +184,18 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
       // Get initial figures
       CPUStats cpuStart = getCPUUtilisation();
 
+      SPDLOG_DEBUG("Total CPU time: {}", cpuStart.totalCpuTime);
+
       // Sleep for 10ms
-      std::this_thread::sleep_for(std::chrono::milliseconds(100));
+      std::this_thread::sleep_for(std::chrono::seconds(1));
 
       // Get final figures
       CPUStats cpuEnd = getCPUUtilisation();
+      SPDLOG_DEBUG("Total CPU time after wait: {}", cpuEnd.totalCpuTime);
 
       long cpuTimeDelta = cpuEnd.totalCpuTime - cpuStart.totalCpuTime;
       long idleTimeDelta = cpuEnd.idleCpuTime - cpuStart.idleCpuTime;
-      double cpu_utilisation = 1.0 - (idleTimeDelta / (double)cpuTimeDelta);
+      double cpu_utilisation = 1.0 - (idleTimeDelta / std::static_cast<double>(cpuTimeDelta));
 
       stats.cpu_utilisation = cpu_utilisation;
       stats.ram_utilisation = getMemoryUtilisation();
