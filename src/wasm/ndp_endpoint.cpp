@@ -24,6 +24,7 @@
 #include <faabric/util/concurrent_map.h>
 #include <faabric/util/func.h>
 #include <faabric/util/logging.h>
+#include <faabric/util/environment.h>
 #include <wasm/ndp.h>
 
 namespace faasm {
@@ -33,6 +34,26 @@ class NdpConnection;
 
 static faabric::util::ConcurrentMap<uint64_t, std::weak_ptr<NdpConnection>>
   ndpSocketMap;
+
+struct UtilisationStats
+{
+  double cpu_utilisation;
+  double ram_utilisation;
+  double load_average;
+};
+
+struct CPUStats
+{
+  long totalCpuTime;
+  long idleCpuTime;
+};
+
+struct MemStats
+{
+  uint64_t total;
+  uint64_t available;
+};
+
 
 class NdpConnection : public std::enable_shared_from_this<NdpConnection>
 {
@@ -88,7 +109,7 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
                           this->shared_from_this()));
     }
 
-    double getCPUUtilisation()
+    CPUStats getCPUUtilisation()
     {
       SPDLOG_INFO("[ndp_endpoint::getCPUUtilisation] Getting CPU utilisation");
       std::ifstream cpuinfo("/proc/stat");
@@ -107,11 +128,7 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
 
       // Calculate total CPU time
       long totalCpuTime = user + nice + system + idle + iowait + irq + softirq + steal + guest + guest_nice;
-
-      // Calculate CPU utilization as a percentage
-      float cpuUtilization = (totalCpuTime - idle) / totalCpuTime;
-
-      return cpuUtilization;
+      return CPUStats{totalCpuTime, idle};
     }
 
     double getMemoryUtilisation()
@@ -139,6 +156,47 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
 
       return 1.0 - (availableMem / (double)totalMem);
     }
+
+    double getLoadAverage()
+    {
+      std::ifstream loadavg("/proc/loadavg");
+      std::string line;
+      if (!loadavg.is_open()) {
+        throw std::runtime_error("Unable to open /proc/loadavg");
+      }
+
+      std::getline(loadavg, line);
+      std::istringstream ss(line);
+      double load1, load5, load15;
+      ss >> load1 >> load5 >> load15;
+
+      return load1;
+    }
+
+    UtilisationStats getSystemUtilisation()
+    {
+      UtilisationStats stats;
+
+      // Get initial figures
+      CPUStats cpuStart = getCPUUtilisation();
+
+      // Sleep for 10ms
+      std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+      // Get final figures
+      CPUStats cpuEnd = getCPUUtilisation();
+
+      long cpuTimeDelta = cpuEnd.totalCpuTime - cpuStart.totalCpuTime;
+      long idleTimeDelta = cpuEnd.idleCpuTime - cpuStart.idleCpuTime;
+      double cpu_utilisation = 1.0 - (idleTimeDelta / (double)cpuTimeDelta);
+
+      stats.cpu_utilisation = cpu_utilisation;
+      stats.ram_utilisation = getMemoryUtilisation();
+      stats.load_average = getLoadAverage();
+
+      return stats;
+    }
+
     // Handles one message
     void onFirstReceivable(const boost::system::error_code& ec)
     {
@@ -154,29 +212,18 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
 
             auto& sch = faabric::scheduler::getScheduler();
             const bool hasCapacity = sch.executionSlotsSemaphore.try_acquire();
+            
+            SPDLOG_INFO("[ndp_endpoint::onFirstReceivable] Number of usable cores: {}", faabric::util::getUsableCores());
+            UtilisationStats stats = getSystemUtilisation();
+            SPDLOG_INFO("[ndp_endpoint::onFirstReceivable] CPU utilisation: {}", stats.cpu_utilisation);
+            SPDLOG_INFO("[ndp_endpoint::onFirstReceivable] RAM utilisation: {}", stats.ram_utilisation);
+            SPDLOG_INFO("[ndp_endpoint::onFirstReceivable] Load average: {}", stats.load_average);
 
-            // Fetch CPU utilisation
-            auto cpu_utilisation = getCPUUtilisation();
-            SPDLOG_INFO("[ndp_endpoint::onFirstReceivable] CPU utilisation: {}", cpu_utilisation);
-          
-            // Fetch RAM utilisation
-            auto ram_utilisation = getMemoryUtilisation();
-            SPDLOG_INFO("[ndp_endpoint::onFirstReceivable] RAM utilisation: {}", ram_utilisation);
-
-            // Fetch disk utilisation
-
-            // Fetch network utilisation
-
-            // Fetch storage utilisation
-
-            // Combine utilisation into score of overall predicted utilisation
-
-            // If score is below threshold, return NdpResult_ProcessLocally
-
-            auto ndpResult = hasCapacity ? ndpmsg::NdpResult_Ok
+            const bool should_offload = hasCapacity && stats.cpu_utilisation < 0.5 && stats.ram_utilisation < 0.8 && stats.load_average < faabric::util::getUsableCores() * 0.75;
+            auto ndpResult = should_offload ? ndpmsg::NdpResult_Ok
                                          : ndpmsg::NdpResult_ProcessLocally;
             std::string ndpError;
-            if (hasCapacity && cpu_utilisation < 0.5 && ram_utilisation < 0.5) {
+            if (should_offload) {
                 // TODO: Keep a token until claimed by the runtime to prevent
                 // oversubscription
                 sch.executionSlotsSemaphore.release();
@@ -260,10 +307,10 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
                     ndpResult = ndpmsg::NdpResult_Error;
                 }
             }
-            SPDLOG_DEBUG("Handling request {} near-storage from OSD {}: {}",
+            SPDLOG_DEBUG("Handling request {} near-storage from OSD {}: Should Offload={}",
                          ndpRequest->request_nested_root()->call_id(),
                          ndpRequest->osd_name()->str(),
-                         hasCapacity);
+                         should_offload);
 
             auto flatBuilder = fbs::FlatBufferBuilder(128);
             auto responseError = flatBuilder.CreateString(ndpError);
