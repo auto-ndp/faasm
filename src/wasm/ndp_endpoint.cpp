@@ -195,7 +195,7 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
 
       long cpuTimeDelta = cpuEnd.totalCpuTime - cpuStart.totalCpuTime;
       long idleTimeDelta = cpuEnd.idleCpuTime - cpuStart.idleCpuTime;
-      double cpu_utilisation = 1.0 - (idleTimeDelta / std::static_cast<double>(cpuTimeDelta));
+      double cpu_utilisation = 1.0 - (idleTimeDelta / (double) cpuTimeDelta);
 
       stats.cpu_utilisation = cpu_utilisation;
       stats.ram_utilisation = getMemoryUtilisation();
