@@ -714,6 +714,12 @@ int S3Wrapper::asyncNdpCall(const std::string& bucketName,
       keyName,
       inputData.size());
     auto pool = RadosState::instance().getPool(bucketName);
+
+    if (pool->ioctx == nullptr) {
+        SPDLOG_ERROR("Key {}/{} cannot be run: no pool", bucketName, keyName);
+        throw std::runtime_error("Key cannot be run.");
+    }
+    
     RadosCompletion completion(pool);
     // int ec = rados_aio_exec(pool->ioctx,
     //                         keyName.c_str(),
@@ -734,7 +740,7 @@ int S3Wrapper::asyncNdpCall(const std::string& bucketName,
                         reinterpret_cast<char*>(outputBuffer.data()),
                         outputBuffer.size());
     if (ec < 0) {
-        SPDLOG_ERROR("Key {}/{} cannot run {}:{}: {}",
+        SPDLOG_ERROR("[S3Wrapper.cpp] Key {}/{} cannot run {}:{}: {}",
                      bucketName,
                      keyName,
                      funcClass,
