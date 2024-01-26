@@ -43,6 +43,10 @@ You may pick a different configuration, but ensure that you modify the `docker-c
 ## Setup
 
 First ssh into every node, and `sudo su` to become root user.
+
+```bash
+git clone --branch donald-ug https://github.com/auto-ndp/faasm.git
+```
 Now clone this repository, and `cd` into it.
 Then run this on each node.
 
