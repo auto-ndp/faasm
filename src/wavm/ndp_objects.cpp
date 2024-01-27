@@ -369,8 +369,9 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
 
         SPDLOG_DEBUG("[ndp_objects] Making async NDP call to Ceph");
         SPDLOG_DEBUG("[ndp_objects] S3 Args: user=faasm, key={}, bucket={}, function=maybe_exec_wasm_ro", keyStr, call->user());
+        int cephEc;
         try {
-            int cephEc = s3w.asyncNdpCall(call->user(),
+            cephEc = s3w.asyncNdpCall(call->user(),
                                       keyStr,
                                       "faasm",
                                       "maybe_exec_wasm_ro",
