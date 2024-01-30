@@ -45,7 +45,7 @@ You may pick a different configuration, but ensure that you modify the `docker-c
 First ssh into every node, and `sudo su` to become root user.
 
 ```bash
-git clone --recurse-submodules --branch donald-ug https://github.com/auto-ndp/faasm.git
+git clone --recurse-submodules --branch donald-ug https://github.com/auto-ndp/faasm.git && cd faasm && source ./bin/one-click-setup.sh
 ```
 Now clone this repository, and `cd` into it.
 Then run this on each node.
