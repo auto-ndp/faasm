@@ -93,7 +93,8 @@
         "shared_mutex": "cpp",
         "thread": "cpp",
         "cinttypes": "cpp",
-        "variant": "cpp"
+        "variant": "cpp",
+        "*.ipp": "cpp"
     },
     "C_Cpp.default.compilerPath": "/usr/bin/gcc"
 }

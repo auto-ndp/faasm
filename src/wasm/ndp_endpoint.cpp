@@ -500,21 +500,29 @@ tl::expected<std::vector<uint8_t>, std::exception_ptr> awaitNdpResponse(
 
 CephSocketCloser::~CephSocketCloser()
 {
-    if (socket != nullptr) {
-        SPDLOG_DEBUG("Closing Ceph socket for {}", id);
-        flatbuffers::FlatBufferBuilder builder(64);
-        auto endField = ndpmsg::CreateNdpEnd(builder);
-        auto endMsg = ndpmsg::CreateStorageMessage(
-          builder, id, ndpmsg::TypedStorageMessage_NdpEnd, endField.Union());
-        builder.Finish(endMsg);
-        socket->sendMessage(builder.GetBufferPointer(), builder.GetSize());
+    try {
+        if (socket != nullptr) {
+            SPDLOG_DEBUG("Closing Ceph socket for {}", id);
+            flatbuffers::FlatBufferBuilder builder(64);
+            auto endField = ndpmsg::CreateNdpEnd(builder);
+            auto endMsg = ndpmsg::CreateStorageMessage(
+              builder, id, ndpmsg::TypedStorageMessage_NdpEnd, endField.Union());
+            builder.Finish(endMsg);
 
-        auto conn = ndpSocketMap.get(id)->lock();
-        if (conn != nullptr) {
-            conn->sockConn.cancel();
+            SPDLOG_DEBUG("Sending NdpEnd message for {}", id)
+            socket->sendMessage(builder.GetBufferPointer(), builder.GetSize());
+
+            auto conn = ndpSocketMap.get(id)->lock();
+            if (conn != nullptr) {
+                SPDLOG_DEBUG("Cancelling ndp socket for {}", id);
+                conn->sockConn.cancel();
+            }
         }
-
-        ::shutdown(socket->getFd(), SHUT_RDWR);
+    } catch (const std::exception& e) {
+        // Handle exception here
+        SPDLOG_ERROR("Exception when closing ndp socket: {}", e.what());
+    } catch (...) {
+        SPDLOG_ERROR("Unknown exception when closing ndp socket");
     }
 }
 
