@@ -246,7 +246,7 @@ class CephFaasmSocket
     void sendError() const
     {
         assert(this->type == SocketType::connect);
-        uint64_t netSize = ::htole64(-1024);
+        uint64_t netSize = ::htole64(1024);
         rawSendBytes(reinterpret_cast<const uint8_t*>(&netSize),
                      sizeof(netSize));
     }
