@@ -226,7 +226,7 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
             SPDLOG_INFO("[ndp_endpoint::onFirstReceivable] RAM utilisation: {}", stats.ram_utilisation);
             SPDLOG_INFO("[ndp_endpoint::onFirstReceivable] Load average: {}", stats.load_average);
 
-            const bool should_offload = hasCapacity && stats.cpu_utilisation < 0.5 && stats.ram_utilisation < 0.8 && stats.load_average < faabric::util::getUsableCores() * 0.75;
+            const bool should_offload = hasCapacity && stats.cpu_utilisation < 0.5 && stats.ram_utilisation < 0.95 && stats.load_average < faabric::util::getUsableCores() * 0.75;
             auto ndpResult = should_offload ? ndpmsg::NdpResult_Ok
                                          : ndpmsg::NdpResult_ProcessLocally;
             std::string ndpError;
@@ -334,8 +334,9 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
             SPDLOG_DEBUG("[ndp_endpoint::onFirstReceivable] hasCapacity: {}", hasCapacity);
 
             if (hasCapacity) {
+                SPDLOG_DEBUG("[ndp_endpoint::onFirstReceivable] Doing recv");
                 doRecv();
-            }
+            } 
         } else {
             SPDLOG_ERROR(
               "Error waiting for first recv on the ndp connection: {}",
@@ -514,7 +515,6 @@ CephSocketCloser::~CephSocketCloser()
         }
 
         ::shutdown(socket->getFd(), SHUT_RDWR);
-        socket = nullptr;
     }
 }
 
