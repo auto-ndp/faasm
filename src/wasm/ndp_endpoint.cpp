@@ -353,7 +353,7 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
                              asio::buffer(nextMsg.data(), nextMsg.size()),
                              std::bind_front(&NdpConnection::onReceivable,
                                              this->shared_from_this()));
-        } else if (ec.value() != boost::system::errc::operation_canceled) {
+        } else {
             SPDLOG_ERROR("Error waiting for recv on the ndp connection: {}",
                          ec.to_string());
         }
@@ -378,7 +378,7 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
             lastMessageFlag.notify_one();
 
             doRecv();
-        } else if (ec.value() != boost::system::errc::operation_canceled) {
+        } else {
             SPDLOG_ERROR("Error waiting for recv on the ndp connection: {}",
                          ec.to_string());
         }
