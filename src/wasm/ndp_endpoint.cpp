@@ -509,7 +509,7 @@ CephSocketCloser::~CephSocketCloser()
               builder, id, ndpmsg::TypedStorageMessage_NdpEnd, endField.Union());
             builder.Finish(endMsg);
 
-            SPDLOG_DEBUG("Sending NdpEnd message for {}", id)
+            SPDLOG_DEBUG("Sending NdpEnd message for {}", id);
             socket->sendMessage(builder.GetBufferPointer(), builder.GetSize());
 
             auto conn = ndpSocketMap.get(id)->lock();
