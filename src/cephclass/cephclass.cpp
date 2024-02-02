@@ -232,7 +232,7 @@ int maybe_exec_wasm(cls_method_context_t hctx,
           e.what(),
           strerror(errno));
         CLS_LOG(10, "%s", errorMsg.c_str());
-        SPDLOG_ERROR("Exception caught in maybe_exec_wasm call {}: {}; errno={}", callId, e.what(), strerror(errno));
+        SPDLOG_ERROR(errorMsg.c_str());
     } catch (...) {
         result = ndpmsg::NdpResult_Error;
         errorMsg = fmt::format(FMT_STRING("Unknown exception type caught in "
@@ -240,7 +240,7 @@ int maybe_exec_wasm(cls_method_context_t hctx,
                                callId,
                                strerror(errno));
         CLS_LOG(10, "%s", errorMsg.c_str());
-        SPDLOG_ERROR("Unkown exception type caught in maybe_exec_wasm call {}; errno={}", callId, strerror(errno));
+        SPDLOG_ERROR(errorMsg.c_str());
     }
 
     // Construct response to Compute Faasm runtime
