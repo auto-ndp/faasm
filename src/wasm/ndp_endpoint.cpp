@@ -32,7 +32,7 @@ namespace faasm {
 class NdpEndpoint;
 class NdpConnection;
 
-static faabric::util::ConcurrentMap<uint64_t, std::unique_ptr<NdpConnection>>
+static faabric::util::ConcurrentMap<uint64_t, std::weak_ptr<NdpConnection>>
   ndpSocketMap;
 
 struct UtilisationStats
@@ -173,10 +173,9 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
       std::istringstream ss(line);
       double load1, load5, load15;
       ss >> load1 >> load5 >> load15;
-
       return load1;
     }
-=
+
     UtilisationStats getSystemUtilisation()
     {
       UtilisationStats stats;

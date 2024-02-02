@@ -137,7 +137,7 @@ int maybe_exec_wasm(cls_method_context_t hctx,
 
         if (!runtime.pollFor(POLLIN, 5000)) {
             // timed out
-            SPDLOG_ERROR("Timed out waiting for Faasm-storage messages");
+            SPDLOG_ERROR("[Initial Polling] Timed out waiting for Faasm-storage messages");
             return -ETIMEDOUT;
         }
 
@@ -163,7 +163,7 @@ int maybe_exec_wasm(cls_method_context_t hctx,
 
             if (!runtime.pollFor(POLLIN, 30000)) {
                 // timed out
-                errorMsg = "Timed out waiting for Faasm-storage messages";
+                errorMsg = "[Secondary Polling] Timed out waiting for Faasm-storage messages";
                 result = ndpmsg::NdpResult_Error;
                 running = false;
                 break;
