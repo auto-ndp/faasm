@@ -1,6 +1,5 @@
 #pragma once
 
-#include "cephcomm_generated.h"
 #include <array>
 #include <cstdint>
 #include <flatbuffers/flatbuffer_builder.h>
