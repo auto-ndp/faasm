@@ -107,19 +107,19 @@ int maybe_exec_wasm(cls_method_context_t hctx,
     std::string errorMsg;
 
     try {
-        CLS_LOG(5,"Received NDP call request of size %d bytes",(int)inBuffers->length());
+        CLS_LOG(10,"Received NDP call request of size %d bytes",(int)inBuffers->length());
         auto input = cephBufferToVecU8(*inBuffers);
         verifyFlatbuf<ndpmsg::NdpRequest>(input);
         const auto* req = flatbuffers::GetRoot<ndpmsg::NdpRequest>(input.data());
         callId = req->call_id();
 
         // Connect to the Faasm runtime
-        CLS_LOG(5, "Connecting to Faasm runtime UDS");
+        CLS_LOG(10, "Connecting to Faasm runtime UDS");
         SPDLOG_DEBUG("Connecting to Faasm runtime UDS");
         CephFaasmSocket runtime(SocketType::connect);
 
         // Forward the NDP request
-        CLS_LOG(5,"Forwarding call request %llu to the Faasm runtime",static_cast<unsigned long long>(callId));
+        CLS_LOG(10,"Forwarding call request %llu to the Faasm runtime",static_cast<unsigned long long>(callId));
         SPDLOG_DEBUG("Forwarding call request to the Faasm runtime");
 
         // Create request to NDP from Storage Ceph to Storage Faasm
@@ -178,12 +178,12 @@ int maybe_exec_wasm(cls_method_context_t hctx,
             }
             switch (topMsg->message_type()) {
                 case ndpmsg::TypedStorageMessage_NdpEnd: {
-                    CLS_LOG(5, "Received NDP end");
+                    CLS_LOG(10, "Received NDP end");
                     running = false;
                     break;
                 }
                 case ndpmsg::TypedStorageMessage_NdpRead: {
-                    CLS_LOG(5, "Received NDP read");
+                    CLS_LOG(10, "Received NDP read");
                     const auto* msg = topMsg->message_as_NdpRead();
                     int ec = cls_cxx_read(
                       hctx, msg->offset(), msg->upto_length(), &readBufferList);
@@ -197,7 +197,7 @@ int maybe_exec_wasm(cls_method_context_t hctx,
                     break;
                 }
                 case ndpmsg::TypedStorageMessage_NdpWrite: {
-                    CLS_LOG(5, "Received NDP write");
+                    CLS_LOG(10, "Received NDP write");
                     const auto* msg = topMsg->message_as_NdpWrite();
                     // Const cast safety: we do not modify the data in the
                     // buffer.
@@ -231,14 +231,16 @@ int maybe_exec_wasm(cls_method_context_t hctx,
           callId,
           e.what(),
           strerror(errno));
-        CLS_LOG(1, "%s", errorMsg.c_str());
+        CLS_LOG(10, "%s", errorMsg.c_str());
+        SPDLOG_ERROR("Exception caught in maybe_exec_wasm call {}: {}; errno={}", callId, e.what(), strerror(errno));
     } catch (...) {
         result = ndpmsg::NdpResult_Error;
         errorMsg = fmt::format(FMT_STRING("Unknown exception type caught in "
                                           "maybe_exec_wasm call {}; errno={}"),
                                callId,
                                strerror(errno));
-        CLS_LOG(1, "%s", errorMsg.c_str());
+        CLS_LOG(10, "%s", errorMsg.c_str());
+        SPDLOG_ERROR("Unkown exception type caught in maybe_exec_wasm call {}; errno={}", callId, strerror(errno));
     }
 
     // Construct response to Compute Faasm runtime
