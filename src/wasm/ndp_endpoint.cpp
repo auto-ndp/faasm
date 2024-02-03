@@ -318,7 +318,7 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
                          ndpRequest->osd_name()->str(),
                          should_offload);
 
-            auto flatBuilder = fbs::FlatBufferBuilder(128);
+            auto flatBuilder = fbs::FlatBufferBuilder();
             auto responseError = flatBuilder.CreateString(ndpError);
             auto responseBuilder = ndpmsg::NdpResponseBuilder(flatBuilder);
             responseBuilder.add_call_id(
@@ -354,8 +354,8 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
                              std::bind_front(&NdpConnection::onReceivable,
                                              this->shared_from_this()));
         } else {
-            SPDLOG_ERROR("Error waiting for recv on the ndp connection: {}",
-                         ec.to_string());
+            SPDLOG_ERROR("[ndp_endpoint::recvMsgContent] Error waiting for recv on the ndp connection: {} - {}", ec.to_string(), strerror(errno));
+
         }
     }
 
@@ -379,7 +379,7 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
 
             doRecv();
         } else {
-            SPDLOG_ERROR("Error waiting for recv on the ndp connection: {}",
+            SPDLOG_ERROR("[ndp_endpoint::onReceivable] Error waiting for recv on the ndp connection: {}",
                          ec.to_string());
         }
     }
@@ -514,8 +514,16 @@ CephSocketCloser::~CephSocketCloser()
             auto conn = ndpSocketMap.get(id)->lock();
             if (conn != nullptr) {
                 SPDLOG_DEBUG("Cancelling ndp socket for {}", id);
-                conn->sockConn.cancel();
+                asio::error_code ec;
+                conn->sockConn.shutdown(asio::socket_base::shutdown_both, ec);
+                if (ec) {
+                    SPDLOG_ERROR("[~CephSocketCloser()] Error when shutting down ndp socket: {}",
+                                 ec.message());
+                } else {
+                  conn->sockConn.close();
+                }
             }
+            socket->~CephFaasmSocket();
         }
     } catch (const std::exception& e) {
         // Handle exception here

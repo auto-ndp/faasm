@@ -210,13 +210,20 @@ class CephFaasmSocket
         assert(this->type == SocketType::connect);
         ssize_t remaining = dataSize;
         do {
+            // Log the data being sent
+            
             ssize_t result = ::send(fd, data, dataSize, 0);
             if (result < 0) {
+                // print the error
+                perror(strerror(errno));
                 if (errno == EINTR) {
                     continue;
+                } else if (errno == EAGAIN) {
+                    continue;
+                } else {
+                    perror("Couldn't send cephcomm data");
+                    throw std::runtime_error("Couldn't send cephcomm data, errno: " + std::to_string(errno) + " " + strerror(errno));
                 }
-                perror("Couldn't send cephcomm data");
-                throw std::runtime_error("Couldn't send cephcomm data");
             }
             remaining -= result;
             data += result;
@@ -246,7 +253,7 @@ class CephFaasmSocket
     void sendError() const
     {
         assert(this->type == SocketType::connect);
-        uint64_t netSize = ::htole64(1024);
+        uint64_t netSize = ::htole64(UINT64_MAX);
         rawSendBytes(reinterpret_cast<const uint8_t*>(&netSize),
                      sizeof(netSize));
     }
