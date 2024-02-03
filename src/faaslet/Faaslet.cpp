@@ -97,11 +97,13 @@ int32_t Faaslet::executeTask(int threadPoolIdx,
 
         // Set up network namespace
         ns = claimNetworkNamespace();
+        SPDLOG_INFO("Claimed network namespace");
         ns->addCurrentThread();
 
         threadIsIsolated = true;
     }
-
+    
+    SPDLOG_INFO("Executing task ");
     int32_t returnValue = module->executeTask(threadPoolIdx, msgIdx, req);
 
     return returnValue;
