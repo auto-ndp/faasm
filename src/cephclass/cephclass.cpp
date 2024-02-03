@@ -114,12 +114,12 @@ int maybe_exec_wasm(cls_method_context_t hctx,
         callId = req->call_id();
 
         // Connect to the Faasm runtime
-        CLS_LOG(10, "Connecting to Faasm runtime UDS");
+        CLS_LOG(3, "Connecting to Faasm runtime UDS");
         SPDLOG_DEBUG("Connecting to Faasm runtime UDS");
         CephFaasmSocket runtime(SocketType::connect);
 
         // Forward the NDP request
-        CLS_LOG(10,"Forwarding call request %llu to the Faasm runtime",static_cast<unsigned long long>(callId));
+        CLS_LOG(3,"Forwarding call request %llu to the Faasm runtime",static_cast<unsigned long long>(callId));
         SPDLOG_DEBUG("Forwarding call request to the Faasm runtime");
 
         // Create request to NDP from Storage Ceph to Storage Faasm
@@ -231,7 +231,7 @@ int maybe_exec_wasm(cls_method_context_t hctx,
           callId,
           e.what(),
           strerror(errno));
-        CLS_LOG(10, "%s", errorMsg.c_str());
+        CLS_LOG(3, "%s", errorMsg.c_str());
         SPDLOG_ERROR(errorMsg.c_str());
     } catch (...) {
         result = ndpmsg::NdpResult_Error;
@@ -239,7 +239,7 @@ int maybe_exec_wasm(cls_method_context_t hctx,
                                           "maybe_exec_wasm call {}; errno={}"),
                                callId,
                                strerror(errno));
-        CLS_LOG(10, "%s", errorMsg.c_str());
+        CLS_LOG(3, "%s", errorMsg.c_str());
         SPDLOG_ERROR(errorMsg.c_str());
     }
 

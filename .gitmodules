@@ -1,6 +1,7 @@
 [submodule "faabric"]
 	path = faabric
 	url = https://github.com/auto-ndp/faabric
+	branch = donald-ug
 [submodule "clients/python"]
 	path = clients/python
 	url = https://github.com/auto-ndp/faasm-python.git
