@@ -15,3 +15,10 @@ docker network rm $(docker network ls -q)
 
 # Remove all dangling images, containers, volumes, and networks
 docker system prune -af
+
+# Leave Docker swarm
+docker swarm leave --force
+
+for key in $(apt-key list | grep -Po '(?<=pub\s\s\s\s)[^/]*' | cut -d' ' -f2); do
+  sudo apt-key del $key
+done
