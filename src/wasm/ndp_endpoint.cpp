@@ -514,14 +514,8 @@ CephSocketCloser::~CephSocketCloser()
             auto conn = ndpSocketMap.get(id)->lock();
             if (conn != nullptr) {
                 SPDLOG_DEBUG("Cancelling ndp socket for {}", id);
-                asio::error_code ec;
-                conn->sockConn.shutdown(asio::socket_base::shutdown_both, ec);
-                if (ec) {
-                    SPDLOG_ERROR("[~CephSocketCloser()] Error when shutting down ndp socket: {}",
-                                 ec.message());
-                } else {
-                  conn->sockConn.close();
-                }
+                std::error_code ec;
+                conn->sockConn.close();
             }
             socket->~CephFaasmSocket();
         }
