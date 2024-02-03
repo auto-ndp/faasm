@@ -36,6 +36,9 @@ function clean {
   rm -r /mnt/ceph
   losetup -d /dev/loop30
   rm /ceph.img
+
+  rm -f ${PROJ_ROOT}/dev/faasm-local/ceph-ceph-mon1/*
+  rm -f ${PROJ_ROOT}/dev/container/shared_store/osd*
 }
 
 docker node ls 1>/dev/null 2>/dev/null
