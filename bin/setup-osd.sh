@@ -31,14 +31,44 @@ function syncleader {
 }
 
 function clean {
-  # rm /mnt/ceph1 /mnt/ceph2 /mnt/ceph3 /mnt/ceph4
-  umount /mnt/ceph
-  rm -r /mnt/ceph
-  losetup -d /dev/loop30
-  rm /ceph.img
+  set -euo pipefail
 
-  rm -f ${PROJ_ROOT}/dev/faasm-local/ceph-ceph-mon1/*
-  rm -f ${PROJ_ROOT}/dev/container/shared_store/osd*
+  # Stop Ceph services (adjust commands if you're using systemd or another init system)
+  pkill ceph-mon || true
+  pkill ceph-mgr || true
+  pkill ceph-osd || true
+
+  echo "Ceph services have been stopped."
+
+  # Wait a bit to ensure the processes have stopped
+  sleep 5
+
+  # Remove Ceph data directories
+  NODE_CEPH_DIR="/usr/local/faasm/ceph-$(hostname)"
+  rm -rf "${NODE_CEPH_DIR}"
+  echo "Ceph data directories have been removed."
+
+  # Remove symlinks created during setup
+  rm -f /etc/ceph/ceph.client.admin.keyring
+  rm -f /var/lib/ceph/bootstrap-osd/ceph.keyring
+  echo "Ceph symlinks have been removed."
+
+  # Clean up Ceph monitor and manager directories
+  sudo rm -rf /var/lib/ceph/mon/ceph-$(hostname -s)
+  sudo rm -rf /var/lib/ceph/mgr/ceph-$(hostname -s)
+  echo "Ceph monitor and manager directories have been removed."
+
+  # Unmount and remove OSD storage
+  umount /mnt/ceph || true
+  rm -r /mnt/ceph || true
+  losetup -d /dev/loop30 || true
+  rm /ceph.img || true
+  echo "OSD storage has been unmounted and removed."
+
+  # Clean up any remaining Ceph files
+  sudo rm -rf /var/lib/ceph/
+  sudo rm -rf /etc/ceph/
+  echo "Ceph has been wiped from the system."
 }
 
 docker node ls 1>/dev/null 2>/dev/null
