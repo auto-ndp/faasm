@@ -107,20 +107,26 @@ int maybe_exec_wasm(cls_method_context_t hctx,
     std::string errorMsg;
 
     try {
-        CLS_LOG(10,"Received NDP call request of size %d bytes",(int)inBuffers->length());
+        CLS_LOG(1,"Received NDP call request of size %d bytes",(int)inBuffers->length());
+        SPDLOG_INFO(fmt::format(FMT_STRING("Received NDP call of size {} bytes"), inBuffers->length()));
         auto input = cephBufferToVecU8(*inBuffers);
+
         verifyFlatbuf<ndpmsg::NdpRequest>(input);
+        SPDLOG_INFO("Verified flatbuffer for input NDP request");
+
+
         const auto* req = flatbuffers::GetRoot<ndpmsg::NdpRequest>(input.data());
         callId = req->call_id();
+        SPDLOG_INFO(fmt::format(FMT_STRING("Received call id {}"), callId));
 
         // Connect to the Faasm runtime
-        CLS_LOG(10, "Connecting to Faasm runtime UDS");
-        SPDLOG_DEBUG("Connecting to Faasm runtime UDS");
+        CLS_LOG(1, "Connecting to Faasm runtime UDS");
+        SPDLOG_INFO("Connecting to Faasm runtime UDS");
         CephFaasmSocket runtime(SocketType::connect);
 
         // Forward the NDP request
-        CLS_LOG(10,"Forwarding call request %llu to the Faasm runtime",static_cast<unsigned long long>(callId));
-        SPDLOG_DEBUG("Forwarding call request to the Faasm runtime");
+        CLS_LOG(1,"Forwarding call request %llu to the Faasm runtime",static_cast<unsigned long long>(callId));
+        SPDLOG_INFO("Forwarding call request to the Faasm runtime");
 
         // Create request to NDP from Storage Ceph to Storage Faasm
         fbs::FlatBufferBuilder fwdBuilder(input.size() + 128);
@@ -131,13 +137,15 @@ int maybe_exec_wasm(cls_method_context_t hctx,
               ndpmsg::CreateCephNdpRequest(fwdBuilder, reqOffset, hnOffset);
             fwdBuilder.Finish(ndpOffset);
         }
+        SPDLOG_INFO("Finished creating flatbuffer for NDP request");
        
         // Send message over the FAASM UDS
         runtime.sendMessage(fwdBuilder.GetBufferPointer(), fwdBuilder.GetSize());
+        SPDLOG_INFO("Sent message over the FAASM UDS");
 
         if (!runtime.pollFor(POLLIN, 5000)) {
             // timed out
-            SPDLOG_ERROR("Timed out waiting for Faasm-storage messages");
+            SPDLOG_ERROR("[Initial Polling] Timed out waiting for Faasm-storage messages");
             return -ETIMEDOUT;
         }
 
@@ -145,12 +153,15 @@ int maybe_exec_wasm(cls_method_context_t hctx,
         const auto initialRuntimeResponseData = runtime.recvMessageVector();
         verifyFlatbuf<ndpmsg::NdpResponse>(initialRuntimeResponseData);
         const auto* initialRuntimeResponse =flatbuffers::GetRoot<ndpmsg::NdpResponse>(initialRuntimeResponseData.data());
+        SPDLOG_INFO("Received response from Faasm runtime");
 
         if (initialRuntimeResponse->call_id() != callId) {
+            SPDLOG_INFO("Mismatched call ids!");
             throw std::runtime_error("Mismatched call ids!");
         }
         if (initialRuntimeResponse->result() != ndpmsg::NdpResult_Ok) {
             // Forward the error and finish.
+            SPDLOG_ERROR("Error in initial runtime response");
             outBuffers->append(reinterpret_cast<const char*>(initialRuntimeResponseData.data()), initialRuntimeResponseData.size());
             return 0;
         }
@@ -163,7 +174,7 @@ int maybe_exec_wasm(cls_method_context_t hctx,
 
             if (!runtime.pollFor(POLLIN, 30000)) {
                 // timed out
-                errorMsg = "Timed out waiting for Faasm-storage messages";
+                errorMsg = "[Running Polling] Timed out waiting for Faasm-storage messages";
                 result = ndpmsg::NdpResult_Error;
                 running = false;
                 break;
@@ -178,12 +189,14 @@ int maybe_exec_wasm(cls_method_context_t hctx,
             }
             switch (topMsg->message_type()) {
                 case ndpmsg::TypedStorageMessage_NdpEnd: {
-                    CLS_LOG(10, "Received NDP end");
+                    CLS_LOG(1, "Received NDP end");
+                    SPDLOG_INFO("Received NDP end");
                     running = false;
                     break;
                 }
                 case ndpmsg::TypedStorageMessage_NdpRead: {
-                    CLS_LOG(10, "Received NDP read");
+                    CLS_LOG(1, "Received NDP read");
+                    SPDLOG_INFO("Received NDP read");
                     const auto* msg = topMsg->message_as_NdpRead();
                     int ec = cls_cxx_read(
                       hctx, msg->offset(), msg->upto_length(), &readBufferList);
@@ -197,7 +210,8 @@ int maybe_exec_wasm(cls_method_context_t hctx,
                     break;
                 }
                 case ndpmsg::TypedStorageMessage_NdpWrite: {
-                    CLS_LOG(10, "Received NDP write");
+                    CLS_LOG(1, "Received NDP write");
+                    SPDLOG_INFO("Received NDP write");
                     const auto* msg = topMsg->message_as_NdpWrite();
                     // Const cast safety: we do not modify the data in the
                     // buffer.
@@ -231,7 +245,7 @@ int maybe_exec_wasm(cls_method_context_t hctx,
           callId,
           e.what(),
           strerror(errno));
-        CLS_LOG(10, "%s", errorMsg.c_str());
+        CLS_LOG(1, "%s", errorMsg.c_str());
         SPDLOG_ERROR(errorMsg.c_str());
     } catch (...) {
         result = ndpmsg::NdpResult_Error;
@@ -239,11 +253,12 @@ int maybe_exec_wasm(cls_method_context_t hctx,
                                           "maybe_exec_wasm call {}; errno={}"),
                                callId,
                                strerror(errno));
-        CLS_LOG(10, "%s", errorMsg.c_str());
+        CLS_LOG(1, "%s", errorMsg.c_str());
         SPDLOG_ERROR(errorMsg.c_str());
     }
 
     // Construct response to Compute Faasm runtime
+    SPDLOG_INFO("Constructing response to Compute Faasm runtime");
     flatbuffers::FlatBufferBuilder builder(256);
     auto errorField = builder.CreateString(errorMsg);
     ndpmsg::NdpResponseBuilder respBuilder(builder);
@@ -257,6 +272,7 @@ int maybe_exec_wasm(cls_method_context_t hctx,
       reinterpret_cast<const char*>(builder.GetBufferPointer()),
       builder.GetSize());
 
+    SPDLOG_INFO("Finished constructing response to Compute Faasm runtime");
     return 0;
 }
 

@@ -109,6 +109,7 @@ int32_t Faaslet::executeTask(int threadPoolIdx,
 
 void Faaslet::reset(faabric::Message& msg)
 {
+    SPDLOG_INFO("[Faaslet.cpp] Resetting faaslet");
     if (module->isBound()) {
         module->reset(msg, localResetSnapshotKey);
     } else {
