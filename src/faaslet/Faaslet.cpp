@@ -91,19 +91,28 @@ int32_t Faaslet::executeTask(int threadPoolIdx,
     // operations being thread-safe.
 
     if (!threadIsIsolated) {
+        SPDLOG_INFO("Thread is not isolated");
         // Add this thread to the cgroup
         CGroup cgroup(BASE_CGROUP_NAME);
         cgroup.addCurrentThread();
 
         // Set up network namespace
         ns = claimNetworkNamespace();
+        SPDLOG_INFO("Claimed network namespace");
         ns->addCurrentThread();
 
         threadIsIsolated = true;
+<<<<<<< HEAD
     }
+    
+    SPDLOG_INFO("Executing task ");
+=======
+    }   
 
+    SPDLOG_INFO("Executing task");
+>>>>>>> 1261aa8f0e7fd8fea977e9b657eab559e9eb8a82
     int32_t returnValue = module->executeTask(threadPoolIdx, msgIdx, req);
-
+    SPDLOG_INFO("Finished executing task");
     return returnValue;
 }
 

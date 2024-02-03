@@ -1,6 +1,7 @@
 [submodule "faabric"]
 	path = faabric
 	url = https://github.com/auto-ndp/faabric
+	branch = donald-ug
 [submodule "clients/python"]
 	path = clients/python
 	url = https://github.com/auto-ndp/faasm-python.git
@@ -10,3 +11,4 @@
 [submodule "third-party/wavm"]
 	path = third-party/wavm
 	url = https://github.com/auto-ndp/WAVM.git
+	branch = 4d47422
