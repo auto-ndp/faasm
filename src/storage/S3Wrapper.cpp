@@ -4,6 +4,7 @@
 
 #include <faabric/util/bytes.h>
 #include <faabric/util/logging.h>
+#include <errno.h>
 
 #include <absl/container/flat_hash_map.h>
 
@@ -743,13 +744,37 @@ int S3Wrapper::asyncNdpCall(const std::string& bucketName,
                         outputBuffer.size());
     mtx.unlock();
     if (ec < 0) {
-        SPDLOG_ERROR("[S3Wrapper.cpp] Key {}/{} cannot run {}:{}: {}",
-                     bucketName,
-                     keyName,
-                     funcClass,
-                     funcName,
-                     strerror(-ec));
-        throw std::runtime_error("Key cannot run an NDP call.");
+
+        switch(ec)
+        {
+            case -ERANGE:
+                SPDLOG_ERROR("[S3Wrapper.cpp] rados_exec failed with ERANGE. "
+                             "Output buffer too small for {}:{}",
+                             funcClass,
+                             funcName);
+
+                throw std::runtime_error("Output buffer too small for NDP call.");
+            case -ENOENT:
+                SPDLOG_ERROR("[S3Wrapper.cpp] rados_exec failed with ENOENT. Specified object does not exist.");
+                throw file_not_found_error("Specified object does not exist.");
+            case -EPERM:
+                SPDLOG_ERROR("[S3Wrapper.cpp] The operation is not permitted, possibly due to insufficient permissions.");
+                throw std::runtime_error("rados_exec failed with EPERM. The operation is not permitted, possibly due to insufficient permissions.");
+            case -EIO:
+                SPDLOG_ERROR("[S3Wrapper.cpp] rados_exec failed with EIO. An lower-level I/O Error occurred! Possibly with OSD or network");
+                throw std::runtime_error("rados_exec failed with EIO. An I/O error occurred.");
+            case -EINVAL:
+                SPDLOG_ERROR("[S3Wrapper.cpp] rados_exec failed with EINVAL. Invalid argument passed to rados_exec");
+                throw std::runtime_error("rados_exec failed with EINVAL. Invalid argument.");   
+            default:
+                SPDLOG_ERROR("[S3Wrapper.cpp] Key {}/{} cannot run {}:{}: {}",
+                             bucketName,
+                             keyName,
+                             funcClass,
+                             funcName,
+                             strerror(-ec));
+                throw std::runtime_error("Key cannot run an NDP call.");
+        }
     }
     // return completion;
     return ec;
