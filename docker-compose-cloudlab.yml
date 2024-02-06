@@ -364,7 +364,7 @@ services:
       - SCHEDULER_MONITOR_FILE=/var/faasm-monitor
       - STATE_MODE=redis
       - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
-      - ENDPOINT_HOST=worker-1
+      - ENDPOINT_HOST=worker-2
       - ENDPOINT_NUM_THREADS=4
       - OVERRIDE_CPU_COUNT=0
       - VM_ARENA_MODE=${VM_ARENA_MODE:-}
