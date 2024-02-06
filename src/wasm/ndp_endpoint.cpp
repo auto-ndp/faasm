@@ -32,7 +32,7 @@ namespace faasm {
 class NdpEndpoint;
 class NdpConnection;
 
-static faabric::util::ConcurrentMap<uint64_t, std::weak_ptr<NdpConnection>>
+static faabric::util::ConcurrentMap<uint64_t, std::shared_ptr<NdpConnection>>
   ndpSocketMap;
 
 struct UtilisationStats
@@ -475,16 +475,27 @@ std::function<void(asio::io_context&)> getNdpEndpoint()
 
 std::shared_ptr<CephFaasmSocket> getNdpSocketFromCall(uint64_t id)
 {
-    auto weak = ndpSocketMap.get(id).value();
-    return std::shared_ptr(weak)->connection;
+    std::optional<std::shared_ptr<NdpConnection>> sock_optional = ndpSocketMap.get(id);
+    if (!sock_optional.has_value()) {
+        throw std::runtime_error("No NDP socket found for call id " +
+                                 std::to_string(id));
+    }
+    std::shared_ptr<NdpConnection> sock = sock_optional.value();
+    return sock->connection;
 }
 
 tl::expected<std::vector<uint8_t>, std::exception_ptr> awaitNdpResponse(
   uint64_t id)
 {
-    auto weak = ndpSocketMap.get(id).value();
-    auto sock = std::shared_ptr(weak);
+    std::optional<std::shared_ptr<NdpConnection>> sock_optional = ndpSocketMap.get(id);
     while (true) {
+        if (!sock_optional.has_value()) {
+            throw std::runtime_error("No NDP socket found for call id " +
+                                     std::to_string(id));
+        }
+
+        std::shared_ptr<NdpConnection> sock = sock_optional.value();
+
         sock->lastMessageFlag.wait(false);
         {
             faabric::util::UniqueLock lock{ sock->lastMessageMx };
@@ -510,14 +521,6 @@ CephSocketCloser::~CephSocketCloser()
 
             SPDLOG_DEBUG("Sending NdpEnd message for {}", id);
             socket->sendMessage(builder.GetBufferPointer(), builder.GetSize());
-
-            auto conn = ndpSocketMap.get(id)->lock();
-            if (conn != nullptr) {
-                SPDLOG_DEBUG("Cancelling ndp socket for {}", id);
-                std::error_code ec;
-                conn->sockConn.close();
-            }
-            socket->~CephFaasmSocket();
         }
     } catch (const std::exception& e) {
         // Handle exception here
