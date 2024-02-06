@@ -8,7 +8,8 @@
 [submodule "clients/cpp"]
 	path = clients/cpp
 	url = https://github.com/auto-ndp/faasm-cpp.git
+	branch = donald-ug
 [submodule "third-party/wavm"]
 	path = third-party/wavm
 	url = https://github.com/auto-ndp/WAVM.git
-	branch = 4d47422
+	commit = 4d47422
