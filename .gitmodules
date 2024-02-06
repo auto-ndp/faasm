@@ -12,4 +12,3 @@
 [submodule "third-party/wavm"]
 	path = third-party/wavm
 	url = https://github.com/auto-ndp/WAVM.git
-	commit = 4d47422
