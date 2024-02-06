@@ -541,9 +541,11 @@ int32_t WasmModule::executeTask(
           std::span(BYTES_CONST(zygoteDelta.data()), zygoteDelta.size()));
     } else if (msg.isstorage()) {
         ZoneNamedN(_zone_fetch, "Fetch NDP delta", true);
+        SPDLOG_DEBUG("Fetching NDP delta for {}", funcStr);
         auto recvDelta = faabric::scheduler::getScheduler()
                            .getFunctionCallClient(msg.directresulthost())
                            ->requestNdpDelta(msg.id());
+        SPDLOG_DEBUG("Received NDP delta for {}", funcStr);
         ZoneNamedN(_zone_apply, "Apply NDP delta", true);
         this->zygoteDeltaRestore(std::span(
           BYTES_CONST(recvDelta.delta().data()), recvDelta.delta().size()));
