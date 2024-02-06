@@ -186,7 +186,7 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
       SPDLOG_DEBUG("Total CPU time: {}", cpuStart.totalCpuTime);
 
       // Sleep for 10ms
-      std::this_thread::sleep_for(std::chrono::seconds(1));
+      std::this_thread::sleep_for(std::chrono::seconds(0.01));
 
       // Get final figures
       CPUStats cpuEnd = getCPUUtilisation();
