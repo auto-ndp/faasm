@@ -350,6 +350,13 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
             builder.Finish(ndpRequest);
         }
 
+        SPDLOG_DEBUG("Sent storage request to bucket={}, key={}, function={}, call_id={}, origin_host={}",
+                     call->user(),
+                     keyStr,
+                     call->function(),
+                     ndpCallId,
+                     config.endpointHost);
+                     
         const std::span<const uint8_t> inputSpan(builder.GetBufferPointer(),
                                                  builder.GetSize());
 
