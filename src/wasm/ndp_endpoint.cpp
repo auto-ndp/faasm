@@ -182,13 +182,10 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
 
       // Get initial figures
       CPUStats cpuStart = getCPUUtilisation();
-
-      SPDLOG_DEBUG("Total CPU time: {}", cpuStart.totalCpuTime);
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
       // Get final figures
       CPUStats cpuEnd = getCPUUtilisation();
-      SPDLOG_DEBUG("Total CPU time after wait: {}", cpuEnd.totalCpuTime);
 
       long cpuTimeDelta = cpuEnd.totalCpuTime - cpuStart.totalCpuTime;
       long idleTimeDelta = cpuEnd.idleCpuTime - cpuStart.idleCpuTime;
@@ -204,7 +201,6 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
     // Handles one message
     void onFirstReceivable(const boost::system::error_code& ec)
     {
-        SPDLOG_DEBUG("[ndp_endpoint] DING DONG");
         SPDLOG_DEBUG("[ndp_endpoint] onFirstReceivable [{}]", ec.message());
         namespace fbs = flatbuffers;
         if (!ec) {
@@ -216,20 +212,18 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
 
             auto& sch = faabric::scheduler::getScheduler();
             const bool hasCapacity = sch.executionSlotsSemaphore.try_acquire();
-            
-            SPDLOG_INFO("[ndp_endpoint::onFirstReceivable] Number of usable cores: {}", faabric::util::getUsableCores());
             UtilisationStats stats = getSystemUtilisation();
+
+            SPDLOG_INFO("[ndp_endpoint::onFirstReceivable] Number of usable cores: {}", faabric::util::getUsableCores());
             SPDLOG_INFO("[ndp_endpoint::onFirstReceivable] CPU utilisation: {}", stats.cpu_utilisation);
             SPDLOG_INFO("[ndp_endpoint::onFirstReceivable] RAM utilisation: {}", stats.ram_utilisation);
             SPDLOG_INFO("[ndp_endpoint::onFirstReceivable] Load average: {}", stats.load_average);
-
+            SPDLOG_INFO("[ndp_endpoint::onFirstReceivable] Has thread capacity: {}", hasCapacity);
             const bool should_offload = hasCapacity && stats.cpu_utilisation < 0.5 && stats.ram_utilisation < 0.95 && stats.load_average < faabric::util::getUsableCores() * 0.75;
             auto ndpResult = should_offload ? ndpmsg::NdpResult_Ok
                                          : ndpmsg::NdpResult_ProcessLocally;
             std::string ndpError;
             if (should_offload) {
-                // TODO: Keep a token until claimed by the runtime to prevent
-                // oversubscription
                 sch.executionSlotsSemaphore.release();
                 try {
 
