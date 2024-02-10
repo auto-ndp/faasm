@@ -345,7 +345,7 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
                              asio::buffer(nextMsg.data(), nextMsg.size()),
                              std::bind_front(&NdpConnection::onReceivable,
                                              this->shared_from_this()));
-        } else if (errno != EGAIN){
+        } else if (errno != EAGAIN){
             SPDLOG_ERROR("[ndp_endpoint::recvMsgContent] Error waiting for recv on the ndp connection: {} - {}", ec.to_string(), strerror(errno));
         }
     }
