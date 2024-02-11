@@ -25,7 +25,7 @@
 #include <faabric/util/func.h>
 #include <faabric/util/logging.h>
 #include <faabric/util/environment.h>
-#include <faabric/util/system_metrics.cpp>
+#include <faabric/util/system_metrics.h>
 #include <wasm/ndp.h>
 
 namespace faasm {
