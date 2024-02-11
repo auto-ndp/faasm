@@ -103,7 +103,7 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
 
             auto& sch = faabric::scheduler::getScheduler();
             const bool hasCapacity = sch.executionSlotsSemaphore.try_acquire();
-            UtilisationStats stats = faabric::util::getSystemUtilisation();
+            faabric::util::UtilisationStats stats = faabric::util::getSystemUtilisation();
 
             SPDLOG_INFO("[ndp_endpoint::onFirstReceivable] Number of usable cores: {}", faabric::util::getUsableCores());
             SPDLOG_INFO("[ndp_endpoint::onFirstReceivable] CPU utilisation: {}", stats.cpu_utilisation);
