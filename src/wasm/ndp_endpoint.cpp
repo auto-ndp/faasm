@@ -25,6 +25,7 @@
 #include <faabric/util/func.h>
 #include <faabric/util/logging.h>
 #include <faabric/util/environment.h>
+#include <faabric/util/system_metrics.cpp>
 #include <wasm/ndp.h>
 
 namespace faasm {
@@ -32,28 +33,7 @@ namespace faasm {
 class NdpEndpoint;
 class NdpConnection;
 
-static faabric::util::ConcurrentMap<uint64_t, std::shared_ptr<NdpConnection>>
-  ndpSocketMap;
-
-struct UtilisationStats
-{
-  double cpu_utilisation;
-  double ram_utilisation;
-  double load_average;
-};
-
-struct CPUStats
-{
-  long totalCpuTime;
-  long idleCpuTime;
-};
-
-struct MemStats
-{
-  uint64_t total;
-  uint64_t available;
-};
-
+static faabric::util::ConcurrentMap<uint64_t, std::shared_ptr<NdpConnection>> ndpSocketMap;
 
 class NdpConnection : public std::enable_shared_from_this<NdpConnection>
 {
@@ -109,98 +89,6 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
                           this->shared_from_this()));
     }
 
-    CPUStats getCPUUtilisation()
-    {
-      SPDLOG_INFO("[ndp_endpoint::getCPUUtilisation] Getting CPU utilisation");
-      std::ifstream cpuinfo("/proc/stat");
-      std::string line;
-      if (!cpuinfo.is_open()) {
-        throw std::runtime_error("Unable to open /proc/stat");
-      }
-
-      std::getline(cpuinfo, line);
-      // Extract CPU utilization information from the line
-      std::istringstream iss(line);
-      std::string cpuLabel;
-      long user, nice, system, idle, iowait, irq, softirq, steal, guest, guest_nice;
-
-      iss >> cpuLabel >> user >> nice >> system >> idle >> iowait >> irq >> softirq >> steal >> guest >> guest_nice;
-
-      // Calculate total CPU time
-      long totalCpuTime = user + nice + system + idle + iowait + irq + softirq + steal + guest + guest_nice;
-      CPUStats stats;
-      stats.totalCpuTime = totalCpuTime;
-      stats.idleCpuTime = idle;
-      return stats;
-    }
-
-
-    double getMemoryUtilisation()
-    {
-      std::ifstream meminfo("/proc/meminfo");
-      std::string line;
-      if (!meminfo.is_open()) {
-        throw std::runtime_error("Unable to open /proc/meminfo");
-      }
-
-      std::getline(meminfo, line);
-      std::istringstream ss(line);
-      std::string mem;
-      ss >> mem;
-
-      uint64_t totalMem;
-      ss >> totalMem;
-
-      std::getline(meminfo, line);
-      ss = std::istringstream(line);
-      ss >> mem;
-
-      uint64_t availableMem;
-      ss >> availableMem;
-
-      return 1.0 - (availableMem / (double)totalMem);
-    }
-
-    double getLoadAverage()
-    {
-      std::ifstream loadavg("/proc/loadavg");
-      std::string line;
-      if (!loadavg.is_open()) {
-        throw std::runtime_error("Unable to open /proc/loadavg");
-      }
-
-      std::getline(loadavg, line);
-      std::istringstream ss(line);
-      double load1, load5, load15;
-      ss >> load1 >> load5 >> load15;
-      return load1;
-    }
-
-    UtilisationStats getSystemUtilisation()
-    {
-      UtilisationStats stats;
-
-      // Get initial figures
-      CPUStats cpuStart = getCPUUtilisation();
-
-      SPDLOG_DEBUG("Total CPU time: {}", cpuStart.totalCpuTime);
-      std::this_thread::sleep_for(std::chrono::milliseconds(1));
-
-      // Get final figures
-      CPUStats cpuEnd = getCPUUtilisation();
-      SPDLOG_DEBUG("Total CPU time after wait: {}", cpuEnd.totalCpuTime);
-
-      long cpuTimeDelta = cpuEnd.totalCpuTime - cpuStart.totalCpuTime;
-      long idleTimeDelta = cpuEnd.idleCpuTime - cpuStart.idleCpuTime;
-      double cpu_utilisation = 1.0 - (idleTimeDelta / (double) cpuTimeDelta);
-
-      stats.cpu_utilisation = cpu_utilisation;
-      stats.ram_utilisation = getMemoryUtilisation();
-      stats.load_average = getLoadAverage();
-
-      return stats;
-    }
-
     // Handles one message
     void onFirstReceivable(const boost::system::error_code& ec)
     {
@@ -218,11 +106,11 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
             const bool hasCapacity = sch.executionSlotsSemaphore.try_acquire();
             
             SPDLOG_INFO("[ndp_endpoint::onFirstReceivable] Number of usable cores: {}", faabric::util::getUsableCores());
-            UtilisationStats stats = getSystemUtilisation();
+            UtilisationStats stats = faabric::util::getSystemUtilisation();
             SPDLOG_INFO("[ndp_endpoint::onFirstReceivable] CPU utilisation: {}", stats.cpu_utilisation);
             SPDLOG_INFO("[ndp_endpoint::onFirstReceivable] RAM utilisation: {}", stats.ram_utilisation);
             SPDLOG_INFO("[ndp_endpoint::onFirstReceivable] Load average: {}", stats.load_average);
-
+=
             const bool should_offload = hasCapacity && stats.cpu_utilisation < 0.5 && stats.ram_utilisation < 0.95 && stats.load_average < faabric::util::getUsableCores() * 0.75;
             auto ndpResult = should_offload ? ndpmsg::NdpResult_Ok
                                          : ndpmsg::NdpResult_ProcessLocally;
