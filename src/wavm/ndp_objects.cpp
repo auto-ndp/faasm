@@ -501,11 +501,16 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
         IR::UntaggedValue result;
 
         // Invoke function on the current faasm runtime
-        Runtime::invokeFunction(thisModule->executionContext,
-                                funcInstance,
-                                funcType,
-                                funcArgs.data(),
-                                &result);      
+        try {
+            Runtime::invokeFunction(thisModule->executionContext,
+                                    funcInstance,
+                                    funcType,
+                                    funcArgs.data(),
+                                    &result);
+        } catch (std::exception& e) {
+            SPDLOG_ERROR("Caught exception: {}", e.what());
+            return -0x12345678;
+        }  
         return result.i32;
     }
     SPDLOG_DEBUG(" ========= EXITING storageCallAndAwaitImpl =========");
