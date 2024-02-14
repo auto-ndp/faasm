@@ -138,7 +138,7 @@ int spawnChainedThread(const std::string& snapshotKey,
     const std::string chainedStr = faabric::util::funcToString(call, false);
 
     // Schedule the call
-    sch.callFunction(call,true);
+    sch.callFunction(call);
 
     return call->id();
 }
