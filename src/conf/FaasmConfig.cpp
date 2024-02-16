@@ -1,4 +1,4 @@
-#include <absl/strings/str_split.h>
+-#include <absl/strings/str_split.h>
 #include <boost/predef.h>
 #include <conf/FaasmConfig.h>
 #include <faabric/util/environment.h>
