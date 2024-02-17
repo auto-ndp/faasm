@@ -47,7 +47,7 @@ Now clone this repository, and `cd` into it.
 Then run this on each node.
 
 ```bash
-git clone --recurse-submodules --branch donald-ug https://github.com/auto-ndp/faasm.git && cd faasm && source ./bin/one-click-setup.sh
+git clone --recurse-submodules --branch donald-ug https://github.com/auto-ndp/faasm.git && cd faasm && git submodule update --remote && source ./bin/one-click-setup.sh
 ```
 
 Now build everything once for the first time
