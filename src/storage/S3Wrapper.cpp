@@ -734,7 +734,7 @@ int S3Wrapper::asyncNdpCall(const std::string& bucketName,
     rados_aio_create_completion(nullptr, nullptr, completion_callback, &completion);
     int ec = rados_aio_exec(pool->ioctx,
                             keyName.c_str(),
-                            completion.completion,
+                            completion,
                             funcClass.c_str(),
                             funcName.c_str(),
                             reinterpret_cast<const char*>(inputData.data()),
