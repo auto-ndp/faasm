@@ -112,7 +112,7 @@ void FaasmConfig::initialise()
 
     offload_cpu_threshold = stod(getEnvVar("OFFLOAD_CPU_THRESHOLD", "0.7"));
     offload_ram_threshold = stod(getEnvVar("OFFLOAD_RAM_THRESHOLD", "0.9"));
-    offload_load_avg_threshold = stod(getEnvVar("OFFLOAD_LOAD_AVG_THRESHOLD", "0.75"));
+    offload_load_avg_threshold = stod(getEnvVar("OFFLOAD_LOAD_AVG_FACTOR_THRESHOLD", "0.75"));
 
     attestationProviderUrl = getEnvVar("AZ_ATTESTATION_PROVIDER_URL", "");
 }
