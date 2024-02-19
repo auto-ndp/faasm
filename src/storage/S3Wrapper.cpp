@@ -731,9 +731,6 @@ int S3Wrapper::asyncNdpCall(const std::string& bucketName,
     //                         inputData.size(),
     //                         reinterpret_cast<char*>(outputBuffer.data()),
     //                         outputBuffer.size());
-    
-    std::mutex mtx;
-    mtx.lock();
     int ec = rados_exec(pool->ioctx,
                         keyName.c_str(),
                         funcClass.c_str(),
@@ -742,7 +739,6 @@ int S3Wrapper::asyncNdpCall(const std::string& bucketName,
                         inputData.size(),
                         reinterpret_cast<char*>(outputBuffer.data()),
                         outputBuffer.size());
-    mtx.unlock();
     if (ec < 0) {
 
         switch(ec)
