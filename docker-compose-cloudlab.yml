@@ -241,7 +241,7 @@ services:
       - CGROUP_MODE=off
       - DELTA_SNAPSHOT_ENCODING=pages=64
       - GLOBAL_MESSAGE_TIMEOUT=30000
-      - LOAD_BALANCE_POLICY=most_slots
+      - LOAD_BALANCE_POLICY=least_load
       - LOG_LEVEL=${LOG_LEVEL:-debug}
       - NETNS_MODE=off
       - REDIS_QUEUE_HOST=redis-queue
@@ -299,7 +299,7 @@ services:
       # be reverted once we upgrade container images to 22.04
       - CGROUP_MODE=off
       - DELTA_SNAPSHOT_ENCODING=pages=64
-      - LOAD_BALANCE_POLICY=faasm_default
+      - LOAD_BALANCE_POLICY=least_load
       - GLOBAL_MESSAGE_TIMEOUT=30000
       - LOG_LEVEL=${LOG_LEVEL:-debug}
       - NETNS_MODE=off
@@ -352,7 +352,7 @@ services:
       - TINI_SUBREAPER=1
       - CODEGEN_TARGETS=x86_64:skylake;aarch64:thunderx2t99
       - CAPTURE_STDOUT=on
-      - LOAD_BALANCE_POLICY=faasm_default
+      - LOAD_BALANCE_POLICY=least_load
       # 02/11/2022 - Temporarily disable CGroup mode, to mitigate a potential
       # mismatch between the host OS and the container image. Ubuntu 20.04
       # uses CGroup v1, whereas Ubuntu 22.04 uses CGroup v2. This change will
