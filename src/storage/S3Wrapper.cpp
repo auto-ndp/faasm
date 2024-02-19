@@ -700,6 +700,15 @@ std::string S3Wrapper::getKeyStr(const std::string& bucketName,
 //                                         const std::string& funcName,
 //                                         std::span<const uint8_t> inputData,
 //                                         std::span<uint8_t> outputBuffer)
+void completion_callback(rados_completion_t completion, void *arg) {
+    int result = rados_aio_get_return_value(completion);
+    if (result < 0) {
+        SPDLOG_ERROR("NDP call failed with error: {}", result);
+    } else {
+        SPDLOG_DEBUG("NDP call completed successfully");
+    }
+}
+
 int S3Wrapper::asyncNdpCall(const std::string& bucketName,
                                         const std::string& keyName,
                                         const std::string& funcClass,
@@ -721,14 +730,6 @@ int S3Wrapper::asyncNdpCall(const std::string& bucketName,
         throw std::runtime_error("Key cannot be run.");
     }
     
-    void completion_callback(rados_completion_t completion, void *arg) {
-        int result = rados_aio_get_return_value(completion);
-        if (result < 0) {
-            SPDLOG_ERROR("NDP call failed with error: {}", result);
-        } else {
-            SPDLOG_DEBUG("NDP call completed successfully");
-        }
-    }
     rados_completion_t completion;
     rados_aio_create_completion(nullptr, nullptr, completion_callback, &completion);
     int ec = rados_aio_exec(pool->ioctx,
