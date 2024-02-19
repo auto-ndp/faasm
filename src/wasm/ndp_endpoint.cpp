@@ -117,9 +117,7 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
                                   stats.ram_utilisation < conf.offload_ram_threshold && 
                                   stats.load_average < conf.offload_load_avg_threshold;
 
-            const bool should_offload = hasCapacity && stats.cpu_utilisation < 0.5 && stats.ram_utilisation < 0.95 && stats.load_average < faabric::util::getUsableCores() * 0.75;
-            auto ndpResult = should_offload ? ndpmsg::NdpResult_Ok
-                                         : ndpmsg::NdpResult_ProcessLocally;
+            auto ndpResult = should_offload ? ndpmsg::NdpResult_Ok : ndpmsg::NdpResult_ProcessLocally;
             std::string ndpError;
             if (should_offload) {
                 sch.executionSlotsSemaphore.release();
