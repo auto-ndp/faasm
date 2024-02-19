@@ -241,7 +241,7 @@ services:
       - CGROUP_MODE=off
       - DELTA_SNAPSHOT_ENCODING=pages=64
       - GLOBAL_MESSAGE_TIMEOUT=30000
-      - LOAD_BALANCE_POLICY=faasm_default
+      - LOAD_BALANCE_POLICY=most_slots
       - LOG_LEVEL=${LOG_LEVEL:-debug}
       - NETNS_MODE=off
       - REDIS_QUEUE_HOST=redis-queue
