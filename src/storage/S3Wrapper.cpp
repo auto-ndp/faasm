@@ -721,7 +721,16 @@ RadosCompletion S3Wrapper::asyncNdpCall(const std::string& bucketName,
         throw std::runtime_error("Key cannot be run.");
     }
     
-    RadosCompletion completion(pool);
+    void completion_callback(rados_completion_t completion, void *arg) {
+        int result = rados_aio_get_return_value(completion);
+        if (result < 0) {
+            SPDLOG_ERROR("NDP call failed with error: {}", result);
+        } else {
+            SPDLOG_DEBUG("NDP call completed successfully");
+        }
+    }
+    rados_completion_t completion;
+    rados_aio_create_completion(nullptr, nullptr, completion_callback, &completion);
     int ec = rados_aio_exec(pool->ioctx,
                             keyName.c_str(),
                             completion.completion,
@@ -773,6 +782,9 @@ RadosCompletion S3Wrapper::asyncNdpCall(const std::string& bucketName,
                 throw std::runtime_error("Key cannot run an NDP call.");
         }
     }
+
+    rados_aio_wait_for_complete(completion);
+    rados_aio_release(completion);
     // return completion;
     return ec;
 }
