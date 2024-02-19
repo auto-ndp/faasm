@@ -110,6 +110,10 @@ void FaasmConfig::initialise()
     s3User = getEnvVar("S3_USER", "minio");
     s3Password = getEnvVar("S3_PASSWORD", "minio123");
 
+    offload_cpu_threshold = stod(getEnvVar("OFFLOAD_CPU_THRESHOLD", "0.7"));
+    offload_ram_threshold = stod(getEnvVar("OFFLOAD_RAM_THRESHOLD", "0.9"));
+    offload_load_avg_threshold = stod(getEnvVar("OFFLOAD_LOAD_AVG_THRESHOLD", "0.75"));
+
     attestationProviderUrl = getEnvVar("AZ_ATTESTATION_PROVIDER_URL", "");
 }
 
@@ -153,6 +157,11 @@ void FaasmConfig::print() const
     SPDLOG_INFO("Object file dir:      {}", objectFileDir);
     SPDLOG_INFO("Runtime files dir:    {}", runtimeFilesDir);
     SPDLOG_INFO("Shared files dir:     {}", sharedFilesDir);
+
+    SPDLOG_INFO("--- OFFLOADING THRESHOLDS ---");
+    SPDLOG_INFO("CPU:                  {}", offload_cpu_threshold);
+    SPDLOG_INFO("RAM:                  {}", offload_ram_threshold);
+    SPDLOG_INFO("Load avg:             {}", offload_load_avg_threshold);
 }
 }
 

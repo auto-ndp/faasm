@@ -50,6 +50,10 @@ class FaasmConfig
     std::string s3User;
     std::string s3Password;
 
+    double offload_cpu_threshold;
+    double offload_ram_threshold;
+    double offload_load_avg_threshold;
+
     std::string attestationProviderUrl;
 
     FaasmConfig();
