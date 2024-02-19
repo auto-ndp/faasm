@@ -694,18 +694,18 @@ std::string S3Wrapper::getKeyStr(const std::string& bucketName,
       getKeyBytes(bucketName, keyName, false));
 }
 
-// RadosCompletion S3Wrapper::asyncNdpCall(const std::string& bucketName,
-//                                         const std::string& keyName,
-//                                         const std::string& funcClass,
-//                                         const std::string& funcName,
-//                                         std::span<const uint8_t> inputData,
-//                                         std::span<uint8_t> outputBuffer)
-int S3Wrapper::asyncNdpCall(const std::string& bucketName,
+RadosCompletion S3Wrapper::asyncNdpCall(const std::string& bucketName,
                                         const std::string& keyName,
                                         const std::string& funcClass,
                                         const std::string& funcName,
                                         std::span<const uint8_t> inputData,
                                         std::span<uint8_t> outputBuffer)
+//int S3Wrapper::asyncNdpCall(const std::string& bucketName,
+//                                        const std::string& keyName,
+//                                        const std::string& funcClass,
+//                                        const std::string& funcName,
+//                                        std::span<const uint8_t> inputData,
+//                                        std::span<uint8_t> outputBuffer)
 {
     SPDLOG_DEBUG(
       "Async Rados NDP call of {}:{} at {}/{} with {} bytes of input",
@@ -722,23 +722,24 @@ int S3Wrapper::asyncNdpCall(const std::string& bucketName,
     }
     
     RadosCompletion completion(pool);
-    // int ec = rados_aio_exec(pool->ioctx,
-    //                         keyName.c_str(),
-    //                         completion.completion,
-    //                         funcClass.c_str(),
-    //                         funcName.c_str(),
-    //                         reinterpret_cast<const char*>(inputData.data()),
-    //                         inputData.size(),
-    //                         reinterpret_cast<char*>(outputBuffer.data()),
-    //                         outputBuffer.size());
-    int ec = rados_exec(pool->ioctx,
-                        keyName.c_str(),
-                        funcClass.c_str(),
-                        funcName.c_str(),
-                        reinterpret_cast<const char*>(inputData.data()),
-                        inputData.size(),
-                        reinterpret_cast<char*>(outputBuffer.data()),
-                        outputBuffer.size());
+    int ec = rados_aio_exec(pool->ioctx,
+                            keyName.c_str(),
+                            completion.completion,
+                            funcClass.c_str(),
+                            funcName.c_str(),
+                            reinterpret_cast<const char*>(inputData.data()),
+                            inputData.size(),
+                            reinterpret_cast<char*>(outputBuffer.data()),
+                            outputBuffer.size());
+    // int ec = rados_exec(pool->ioctx,
+    //                     keyName.c_str(),
+    //                     funcClass.c_str(),
+    //                     funcName.c_str(),
+    //                     reinterpret_cast<const char*>(inputData.data()),
+    //                     inputData.size(),
+    //                     reinterpret_cast<char*>(outputBuffer.data()),
+    //                     outputBuffer.size());
+
     if (ec < 0) {
 
         switch(ec)
