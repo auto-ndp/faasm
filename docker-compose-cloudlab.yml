@@ -127,7 +127,7 @@ services:
     environment:
       - CODEGEN_TARGETS=x86_64:skylake;aarch64:thunderx2t99
       - DELTA_SNAPSHOT_ENCODING=pages=64
-      - LOG_LEVEL=${LOG_LEVEL:-debug}
+      - LOG_LEVEL=${LOG_LEVEL:-trace}
       - PYTHON_CODEGEN=${PYTHON_CODEGEN:-off}
       - REDIS_QUEUE_HOST=redis-queue
       - REDIS_STATE_HOST=redis-state
@@ -245,7 +245,7 @@ services:
       - DELTA_SNAPSHOT_ENCODING=pages=64
       - GLOBAL_MESSAGE_TIMEOUT=30000
       - LOAD_BALANCE_POLICY=least_load
-      - LOG_LEVEL=${LOG_LEVEL:-debug}
+      - LOG_LEVEL=${LOG_LEVEL:-trace}
       - NETNS_MODE=off
       - REDIS_QUEUE_HOST=redis-queue
       - REDIS_STATE_HOST=redis-state
@@ -304,7 +304,7 @@ services:
       - DELTA_SNAPSHOT_ENCODING=pages=64
       - LOAD_BALANCE_POLICY=least_load
       - GLOBAL_MESSAGE_TIMEOUT=30000
-      - LOG_LEVEL=${LOG_LEVEL:-debug}
+      - LOG_LEVEL=${LOG_LEVEL:-trace}
       - NETNS_MODE=off
       - REDIS_QUEUE_HOST=redis-queue
       - REDIS_STATE_HOST=redis-state
@@ -363,7 +363,7 @@ services:
       - CGROUP_MODE=off
       - DELTA_SNAPSHOT_ENCODING=pages=64
       - GLOBAL_MESSAGE_TIMEOUT=30000
-      - LOG_LEVEL=${LOG_LEVEL:-debug}
+      - LOG_LEVEL=${LOG_LEVEL:-trace}
       - NETNS_MODE=off
       - REDIS_QUEUE_HOST=redis-queue
       - REDIS_STATE_HOST=redis-state
@@ -421,7 +421,7 @@ services:
       - CGROUP_MODE=off
       - DELTA_SNAPSHOT_ENCODING=pages=64
       - GLOBAL_MESSAGE_TIMEOUT=30000
-      - LOG_LEVEL=${LOG_LEVEL:-debug}
+      - LOG_LEVEL=${LOG_LEVEL:-trace}
       - NETNS_MODE=off
       - REDIS_QUEUE_HOST=redis-queue
       - REDIS_STATE_HOST=redis-state
@@ -479,7 +479,7 @@ services:
       - CGROUP_MODE=off
       - DELTA_SNAPSHOT_ENCODING=pages=64
       - GLOBAL_MESSAGE_TIMEOUT=30000
-      - LOG_LEVEL=${LOG_LEVEL:-debug}
+      - LOG_LEVEL=${LOG_LEVEL:-trace}
       - NETNS_MODE=off
       - REDIS_QUEUE_HOST=redis-queue
       - REDIS_STATE_HOST=redis-state
@@ -538,7 +538,7 @@ services:
       - CGROUP_MODE=off
       - DELTA_SNAPSHOT_ENCODING=pages=64
       - GLOBAL_MESSAGE_TIMEOUT=30000
-      - LOG_LEVEL=${LOG_LEVEL:-debug}
+      - LOG_LEVEL=${LOG_LEVEL:-trace}
       - NETNS_MODE=off
       - REDIS_QUEUE_HOST=redis-queue
       - REDIS_STATE_HOST=redis-state
@@ -600,7 +600,7 @@ services:
     environment:
       - UPLOAD_HOST=${UPLOAD_HOST:-upload}
       - INVOKE_HOST=${INVOKE_HOST:-worker}
-      - LOG_LEVEL=${LOG_LEVEL:-debug}
+      - LOG_LEVEL=${LOG_LEVEL:-trace}
       - REDIS_QUEUE_HOST=redis-queue
       - REDIS_STATE_HOST=redis-state
       - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
@@ -652,7 +652,7 @@ services:
       - upload
     environment:
       - LD_LIBRARY_PATH=/usr/local/lib
-      - LOG_LEVEL=${LOG_LEVEL:-debug}
+      - LOG_LEVEL=${LOG_LEVEL:-trace}
       - REDIS_QUEUE_HOST=redis-queue
       - REDIS_STATE_HOST=redis-state
       - OVERRIDE_CPU_COUNT=4
