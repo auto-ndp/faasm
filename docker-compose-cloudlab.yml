@@ -390,7 +390,7 @@ services:
       - "8003-8010"
     ports:
       - "8081:8080"
-      - "8087:8086"
+      - "8088:8086"
     privileged: true
     deploy:
       placement:
@@ -448,7 +448,7 @@ services:
       - "8003-8010"
     ports:
       - "8082:8080"
-      - "8088:8086"
+      - "8089:8086"
     privileged: true
     deploy:
       placement:
