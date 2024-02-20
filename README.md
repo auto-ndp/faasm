@@ -47,8 +47,7 @@ Now clone this repository, and `cd` into it.
 Then run this on each node.
 
 ```bash
-git submodule update --init --recursive # clone the submodules
-source ./bin/one-click-setup.sh # install deps, download containers, and enter work env
+git clone --recurse-submodules --branch donald-experiments https://github.com/auto-ndp/faasm.git && cd faasm && git submodule update --remote && source ./bin/one-click-setup.sh
 ```
 
 Now build everything once for the first time
@@ -80,6 +79,10 @@ node3=$(docker node ls | grep node-3 | awk '{print $1;}')
 node4=$(docker node ls | grep node-4 | awk '{print $1;}')
 node5=$(docker node ls | grep node-5 | awk '{print $1;}')
 node6=$(docker node ls | grep node-6 | awk '{print $1;}')
+node7=$(docker node ls | grep node-7 | awk '{print $1;}')
+node8=$(docker node ls | grep node-8 | awk '{print $1;}')
+node9=$(docker node ls | grep node-9 | awk '{print $1;}')
+node10=$(docker node ls | grep node-10 | awk '{print $1;}')
 
 docker node update --label-add rank=leader ${node0}
 docker node update --label-add type=storage ${node0}
@@ -91,16 +94,28 @@ docker node update --label-add name=storage1 ${node1}
 docker node update --label-add type=storage ${node2}
 docker node update --label-add name=storage2 ${node2}
 
-docker node update --label-add type=compute ${node3}
-docker node update --label-add name=compute0 ${node3}
+docker node update --label-add type=storage ${node3}
+docker node update --label-add name=storage2 ${node3}
 
-docker node update --label-add type=compute ${node4}
-docker node update --label-add name=compute1 ${node4}
+docker node update --label-add type=storage ${node4}
+docker node update --label-add name=storage2 ${node4}
 
 docker node update --label-add type=compute ${node5}
-docker node update --label-add name=compute2 ${node5}
+docker node update --label-add name=compute0 ${node5}
 
-docker node update --label-add type=loadgen ${node6}
+docker node update --label-add type=compute ${node6}
+docker node update --label-add name=compute1 ${node6}
+
+docker node update --label-add type=compute ${node7}
+docker node update --label-add name=compute2 ${node7}
+
+docker node update --label-add type=compute ${node8}
+docker node update --label-add name=compute3 ${node8}
+
+docker node update --label-add type=compute ${node9}
+docker node update --label-add name=compute4 ${node9}
+
+docker node update --label-add type=loadgen ${node10}
 ```
 
 Inspect the node labels to see if they have been labelled correctly.
@@ -176,32 +191,6 @@ docker exec -it $(docker ps | grep faasm_cpp | awk '{print $1;}') /bin/bash # en
 In the above example we tested `worker-0`.
 Similarly test `worker-1` and `worker-2` as well.
 
-The following code can be used to copy/paste straight into the terminal
-```bash
-docker exec -it $(docker ps | grep faasm_cpp | awk '{print $1;}') /bin/bash # enter faasm-cpp
-inv func ndp get # build get.cpp
-inv func ndp put # build put.cpp
-inv func ndp wordcount # build wordcount.cpp
-
-# upload the bytecodes (to the upload service running on Leader Node)
-inv func.upload ndp get
-inv func.upload ndp put
-inv func.upload ndp wordcount
-
-# the following steps can be performed from either the faasm-cli or the cpp container on the loadgen node
-
-# put a key-value object {'key': 'v1 v2 v3'} into the storage backend
-curl -X POST 'http://worker-0:8080/f/' -H "Content-Type: application/json" -d '{"async": false, "user": "ndp", "function": "put", "input_data": "key v1 v2 v3"}'
-
-# get the same to test that it works
-curl -X POST 'http://worker-0:8080/f/' -H "Content-Type: application/json" -d '{"async": false, "user": "ndp", "function": "get", "input_data": "key"}'
-
-# run wordcount with offloading
-curl -X POST 'http://worker-0:8080/f/' -H "Content-Type: application/json" -d '{"async": false, "user": "ndp", "function": "wordcount", "input_data": "key"}'
-
-# run wordcount without offloading
-curl -X POST 'http://worker-0:8080/f/' -H "Content-Type: application/json" -d '{"async": false, "user": "ndp", "function": "wordcount", "input_data": "key", "forbid_ndp": true}'
-```
 ## Restarting the Swarm
 
 ### Simple Restart
