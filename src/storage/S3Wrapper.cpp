@@ -730,15 +730,18 @@ int S3Wrapper::asyncNdpCall(const std::string& bucketName,
       keyName,
       inputData.size());
     auto pool = RadosState::instance().getPool(bucketName);
-
-    if (pool->ioctx == nullptr) {
-        SPDLOG_ERROR("Key {}/{} cannot be run: no pool", bucketName, keyName);
-        throw std::runtime_error("Key cannot be run.");
-    }
     
+    rados_ioctx_t ioctx;
+    int ioctx_ec = rados_ioctx_create(cluster, bucketName.c_str(), &ioctx);
+
+    if (ioctx_ec < 0) {
+        SPDLOG_ERROR("[S3Wrapper.cpp] rados_ioctx_create failed with error: {} ({})", ioctx_ec, strerror(-ioctx_ec));
+        throw std::runtime_error("rados_ioctx_create failed.");
+    }
+
     rados_completion_t completion;
     rados_aio_create_completion(nullptr, nullptr, completion_callback, &completion);
-    int ec = rados_aio_exec(pool->ioctx,
+    int ec = rados_aio_exec(ioctx,
                             keyName.c_str(),
                             completion,
                             funcClass.c_str(),
@@ -792,6 +795,8 @@ int S3Wrapper::asyncNdpCall(const std::string& bucketName,
 
     rados_aio_wait_for_complete(completion);
     rados_aio_release(completion);
+
+    rados_ioctx_destroy(ioctx);
     // return completion;
     return ec;
 }
