@@ -318,7 +318,7 @@ void S3Wrapper::createBucket(const std::string& bucketName)
                                          bucketName,
                                          strerror(-err));
             SPDLOG_ERROR(errString.c_str());
-            throw std::runtime_error(errString.c_str();
+            throw std::runtime_error(errString.c_str());
         }
     }
 }
