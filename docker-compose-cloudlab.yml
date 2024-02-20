@@ -80,19 +80,18 @@ services:
       placement:
         constraints: [ node.labels.name == storage2 ]
 
-  # ceph-osd4:
-  #   <<: *ceph-osd1
-  #   hostname: ceph-osd4
-  #   deploy:
-  #     placement:
-  #       constraints: [ node.labels.name == storage3 ]
-
-  # ceph-osd5:
-  #   <<: *ceph-osd1
-  #   hostname: ceph-osd5
-  #   deploy:
-  #     placement:
-  #       constraints: [ node.labels.name == storage4 ]
+  ceph-osd4:
+    <<: *ceph-osd1
+    hostname: ceph-osd4
+    deploy:
+      placement:
+        constraints: [ node.labels.name == storage3 ]
+  ceph-osd5:
+    <<: *ceph-osd1
+    hostname: ceph-osd5
+    deploy:
+      placement:
+        constraints: [ node.labels.name == storage4 ]
 
   upload:
     image: kubasz51/faasm-upload:${FAASM_VERSION}
@@ -107,6 +106,8 @@ services:
       - ceph-osd1
       - ceph-osd2
       - ceph-osd3
+      - ceph-osd4
+      - ceph-osd5
     restart: on-failure
     deploy:
       placement: 
@@ -375,6 +376,180 @@ services:
       - TSAN_OPTIONS=halt_on_error=1:suppressions=/usr/local/code/faasm/thread-sanitizer-ignorelist.txt:history_size=7:second_deadlock_stack=1
       - UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=1
 
+  worker-3:
+    image: kubasz51/faasm-worker:${FAASM_VERSION}
+    security_opt:
+      - seccomp:unconfined
+    # Allows for tracy thread&ctx switch tracking to work better
+    pid: "host"
+    depends_on:
+      - upload
+    expose:
+      - "8080"
+      - "5000"
+      - "8003-8010"
+    ports:
+      - "8080:8080"
+      - "8086:8086"
+    privileged: true
+    deploy:
+      placement:
+        constraints: [ node.labels.name == compute3 ]
+    volumes:
+      - ./:/usr/local/code/faasm/
+      - /tmp/faasm-monitor:/var/faasm-monitor
+      - ./deploy/conf/ceph/ceph.conf:/etc/ceph/ceph.conf:ro
+      - ${FAASM_BUILD_DIR}:${FAASM_BUILD_MOUNT}
+      - ./dev/faasm-local/:${FAASM_LOCAL_MOUNT}
+      - aesmd-socket:/var/run/aesmd
+      - ./dev/container/shared_store/:/usr/local/faasm/debug_shared_store/
+      - ${SGX_DEVICE_MOUNT_DIR:-./dev/faasm-local/sgx}:/dev/sgx
+      - ./bin/entrypoint_worker.sh:/entrypoint.sh
+      - /sys/kernel/debug:/sys/kernel/debug
+      - /sys/kernel/debug/tracing:/sys/kernel/debug/tracing
+    environment:
+      - TINI_SUBREAPER=1
+      - CODEGEN_TARGETS=x86_64:skylake;aarch64:thunderx2t99
+      - CAPTURE_STDOUT=on
+      - LOAD_BALANCE_POLICY=least_load
+      # 02/11/2022 - Temporarily disable CGroup mode, to mitigate a potential
+      # mismatch between the host OS and the container image. Ubuntu 20.04
+      # uses CGroup v1, whereas Ubuntu 22.04 uses CGroup v2. This change will
+      # be reverted once we upgrade container images to 22.04
+      - CGROUP_MODE=off
+      - DELTA_SNAPSHOT_ENCODING=pages=64
+      - GLOBAL_MESSAGE_TIMEOUT=30000
+      - LOG_LEVEL=${LOG_LEVEL:-debug}
+      - NETNS_MODE=off
+      - REDIS_QUEUE_HOST=redis-queue
+      - REDIS_STATE_HOST=redis-state
+      - SCHEDULER_MONITOR_FILE=/var/faasm-monitor
+      - STATE_MODE=redis
+      - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
+      - ENDPOINT_HOST=worker-3
+      - ENDPOINT_NUM_THREADS=4
+      - OVERRIDE_CPU_COUNT=0
+      - VM_ARENA_MODE=${VM_ARENA_MODE:-}
+      - ASAN_OPTIONS=verbosity=1:halt_on_error=1
+      - TSAN_OPTIONS=halt_on_error=1:suppressions=/usr/local/code/faasm/thread-sanitizer-ignorelist.txt:history_size=7:second_deadlock_stack=1
+      - UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=1
+  
+  worker-4:
+    image: kubasz51/faasm-worker:${FAASM_VERSION}
+    security_opt:
+      - seccomp:unconfined
+    # Allows for tracy thread&ctx switch tracking to work better
+    pid: "host"
+    depends_on:
+      - upload
+    expose:
+      - "8080"
+      - "5000"
+      - "8003-8010"
+    ports:
+      - "8080:8080"
+      - "8086:8086"
+    privileged: true
+    deploy:
+      placement:
+        constraints: [ node.labels.name == compute4 ]
+    volumes:
+      - ./:/usr/local/code/faasm/
+      - /tmp/faasm-monitor:/var/faasm-monitor
+      - ./deploy/conf/ceph/ceph.conf:/etc/ceph/ceph.conf:ro
+      - ${FAASM_BUILD_DIR}:${FAASM_BUILD_MOUNT}
+      - ./dev/faasm-local/:${FAASM_LOCAL_MOUNT}
+      - aesmd-socket:/var/run/aesmd
+      - ./dev/container/shared_store/:/usr/local/faasm/debug_shared_store/
+      - ${SGX_DEVICE_MOUNT_DIR:-./dev/faasm-local/sgx}:/dev/sgx
+      - ./bin/entrypoint_worker.sh:/entrypoint.sh
+      - /sys/kernel/debug:/sys/kernel/debug
+      - /sys/kernel/debug/tracing:/sys/kernel/debug/tracing
+    environment:
+      - TINI_SUBREAPER=1
+      - CODEGEN_TARGETS=x86_64:skylake;aarch64:thunderx2t99
+      - CAPTURE_STDOUT=on
+      - LOAD_BALANCE_POLICY=least_load
+      # 02/11/2022 - Temporarily disable CGroup mode, to mitigate a potential
+      # mismatch between the host OS and the container image. Ubuntu 20.04
+      # uses CGroup v1, whereas Ubuntu 22.04 uses CGroup v2. This change will
+      # be reverted once we upgrade container images to 22.04
+      - CGROUP_MODE=off
+      - DELTA_SNAPSHOT_ENCODING=pages=64
+      - GLOBAL_MESSAGE_TIMEOUT=30000
+      - LOG_LEVEL=${LOG_LEVEL:-debug}
+      - NETNS_MODE=off
+      - REDIS_QUEUE_HOST=redis-queue
+      - REDIS_STATE_HOST=redis-state
+      - SCHEDULER_MONITOR_FILE=/var/faasm-monitor
+      - STATE_MODE=redis
+      - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
+      - ENDPOINT_HOST=worker-4
+      - ENDPOINT_NUM_THREADS=4
+      - OVERRIDE_CPU_COUNT=0
+      - VM_ARENA_MODE=${VM_ARENA_MODE:-}
+      - ASAN_OPTIONS=verbosity=1:halt_on_error=1
+      - TSAN_OPTIONS=halt_on_error=1:suppressions=/usr/local/code/faasm/thread-sanitizer-ignorelist.txt:history_size=7:second_deadlock_stack=1
+      - UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=1
+
+  worker-5:
+    image: kubasz51/faasm-worker:${FAASM_VERSION}
+    security_opt:
+      - seccomp:unconfined
+    # Allows for tracy thread&ctx switch tracking to work better
+    pid: "host"
+    depends_on:
+      - upload
+    expose:
+      - "8080"
+      - "5000"
+      - "8003-8010"
+    ports:
+      - "8080:8080"
+      - "8086:8086"
+    privileged: true
+    deploy:
+      placement:
+        constraints: [ node.labels.name == compute5 ]
+    volumes:
+      - ./:/usr/local/code/faasm/
+      - /tmp/faasm-monitor:/var/faasm-monitor
+      - ./deploy/conf/ceph/ceph.conf:/etc/ceph/ceph.conf:ro
+      - ${FAASM_BUILD_DIR}:${FAASM_BUILD_MOUNT}
+      - ./dev/faasm-local/:${FAASM_LOCAL_MOUNT}
+      - aesmd-socket:/var/run/aesmd
+      - ./dev/container/shared_store/:/usr/local/faasm/debug_shared_store/
+      - ${SGX_DEVICE_MOUNT_DIR:-./dev/faasm-local/sgx}:/dev/sgx
+      - ./bin/entrypoint_worker.sh:/entrypoint.sh
+      - /sys/kernel/debug:/sys/kernel/debug
+      - /sys/kernel/debug/tracing:/sys/kernel/debug/tracing
+    environment:
+      - TINI_SUBREAPER=1
+      - CODEGEN_TARGETS=x86_64:skylake;aarch64:thunderx2t99
+      - CAPTURE_STDOUT=on
+      - LOAD_BALANCE_POLICY=least_load
+      # 02/11/2022 - Temporarily disable CGroup mode, to mitigate a potential
+      # mismatch between the host OS and the container image. Ubuntu 20.04
+      # uses CGroup v1, whereas Ubuntu 22.04 uses CGroup v2. This change will
+      # be reverted once we upgrade container images to 22.04
+      - CGROUP_MODE=off
+      - DELTA_SNAPSHOT_ENCODING=pages=64
+      - GLOBAL_MESSAGE_TIMEOUT=30000
+      - LOG_LEVEL=${LOG_LEVEL:-debug}
+      - NETNS_MODE=off
+      - REDIS_QUEUE_HOST=redis-queue
+      - REDIS_STATE_HOST=redis-state
+      - SCHEDULER_MONITOR_FILE=/var/faasm-monitor
+      - STATE_MODE=redis
+      - LD_LIBRARY_PATH=/build/faasm/third-party/lib:/usr/local/lib
+      - ENDPOINT_HOST=worker-5
+      - ENDPOINT_NUM_THREADS=4
+      - OVERRIDE_CPU_COUNT=0
+      - VM_ARENA_MODE=${VM_ARENA_MODE:-}
+      - ASAN_OPTIONS=verbosity=1:halt_on_error=1
+      - TSAN_OPTIONS=halt_on_error=1:suppressions=/usr/local/code/faasm/thread-sanitizer-ignorelist.txt:history_size=7:second_deadlock_stack=1
+      - UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=1
+
   worker-storage:
     image: kubasz51/faasm-worker:${FAASM_VERSION}
     security_opt:
@@ -392,7 +567,7 @@ services:
       - "8087:8086"
     privileged: true
     deploy:
-      replicas: 3
+      replicas: 5
       placement:
         constraints: [ node.labels.type == storage ]
     volumes:
