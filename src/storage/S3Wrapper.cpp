@@ -313,7 +313,7 @@ void S3Wrapper::createBucket(const std::string& bucketName)
             SPDLOG_ERROR("Bucket {} creation failed with ENAMETOOLONG: {}",
                          bucketName,
                          strerror(-err));
-        } else
+        } else {
             auto errString = fmt::format("Bucket {} cannot be created: {}",
                                          bucketName,
                                          strerror(-err));
