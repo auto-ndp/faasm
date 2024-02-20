@@ -314,8 +314,7 @@ void S3Wrapper::createBucket(const std::string& bucketName)
                          bucketName,
                          strerror(-err));
         } else
-            SPDLOG_ERROR(
-              "Bucket {} cannot be created: Error {} ({})", bucketName, strerror(-err));
+            SPDLOG_ERROR("Bucket {} cannot be created: Error {} ({})", bucketName, -err, strerror(-err));
             throw std::runtime_error("Bucket cannot be created.");
         }
     }
