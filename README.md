@@ -95,10 +95,10 @@ docker node update --label-add type=storage ${node2}
 docker node update --label-add name=storage2 ${node2}
 
 docker node update --label-add type=storage ${node3}
-docker node update --label-add name=storage2 ${node3}
+docker node update --label-add name=storage3 ${node3}
 
 docker node update --label-add type=storage ${node4}
-docker node update --label-add name=storage2 ${node4}
+docker node update --label-add name=storage4 ${node4}
 
 docker node update --label-add type=compute ${node5}
 docker node update --label-add name=compute0 ${node5}
