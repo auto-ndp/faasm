@@ -301,9 +301,21 @@ void S3Wrapper::createBucket(const std::string& bucketName)
     if (err < 0) {
         if (err == -EEXIST) {
             SPDLOG_DEBUG("Bucket already exists {}", bucketName);
-        } else {
+        } else if (err == -EINVAL) {
+            SPDLOG_ERROR("Bucket {} creation failed with EINVAL: {}",
+                         bucketName,
+                         strerror(-err));
+        } else if (err == -EPERM) {
+            SPDLOG_ERROR("Bucket {} creation failed with EPERM: {}",
+                         bucketName,
+                         strerror(-err));
+        } else if (err == -ENAMETOOLONG) {
+            SPDLOG_ERROR("Bucket {} creation failed with ENAMETOOLONG: {}",
+                         bucketName,
+                         strerror(-err));
+        } else
             SPDLOG_ERROR(
-              "Bucket {} cannot be created: {}", bucketName, strerror(-err));
+              "Bucket {} cannot be created: Error {} ({})", bucketName, strerror(-err));
             throw std::runtime_error("Bucket cannot be created.");
         }
     }
