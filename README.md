@@ -138,7 +138,11 @@ docker exec -it $(docker ps | grep faasm_cpp | awk '{print $1;}') /bin/bash # en
 (cpp)$ ./bin/buildcpp.sh
 (cpp)$ exit
 ```
-
+Or quickly
+```bash
+docker exec -it $(docker ps | grep faasm_faasm-cli | awk '{print $1;}') /bin/bash -c "./bin/buildfaasm.sh"
+docker exec -it $(docker ps | grep faasm_cpp | awk '{print $1;}') /bin/bash -c "./bin/buildcpp.sh"
+```
 ## Run Offloading Experiments
 
 Now let us see offloading in action.
