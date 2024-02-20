@@ -737,6 +737,8 @@ int S3Wrapper::asyncNdpCall(const std::string& bucketName,
     if (ioctx_ec < 0) {
         SPDLOG_ERROR("[S3Wrapper.cpp] rados_ioctx_create failed with error: {} ({})", ioctx_ec, strerror(-ioctx_ec));
         throw std::runtime_error("rados_ioctx_create failed.");
+    } else {
+        SPDLOG_DEBUG("[S3Wrapper.cpp] rados_ioctx_create succeeded.");
     }
 
     rados_completion_t completion;
