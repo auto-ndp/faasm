@@ -3,7 +3,6 @@ from subprocess import call
 from invoke import task
 from os import environ
 from faasmcli.util.env import PROJ_ROOT, AVAILABLE_HOSTS_SET
-from subprocess import check_output, CalledProcessError
 
 def _do_redis_command(sub_cmd, local, docker, k8s):
     redis_host = environ.get("REDIS_QUEUE_HOST", "redis")
@@ -26,14 +25,10 @@ def _do_redis_command(sub_cmd, local, docker, k8s):
 
     cmd_string = " ".join(cmd)
     print(cmd_string)
-    cmd_string = " ".join(cmd)
-    print(cmd_string)
-    try:
-        output = check_output(cmd_string, shell=True, cwd=PROJ_ROOT)
-        return output.decode('utf-8')
-    except CalledProcessError as e:
-        print(f"Command failed: {cmd_string}")
-        return None
+    ret_code = call(" ".join(cmd), shell=True, cwd=PROJ_ROOT)
+
+    if ret_code != 0:
+        print("Command failed: {}".format(cmd_string))
 
 
 @task
@@ -49,10 +44,9 @@ def all_workers(ctx, local=False, docker=False, k8s=True):
     """
     List all available Faasm instances
     """
-    return_str = _do_redis_command(
+    _do_redis_command(
         "smembers {}".format(AVAILABLE_HOSTS_SET), local, docker, k8s
     )
-    print("All_workers returned: ", return_str)
 
 
 @task
