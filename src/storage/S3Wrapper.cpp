@@ -427,6 +427,7 @@ std::vector<std::string> S3Wrapper::listKeys(const std::string& bucketName)
     */
     std::vector<std::string> keys;
     auto pool = RadosState::instance().getPool(bucketName);
+
     rados_list_ctx_t lst = nullptr;
     int err = rados_nobjects_list_open(pool->ioctx, &lst);
     if (err < 0) {
@@ -731,19 +732,19 @@ int S3Wrapper::asyncNdpCall(const std::string& bucketName,
       inputData.size());
     auto pool = RadosState::instance().getPool(bucketName);
     
-    rados_ioctx_t ioctx;
-    int ioctx_ec = rados_ioctx_create(cluster, bucketName.c_str(), &ioctx);
-
-    if (ioctx_ec < 0) {
-        SPDLOG_ERROR("[S3Wrapper.cpp] rados_ioctx_create failed with error: {} ({})", ioctx_ec, strerror(-ioctx_ec));
-        throw std::runtime_error("rados_ioctx_create failed.");
-    } else {
-        SPDLOG_DEBUG("[S3Wrapper.cpp] rados_ioctx_create succeeded.");
+    if (pool == nullptr) {
+        SPDLOG_ERROR("Pool {} does not exist", bucketName);
+        throw std::runtime_error("Pool does not exist.");
     }
+
+    if (pool->ioctx == nullptr) {
+        SPDLOG_ERROR("Pool {} does not have an ioctx", bucketName);
+        throw std::runtime_error("Pool does not have an ioctx.");
+    }   
 
     rados_completion_t completion;
     rados_aio_create_completion(nullptr, nullptr, completion_callback, &completion);
-    int ec = rados_aio_exec(ioctx,
+    int ec = rados_aio_exec(pool->ioctx,
                             keyName.c_str(),
                             completion,
                             funcClass.c_str(),

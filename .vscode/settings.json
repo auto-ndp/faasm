@@ -94,7 +94,18 @@
         "thread": "cpp",
         "cinttypes": "cpp",
         "variant": "cpp",
-        "*.ipp": "cpp"
+        "*.ipp": "cpp",
+        "filesystem": "cpp",
+        "format": "cpp",
+        "xiosbase": "cpp",
+        "xlocale": "cpp",
+        "xlocbuf": "cpp",
+        "xlocinfo": "cpp",
+        "xlocmes": "cpp",
+        "xlocmon": "cpp",
+        "xlocnum": "cpp",
+        "xloctime": "cpp",
+        "xstring": "cpp"
     },
     "C_Cpp.default.compilerPath": "/usr/bin/gcc",
     "editor.tokenColorCustomizations": {
