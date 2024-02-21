@@ -142,10 +142,8 @@ def dispatch_impl(ctx,
         asynch = True
 
     # Create URL and message
-    url = "http://{}".format(host)
-    if not port == "80":
-        url += ":{}".format(port)
-
+    url = "http://{}:{}/f/".format(host, port)
+    
     if py:
         msg = {
             "user": PYTHON_USER,
