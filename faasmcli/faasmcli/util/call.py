@@ -5,12 +5,33 @@ from faasmcli.util.env import PYTHON_USER, PYTHON_FUNC, AVAILABLE_HOSTS_SET
 
 from faasmcli.util.http import do_post
 from faasmcli.util.endpoints import get_invoke_host_port
+from faasmcli.tasks.redis import _do_redis_command
+from faasmcli.util.load_balance_policy import RoundRobinLoadBalancerStrategy, WorkerHashLoadBalancerStrategy
 
 STATUS_SUCCESS = "SUCCESS"
 STATUS_FAILED = "FAILED"
 STATUS_RUNNING = "RUNNING"
 
 POLL_INTERVAL_MS = 1000
+
+worker_address_cmd_str = _do_redis_command("smembers {}".format(AVAILABLE_HOSTS_SET), False, True, True)
+ret_list = list(filter(None, worker_address_cmd_str.split("\n")))
+print("WORKER_ADDRESSES: {}".format(ret_list))
+
+rr_strategy = RoundRobinLoadBalancerStrategy(ret_list)
+wh_strategy = WorkerHashLoadBalancerStrategy(ret_list)
+
+
+def get_load_balance_strategy(policy):
+    if policy == "round_robin":
+        print("Using round robin strategy")
+        return rr_strategy
+    elif policy == "worker_hash":
+        print("Using worker hash strategy")
+        return wh_strategy
+    else:
+        print("Using round robin strategy as default")
+        return rr_strategy
 
 def _do_invoke(user, func, host, port, func_type, input=None):
     url = "http://{}:{}/{}/{}/{}".format(host, port, func_type, user, func)
@@ -131,6 +152,76 @@ def invoke_impl(
         return _async_invoke(url, msg, poll=poll, host=host, port=port)
     else:
         return do_post(url, msg, json=True, debug=debug)
+
+def dispatch_impl(user,
+                  func,
+                  policy="round_robin",
+                  input=None,
+                  py=False,
+                  asynch=False,
+                  poll=False,
+                  cmdline=None,
+                  mpi_world_size=None,
+                  debug=False,
+                  sgx=False,
+                  graph=False,
+                  forbid_ndp=False):
+    
+    balancer = get_load_balance_strategy(policy)
+    host = balancer.get_next_host(user, func)
+    
+    port = 8080 # default invoke port
+    # Polling always requires asynch
+    if poll:
+        asynch = True
+
+    # Create URL and message
+    url = "http://{}".format(host)
+    if not port == "80":
+        url += ":{}".format(port)
+
+    if py:
+        msg = {
+            "user": PYTHON_USER,
+            "function": PYTHON_FUNC,
+            "async": asynch,
+            "py_user": user,
+            "py_func": func,
+            "python": True,
+        }
+    else:
+        msg = {
+            "user": user,
+            "function": func,
+            "async": asynch,
+        }
+
+    if sgx:
+        msg["sgx"] = sgx
+
+    if input:
+        msg["input_data"] = input
+
+    if cmdline:
+        msg["cmdline"] = cmdline
+
+    if mpi_world_size:
+        msg["mpi_world_size"] = int(mpi_world_size)
+
+    if graph:
+        msg["record_exec_graph"] = graph
+        
+    if forbid_ndp:
+        msg["forbid_ndp"] = forbid_ndp
+    print("Invoking function at {}".format(url))
+    print("Payload:")
+    pprint.pprint(msg)
+
+    if asynch:
+        return _async_invoke(url, msg, poll=poll, host=host, port=port)
+    else:
+        return do_post(url, msg, json=True, debug=debug)
+
 
 def status_call_impl(user, func, call_id, host, port, quiet=False):
     msg = {
