@@ -117,6 +117,7 @@ def dispatch(
         with open(LAST_CALL_ID_FILE, "w") as fh:
             fh.write(str(res))
 
+@task
 def dispatch_impl(ctx,
                   user,
                   func,
