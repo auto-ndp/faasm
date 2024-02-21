@@ -153,7 +153,8 @@ def invoke_impl(
     else:
         return do_post(url, msg, json=True, debug=debug)
 
-def dispatch_impl(user,
+def dispatch_impl(ctx,
+                  user,
                   func,
                   policy="round_robin",
                   input=None,
@@ -167,6 +168,7 @@ def dispatch_impl(user,
                   graph=False,
                   forbid_ndp=False):
     
+    ctx.config
     balancer = get_load_balance_strategy(policy)
     host = balancer.get_next_host(user, func)
     
