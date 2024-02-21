@@ -3,8 +3,7 @@ import pprint
 
 from faasmcli.util.env import PYTHON_USER, PYTHON_FUNC
 from faasmcli.util.http import do_post
-from faasmcli.util.endpoints import get_invoke_host_port, get_worker_addresses
-from faasmcli.util.load_balance_policy import RoundRobinLoadBalancerStrategy, WorkerHashLoadBalancerStrategy
+from faasmcli.util.endpoints import get_invoke_host_port
 STATUS_SUCCESS = "SUCCESS"
 STATUS_FAILED = "FAILED"
 STATUS_RUNNING = "RUNNING"
@@ -136,7 +135,6 @@ def dispatch_impl(user,
                   func,
                   host,
                   port,
-                  dispatch_policy=None,
                   input=None,
                   py=False,
                   asynch=False,

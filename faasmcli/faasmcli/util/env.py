@@ -2,7 +2,8 @@ from os import makedirs, environ
 from os.path import dirname, realpath, join, exists, expanduser
 
 from faasmtools.build import FAASM_LOCAL_DIR
-
+from load_balance_policy import RoundRobinLoadBalancerStrategy, WorkerHashLoadBalancerStrategy
+from endpoints import get_worker_addresses
 
 def _get_dir(variable, default):
     env_val = environ.get(variable)
@@ -36,6 +37,9 @@ FAASM_SGX_MODE_HARDWARE = "Hardware"
 
 AVAILABLE_HOSTS_SET = "available_hosts"
 
+ALL_WORKERS = get_worker_addresses()
+ROUND_ROBIN_POLICY = RoundRobinLoadBalancerStrategy(ALL_WORKERS)
+WORKER_HASH_POLICY = WorkerHashLoadBalancerStrategy(ALL_WORKERS)
 
 def get_wasm_func_path(user, func_name):
     func_dir = join(WASM_DIR, user, func_name)
