@@ -58,7 +58,6 @@ def all_workers(ctx, local=False, docker=False, k8s=True):
     ret_list = list(filter(None, ret_list))
     return ret_list
 
-@task
 def upload_load_balancer_state(load_balance_obj, policy, local=False, docker=False, k8s=True):
     """
     Upload the load balancer state to Redis
@@ -70,8 +69,7 @@ def upload_load_balancer_state(load_balance_obj, policy, local=False, docker=Fal
         "set {} {}".format(policy, load_balance_obj_str), "REDIS_STATE_HOST", local, docker, k8s
     )
 
-@task
-def get_load_balancer_state(ctx, policy, local=False, docker=False, k8s=True):
+def get_load_balancer_state(policy, local=False, docker=False, k8s=True):
     result_obj_str = _do_redis_command(
         "get {}".format(policy), "REDIS_STATE_HOST", local, docker, k8s)
     

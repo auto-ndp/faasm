@@ -5,9 +5,8 @@ from faasmcli.util.env import PYTHON_USER, PYTHON_FUNC, AVAILABLE_HOSTS_SET
 
 from faasmcli.util.http import do_post
 from faasmcli.util.endpoints import get_invoke_host_port
-from faasmcli.tasks.redis import all_workers
+from faasmcli.tasks.redis import all_workers, upload_load_balancer_state, get_load_balancer_state
 from faasmcli.util.load_balance_policy import RoundRobinLoadBalancerStrategy, WorkerHashLoadBalancerStrategy
-
 STATUS_SUCCESS = "SUCCESS"
 STATUS_FAILED = "FAILED"
 STATUS_RUNNING = "RUNNING"
@@ -24,13 +23,13 @@ wh_strategy = WorkerHashLoadBalancerStrategy(workers=worker_list)
 def get_load_balance_strategy(policy):
     if policy == "round_robin":
         print("Using round robin strategy")
-        return rr_strategy
+        return get_load_balancer_state(policy, local=False, docker=True, k8s=True)
     elif policy == "worker_hash":
         print("Using worker hash strategy")
-        return wh_strategy
+        return get_load_balance_strategy(policy, local=False, docker=True, k8s=True)
     else:
         print("Using round robin strategy as default")
-        return rr_strategy
+        return get_load_balance_strategy("round_robin", local=False, docker=True, k8s=True)
 
 def _do_invoke(user, func, host, port, func_type, input=None):
     url = "http://{}:{}/{}/{}/{}".format(host, port, func_type, user, func)
@@ -168,6 +167,8 @@ def dispatch_impl(user,
     
     balancer = get_load_balance_strategy(policy)
     host = balancer.get_next_host(user, func)
+    
+    upload_load_balancer_state(balancer, policy, local=False, docker=True, k8s=True) # Allows the load balancer to keep state between calls
     
     port = 8080 # default invoke port
     # Polling always requires asynch
