@@ -60,7 +60,7 @@ def dispatch(
     ctx,
     user,
     func,
-    dispatch_policy=None,
+    dispatch_policy,
     input=None,
     py=False,
     asynch=False,
