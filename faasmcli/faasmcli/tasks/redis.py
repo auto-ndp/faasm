@@ -86,6 +86,3 @@ def func_workers(ctx, user, func, local=False, docker=False, k8s=True):
     obj_str =_do_redis_command(
         "smembers {}".format(worker_set_name), "REDIS_QUEUE_HOST", local, docker, k8s
     )
-    
-    # Deserialize the object to ILoadBalanceStrategy
-    load_balance_obj = 
