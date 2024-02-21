@@ -102,7 +102,7 @@ def batch_execute(
     ctx,
     user,
     func,
-    num_calls=10,
+    iters=10,
     policy="round_robin",
     input=None,
     py=False,
