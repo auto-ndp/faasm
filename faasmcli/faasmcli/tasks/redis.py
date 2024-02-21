@@ -81,6 +81,8 @@ def get_load_balancer_state(policy, local=False, docker=False, k8s=True):
         return None
     
     serialied_obj = base64.b64decode(result_obj_str)
+    if serialied_obj is None:
+        return None
     
     print(serialied_obj)
     return pickle.loads(serialied_obj)
