@@ -16,7 +16,9 @@ class RoundRobinLoadBalancerStrategy(ILoadBalanceStrategy):
         print("Creating RoundRobinLoadBalancerStrategy with {} workers".format(len(workers)))
         
     def get_next_host(self, user=None, func_name=None):
-        return next(self.worker_iterator)
+        host = next(self.worker_iterator)
+        print("Returning host: ", host)
+        return host
     
 class WorkerHashLoadBalancerStrategy(ILoadBalanceStrategy):
     def __init__(self, workers):
