@@ -81,6 +81,7 @@ def dispatch(
     elif dispatch_policy == "worker_hash":
         host = WORKER_HASH_STRATEGY.get_next_host(user, func)
     else:
+        print("Invalid dispatch policy, using round robin")
         host = ROUND_ROBIN_STRATEGY.get_next_host(user, func)
         
     port = get_invoke_host_port()[1]
