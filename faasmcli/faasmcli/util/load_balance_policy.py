@@ -9,15 +9,13 @@ class ILoadBalanceStrategy(ABC):
     
 
 class RoundRobinLoadBalancerStrategy(ILoadBalanceStrategy):
-    
     def __init__(self, workers):
         self.workers = workers
-        self.worker_iterator = itertools.cycle(workers)
+        self.worker_iterator = itertools.cycle(self.workers)
         print("Creating RoundRobinLoadBalancerStrategy with {} workers".format(len(workers)))
         
     def get_next_host(self, user=None, func_name=None):
-        host = next(self.worker_iterator)
-        return host
+        return next(self.worker_iterator)
     
 class WorkerHashLoadBalancerStrategy(ILoadBalanceStrategy):
     def __init__(self, workers):
