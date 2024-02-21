@@ -75,6 +75,7 @@ def invoke_impl(
     debug=False,
     sgx=False,
     graph=False,
+    forbid_ndp=False,
 ):
     host, port = get_invoke_host_port()
 
@@ -117,6 +118,9 @@ def invoke_impl(
 
     if graph:
         msg["record_exec_graph"] = graph
+        
+    if forbid_ndp:
+        msg["forbid_ndp"] = forbid_ndp
 
     print("Invoking function at {}".format(url))
 
