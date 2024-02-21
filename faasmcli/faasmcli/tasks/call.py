@@ -13,7 +13,8 @@ from faasmcli.tasks.redis import all_workers
 
 LAST_CALL_ID_FILE = "/tmp/faasm_last_call.txt"
 
-# WORKER_ADDRESSES = get_worker_addresses() # Parse the config for list of all local workers in cluster
+WORKER_ADDRESSES = all_workers(docker=True) # Parse the config for list of all local workers in cluster
+print("WORKER_ADDRESSES: {}".format(WORKER_ADDRESSES))
 # round_robin_strategy = RoundRobinLoadBalancerStrategy(WORKER_ADDRESSES) # Create a round robin load balancer strategy
 # worker_hash_strategy = WorkerHashLoadBalancerStrategy(WORKER_ADDRESSES) # Create a worker hash load balancer strategy
 
