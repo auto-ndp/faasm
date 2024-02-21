@@ -4,6 +4,7 @@ from faasmcli.util.call import (
     invoke_impl,
     status_call_impl,
     exec_graph_call_impl,
+    dispatch_impl
 )
 from faasmcli.util.endpoints import get_invoke_host_port
 from faasmcli.util.exec_graph import parse_exec_graph_json, plot_exec_graph
@@ -48,6 +49,44 @@ def invoke(
         with open(LAST_CALL_ID_FILE, "w") as fh:
             fh.write(str(res))
 
+@task
+def dispatch(
+    ctx,
+    user,
+    func,
+    dispatch_policy=None,
+    input=None,
+    py=False,
+    asynch=False,
+    poll=False,
+    cmdline=None,
+    mpi_world_size=None,
+    debug=False,
+    sgx=False,
+    graph=False,
+):
+    """
+    Invoke a function
+    """
+    res = dispatch_impl(
+        user,
+        func,
+        dispatch_policy=dispatch_policy,
+        input=input,
+        py=py,
+        asynch=asynch,
+        poll=poll,
+        cmdline=cmdline,
+        mpi_world_size=mpi_world_size,
+        debug=debug,
+        sgx=sgx,
+        graph=graph,
+    )
+
+    if asynch:
+        print("Call ID: " + str(res))
+        with open(LAST_CALL_ID_FILE, "w") as fh:
+            fh.write(str(res))
 
 def get_call_id(call_id):
     if not call_id:

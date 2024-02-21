@@ -3,13 +3,18 @@ import pprint
 
 from faasmcli.util.env import PYTHON_USER, PYTHON_FUNC
 from faasmcli.util.http import do_post
-from faasmcli.util.endpoints import get_invoke_host_port
-
+from faasmcli.util.endpoints import get_invoke_host_port, get_worker_addresses
+from faasmcli.util.load_balance_policy import RoundRobinLoadBalancerStrategy, WorkerHashLoadBalancerStrategy
 STATUS_SUCCESS = "SUCCESS"
 STATUS_FAILED = "FAILED"
 STATUS_RUNNING = "RUNNING"
 
 POLL_INTERVAL_MS = 1000
+
+WORKER_ADDRESSES = get_worker_addresses() # Parse the config for list of all local workers in cluster
+ROUND_ROBIN_STRATEGY = RoundRobinLoadBalancerStrategy(WORKER_ADDRESSES) # Create a round robin load balancer strategy
+WORKER_HASH_STRATEGY = WorkerHashLoadBalancerStrategy(WORKER_ADDRESSES) # Create a worker hash load balancer strategy
+
 
 
 def _do_invoke(user, func, host, port, func_type, input=None):
@@ -79,6 +84,83 @@ def invoke_impl(
 ):
     host, port = get_invoke_host_port()
 
+    # Polling always requires asynch
+    if poll:
+        asynch = True
+
+    # Create URL and message
+    url = "http://{}".format(host)
+    if not port == "80":
+        url += ":{}".format(port)
+
+    if py:
+        msg = {
+            "user": PYTHON_USER,
+            "function": PYTHON_FUNC,
+            "async": asynch,
+            "py_user": user,
+            "py_func": func,
+            "python": True,
+        }
+    else:
+        msg = {
+            "user": user,
+            "function": func,
+            "async": asynch,
+        }
+
+    if sgx:
+        msg["sgx"] = sgx
+
+    if input:
+        msg["input_data"] = input
+
+    if cmdline:
+        msg["cmdline"] = cmdline
+
+    if mpi_world_size:
+        msg["mpi_world_size"] = int(mpi_world_size)
+
+    if graph:
+        msg["record_exec_graph"] = graph
+        
+    if forbid_ndp:
+        msg["forbid_ndp"] = forbid_ndp
+
+    print("Invoking function at {}".format(url))
+
+    print("Payload:")
+    pprint.pprint(msg)
+
+    if asynch:
+        return _async_invoke(url, msg, poll=poll, host=host, port=port)
+    else:
+        return do_post(url, msg, json=True, debug=debug)
+
+def dispatch_impl(user,
+                  func,
+                  dispatch_policy=None,
+                  input=None,
+                  py=False,
+                  asynch=False,
+                  poll=False,
+                  cmdline=None,
+                  mpi_world_size=None,
+                  debug=False,
+                  sgx=False,
+                  graph=False,
+                  forbid_ndp=False):
+    
+    # Selection of dispatch policy
+    if dispatch_policy == "round_robin":
+        host = ROUND_ROBIN_STRATEGY.get_next_host(user, func)
+    elif dispatch_policy == "worker_hash":
+        host = WORKER_HASH_STRATEGY.get_next_host(user, func)
+    else:
+        host = ROUND_ROBIN_STRATEGY.get_next_host(user, func)
+        
+    port = get_invoke_host_port()[1]
+    
     # Polling always requires asynch
     if poll:
         asynch = True
