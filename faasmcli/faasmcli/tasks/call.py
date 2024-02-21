@@ -76,9 +76,9 @@ def dispatch(
     """
     
     # Get worker based on policy
-    if dispatch_policy == "round_robin":
+    if policy == "round_robin":
         host = ROUND_ROBIN_STRATEGY.get_next_host(user, func)
-    elif dispatch_policy == "worker_hash":
+    elif policy == "worker_hash":
         host = WORKER_HASH_STRATEGY.get_next_host(user, func)
     else:
         host = ROUND_ROBIN_STRATEGY.get_next_host(user, func)
