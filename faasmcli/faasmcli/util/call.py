@@ -24,10 +24,13 @@ wh_strategy = WorkerHashLoadBalancerStrategy(ret_list)
 
 def get_load_balance_strategy(policy):
     if policy == "round_robin":
+        print("Using round robin strategy")
         return rr_strategy
     elif policy == "worker_hash":
+        print("Using worker hash strategy")
         return wh_strategy
     else:
+        print("Using round robin strategy as default")
         return rr_strategy
 
 def _do_invoke(user, func, host, port, func_type, input=None):
@@ -210,9 +213,8 @@ def dispatch_impl(user,
         
     if forbid_ndp:
         msg["forbid_ndp"] = forbid_ndp
-
+        
     print("Invoking function at {}".format(url))
-
     print("Payload:")
     pprint.pprint(msg)
 

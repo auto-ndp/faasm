@@ -25,6 +25,7 @@ def invoke(
     debug=False,
     sgx=False,
     graph=False,
+    forbid_ndp=False
 ):
     """
     Invoke a function
@@ -41,6 +42,7 @@ def invoke(
         debug=debug,
         sgx=sgx,
         graph=graph,
+        forbid_ndp=forbid_ndp
     )
 
     if asynch:

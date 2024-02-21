@@ -3,7 +3,6 @@ from os.path import dirname, realpath, join, exists, expanduser
 
 from faasmtools.build import FAASM_LOCAL_DIR
 
-
 def _get_dir(variable, default):
     env_val = environ.get(variable)
     return env_val if env_val else default
@@ -35,7 +34,6 @@ FAASM_SGX_MODE_SIM = "Simulation"
 FAASM_SGX_MODE_HARDWARE = "Hardware"
 
 AVAILABLE_HOSTS_SET = "available_hosts"
-
 
 def get_wasm_func_path(user, func_name):
     func_dir = join(WASM_DIR, user, func_name)
