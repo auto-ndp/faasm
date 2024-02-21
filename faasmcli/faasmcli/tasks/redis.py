@@ -1,12 +1,14 @@
 from subprocess import call
 import pickle
 import base64
+import threading
 
 from invoke import task
 from os import environ
 from faasmcli.util.env import PROJ_ROOT, AVAILABLE_HOSTS_SET
 from subprocess import check_output, CalledProcessError
 
+lock = threading.Lock()
 def _do_redis_command(sub_cmd, host, local, docker, k8s):
     redis_host = environ.get(host, "redis")
     if local:
@@ -68,8 +70,8 @@ def upload_load_balancer_state(load_balance_obj, policy, local=False, docker=Fal
     load_balance_obj_str = pickle.dumps(load_balance_obj)
     print(load_balance_obj_str)
     serialised_obj_str = base64.b64encode(load_balance_obj_str).decode('utf-8')
-    
-    _do_redis_command("set {} {}".format(policy, serialised_obj_str), "REDIS_STATE_HOST", local, docker, k8s)
+    with lock:
+        _do_redis_command("set {} {}".format(policy, serialised_obj_str), "REDIS_STATE_HOST", local, docker, k8s)
 
 def get_load_balancer_state(policy, local=False, docker=False, k8s=True):
     print("Fetching load balancer state from Redis for policy: {}".format(policy))
