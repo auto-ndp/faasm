@@ -97,6 +97,47 @@ def get_call_id(call_id):
 
     return call_id
 
+@task
+def batch_execute(
+    ctx,
+    user,
+    func,
+    num_calls,
+    policy=None,
+    input=None,
+    py=False,
+    asynch=False,
+    poll=False,
+    cmdline=None,
+    mpi_world_size=None,
+    debug=False,
+    sgx=False,
+    graph=False,
+):
+    """
+    Invoke a function
+    """
+    for i in range(num_calls):
+        res = dispatch_impl(
+            user,
+            func,
+            policy=policy,
+            input=input,
+            py=py,
+            asynch=asynch,
+            poll=poll,
+            cmdline=cmdline,
+            mpi_world_size=mpi_world_size,
+            debug=debug,
+            sgx=sgx,
+            graph=graph,
+        )
+    
+        if asynch:
+            print("Call ID: " + str(res))
+            with open(LAST_CALL_ID_FILE, "w") as fh:
+                fh.write(str(res))
+
 
 @task
 def status(ctx, call_id=None):
