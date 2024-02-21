@@ -480,7 +480,7 @@ services:
       - redis-queue
     environment:
       - UPLOAD_HOST=${UPLOAD_HOST:-upload}
-      - INVOKE_HOST=${INVOKE_HOST:-worker}
+      - INVOKE_HOST=${INVOKE_HOST:-worker-0}
       - LOG_LEVEL=${LOG_LEVEL:-debug}
       - REDIS_QUEUE_HOST=redis-queue
       - REDIS_STATE_HOST=redis-state
