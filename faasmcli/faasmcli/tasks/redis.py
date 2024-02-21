@@ -51,7 +51,10 @@ def all_workers(ctx, local=False, docker=False, k8s=True):
     )
     # format the output into a list
     ret_list = ret_str.split("\n")
-    print(ret_list)
+    
+    # Remove empty strings
+    ret_list = list(filter(None, ret_list))
+    return ret_list
 
 
 @task
