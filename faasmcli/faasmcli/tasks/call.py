@@ -6,9 +6,10 @@ from faasmcli.util.call import (
     exec_graph_call_impl,
     dispatch_impl
 )
-from faasmcli.util.endpoints import get_invoke_host_port, get_worker_addresses
+from faasmcli.util.endpoints import get_invoke_host_port
 from faasmcli.util.exec_graph import parse_exec_graph_json, plot_exec_graph
 from faasmcli.util.load_balance_policy import RoundRobinLoadBalancerStrategy, WorkerHashLoadBalancerStrategy
+from faasmcli.tasks.redis import all_workers
 
 LAST_CALL_ID_FILE = "/tmp/faasm_last_call.txt"
 
