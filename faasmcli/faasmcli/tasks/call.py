@@ -13,9 +13,9 @@ from faasmcli.tasks.redis import all_workers
 
 LAST_CALL_ID_FILE = "/tmp/faasm_last_call.txt"
 
-WORKER_ADDRESSES = get_worker_addresses() # Parse the config for list of all local workers in cluster
-round_robin_strategy = RoundRobinLoadBalancerStrategy(WORKER_ADDRESSES) # Create a round robin load balancer strategy
-worker_hash_strategy = WorkerHashLoadBalancerStrategy(WORKER_ADDRESSES) # Create a worker hash load balancer strategy
+# WORKER_ADDRESSES = get_worker_addresses() # Parse the config for list of all local workers in cluster
+# round_robin_strategy = RoundRobinLoadBalancerStrategy(WORKER_ADDRESSES) # Create a round robin load balancer strategy
+# worker_hash_strategy = WorkerHashLoadBalancerStrategy(WORKER_ADDRESSES) # Create a worker hash load balancer strategy
 
 
 
@@ -77,13 +77,14 @@ def dispatch(
     """
     
     # Get worker based on policy
-    if policy == "round_robin":
-        host = round_robin_strategy.get_next_host(user, func)
-    elif policy == "worker_hash":
-        host = worker_hash_strategy.get_next_host(user, func)
-    else:
-        host = round_robin_strategy.get_next_host(user, func)
+    # if policy == "round_robin":
+    #     host = round_robin_strategy.get_next_host(user, func)
+    # elif policy == "worker_hash":
+    #     host = worker_hash_strategy.get_next_host(user, func)
+    # else:
+    #     host = round_robin_strategy.get_next_host(user, func)
     
+    host="worker-0"
     print("Dispatching to worker: {}".format(host))
     port = 8080 # default invoke port
     res = dispatch_impl(
