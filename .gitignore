@@ -5,7 +5,7 @@ dev/
 perf/
 work/
 
-faasm.ini
+# faasm.ini
 perf.data
 perf.data.*
 /wrk-*.lua
