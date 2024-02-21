@@ -180,7 +180,8 @@ def dispatch_impl(user,
     balancer = get_load_balance_strategy(policy)
     host = balancer.get_next_host(user, func)
     
-    upload_load_balancer_state(balancer, policy, docker=True) # Allows the load balancer to keep state between calls
+    if (policy != "worker_hash"):
+        upload_load_balancer_state(balancer, policy, docker=True) # Allows the load balancer to keep state between calls
     
     port = 8080 # default invoke port
     # Polling always requires asynch
