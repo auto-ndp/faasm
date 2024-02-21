@@ -131,8 +131,6 @@ def dispatch_impl(ctx,
                   sgx=False,
                   graph=False,
                   forbid_ndp=False):
-    
-    ctx.config
     balancer = get_load_balance_strategy(policy)
     host = balancer.get_next_host(user, func)
     
