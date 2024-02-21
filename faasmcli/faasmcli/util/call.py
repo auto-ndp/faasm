@@ -5,7 +5,7 @@ from faasmcli.util.env import PYTHON_USER, PYTHON_FUNC, AVAILABLE_HOSTS_SET
 
 from faasmcli.util.http import do_post
 from faasmcli.util.endpoints import get_invoke_host_port
-from faasmcli.tasks.redis import _do_redis_command
+from faasmcli.tasks.redis import all_workers
 from faasmcli.util.load_balance_policy import RoundRobinLoadBalancerStrategy, WorkerHashLoadBalancerStrategy
 
 STATUS_SUCCESS = "SUCCESS"
@@ -14,12 +14,10 @@ STATUS_RUNNING = "RUNNING"
 
 POLL_INTERVAL_MS = 1000
 
-worker_address_cmd_str = _do_redis_command("smembers {}".format(AVAILABLE_HOSTS_SET), False, True, True)
-ret_list = list(filter(None, worker_address_cmd_str.split("\n")))
-print("WORKER_ADDRESSES: {}".format(ret_list))
+worker_list = all_workers()
 
-rr_strategy = RoundRobinLoadBalancerStrategy(ret_list)
-wh_strategy = WorkerHashLoadBalancerStrategy(ret_list)
+rr_strategy = RoundRobinLoadBalancerStrategy(workers=worker_list)
+wh_strategy = WorkerHashLoadBalancerStrategy(workers=worker_list)
 
 
 def get_load_balance_strategy(policy):
