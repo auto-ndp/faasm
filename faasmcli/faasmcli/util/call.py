@@ -11,11 +11,6 @@ STATUS_RUNNING = "RUNNING"
 
 POLL_INTERVAL_MS = 1000
 
-WORKER_ADDRESSES = get_worker_addresses() # Parse the config for list of all local workers in cluster
-ROUND_ROBIN_STRATEGY = RoundRobinLoadBalancerStrategy(WORKER_ADDRESSES) # Create a round robin load balancer strategy
-WORKER_HASH_STRATEGY = WorkerHashLoadBalancerStrategy(WORKER_ADDRESSES) # Create a worker hash load balancer strategy
-
-
 
 def _do_invoke(user, func, host, port, func_type, input=None):
     url = "http://{}:{}/{}/{}/{}".format(host, port, func_type, user, func)
@@ -139,6 +134,8 @@ def invoke_impl(
 
 def dispatch_impl(user,
                   func,
+                  host,
+                  port,
                   dispatch_policy=None,
                   input=None,
                   py=False,
@@ -150,16 +147,6 @@ def dispatch_impl(user,
                   sgx=False,
                   graph=False,
                   forbid_ndp=False):
-    
-    # Selection of dispatch policy
-    if dispatch_policy == "round_robin":
-        host = ROUND_ROBIN_STRATEGY.get_next_host(user, func)
-    elif dispatch_policy == "worker_hash":
-        host = WORKER_HASH_STRATEGY.get_next_host(user, func)
-    else:
-        host = ROUND_ROBIN_STRATEGY.get_next_host(user, func)
-        
-    port = get_invoke_host_port()[1]
     
     # Polling always requires asynch
     if poll:

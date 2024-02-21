@@ -6,10 +6,16 @@ from faasmcli.util.call import (
     exec_graph_call_impl,
     dispatch_impl
 )
-from faasmcli.util.endpoints import get_invoke_host_port
+from faasmcli.util.endpoints import get_invoke_host_port, get_worker_addresses()
 from faasmcli.util.exec_graph import parse_exec_graph_json, plot_exec_graph
+from faasmcli.util.load_balance_policy import RoundRobinLoadBalancerStrategy, WorkerHashLoadBalancerStrategy
 
 LAST_CALL_ID_FILE = "/tmp/faasm_last_call.txt"
+
+WORKER_ADDRESSES = get_worker_addresses() # Parse the config for list of all local workers in cluster
+ROUND_ROBIN_STRATEGY = RoundRobinLoadBalancerStrategy(WORKER_ADDRESSES) # Create a round robin load balancer strategy
+WORKER_HASH_STRATEGY = WorkerHashLoadBalancerStrategy(WORKER_ADDRESSES) # Create a worker hash load balancer strategy
+
 
 
 @task(default=True)
@@ -68,9 +74,21 @@ def dispatch(
     """
     Invoke a function
     """
+    
+    # Get worker based on policy
+    if dispatch_policy == "round_robin":
+        host = ROUND_ROBIN_STRATEGY.get_next_host(user, func)
+    elif dispatch_policy == "worker_hash":
+        host = WORKER_HASH_STRATEGY.get_next_host(user, func)
+    else:
+        host = ROUND_ROBIN_STRATEGY.get_next_host(user, func)
+        
+    port = get_invoke_host_port()[1]
     res = dispatch_impl(
         user,
         func,
+        host,
+        port,
         dispatch_policy=dispatch_policy,
         input=input,
         py=py,
