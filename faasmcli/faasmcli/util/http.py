@@ -22,5 +22,8 @@ def do_post(url, input, headers=None, quiet=False, json=False, debug=False):
         print(response.text)
     elif not quiet:
         print("Empty response")
-
+    
+    if debug:
+        print("Latency: {}s".format(response.elapsed.total_seconds()))
+        
     return response.text
