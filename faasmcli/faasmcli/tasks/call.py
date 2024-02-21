@@ -9,12 +9,14 @@ from faasmcli.util.call import (
 from faasmcli.util.endpoints import get_invoke_host_port
 from faasmcli.util.exec_graph import parse_exec_graph_json, plot_exec_graph
 from faasmcli.util.load_balance_policy import RoundRobinLoadBalancerStrategy, WorkerHashLoadBalancerStrategy
-from faasmcli.tasks.redis import all_workers
+from faasmcli.tasks.redis import _do_redis_command
+from faasmcli.util.env import AVAILABLE_HOSTS_SET
 
 LAST_CALL_ID_FILE = "/tmp/faasm_last_call.txt"
 
-WORKER_ADDRESSES = all_workers(docker=True) # Parse the config for list of all local workers in cluster
-print("WORKER_ADDRESSES: {}".format(WORKER_ADDRESSES))
+worker_address_cmd_str = _do_redis_command("smembers {}".format(AVAILABLE_HOSTS_SET), False, True, True)
+ret_list = list(filter(None, worker_address_cmd_str.split("\n")))
+print("WORKER_ADDRESSES: {}".format(ret_list))
 # round_robin_strategy = RoundRobinLoadBalancerStrategy(WORKER_ADDRESSES) # Create a round robin load balancer strategy
 # worker_hash_strategy = WorkerHashLoadBalancerStrategy(WORKER_ADDRESSES) # Create a worker hash load balancer strategy
 
