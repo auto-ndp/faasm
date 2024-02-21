@@ -46,9 +46,10 @@ def all_workers(ctx, local=False, docker=False, k8s=True):
     """
     List all available Faasm instances
     """
-    _do_redis_command(
+    ret_str = _do_redis_command(
         "smembers {}".format(AVAILABLE_HOSTS_SET), local, docker, k8s
     )
+    print("Available hosts: {}".format(ret_str))
 
 
 @task
