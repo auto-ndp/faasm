@@ -102,7 +102,7 @@ def batch_execute(
     ctx,
     user,
     func,
-    num_calls,
+    num_calls=10,
     policy=None,
     input=None,
     py=False,
@@ -117,7 +117,7 @@ def batch_execute(
     """
     Invoke a function
     """
-    for i in range(num_calls):
+    for i in range(int(num_calls)):
         res = dispatch_impl(
             user,
             func,
@@ -132,7 +132,7 @@ def batch_execute(
             sgx=sgx,
             graph=graph,
         )
-    
+
         if asynch:
             print("Call ID: " + str(res))
             with open(LAST_CALL_ID_FILE, "w") as fh:
