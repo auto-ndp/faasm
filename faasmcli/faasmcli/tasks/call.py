@@ -8,15 +8,7 @@ from faasmcli.util.call import (
 )
 from faasmcli.util.endpoints import get_invoke_host_port
 from faasmcli.util.exec_graph import parse_exec_graph_json, plot_exec_graph
-from faasmcli.util.load_balance_policy import RoundRobinLoadBalancerStrategy, WorkerHashLoadBalancerStrategy
-from faasmcli.tasks.redis import _do_redis_command
-from faasmcli.util.env import AVAILABLE_HOSTS_SET
-
 LAST_CALL_ID_FILE = "/tmp/faasm_last_call.txt"
-
-# round_robin_strategy = RoundRobinLoadBalancerStrategy(WORKER_ADDRESSES) # Create a round robin load balancer strategy
-# worker_hash_strategy = WorkerHashLoadBalancerStrategy(WORKER_ADDRESSES) # Create a worker hash load balancer strategy
-
 
 
 @task(default=True, name="invoke")
@@ -75,14 +67,6 @@ def dispatch(
     """
     Invoke a function
     """
-    
-    # Get worker based on policy
-    # if policy == "round_robin":
-    #     host = round_robin_strategy.get_next_host(user, func)
-    # elif policy == "worker_hash":
-    #     host = worker_hash_strategy.get_next_host(user, func)
-    # else:
-    #     host = round_robin_strategy.get_next_host(user, func)
     res = dispatch_impl(
         user,
         func,
