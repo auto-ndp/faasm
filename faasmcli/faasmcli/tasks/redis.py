@@ -69,9 +69,7 @@ def upload_load_balancer_state(load_balance_obj, policy, local=False, docker=Fal
     print(load_balance_obj_str)
     serialised_obj_str = base64.b64encode(load_balance_obj_str).decode('utf-8')
     
-    result_obj_str = _do_redis_command(
-        "set {} {}".format(policy, serialised_obj_str), "REDIS_STATE_HOST", local, docker, k8s
-    )
+    _do_redis_command("set {} {}".format(policy, serialised_obj_str), "REDIS_STATE_HOST", local, docker, k8s)
 
 def get_load_balancer_state(policy, local=False, docker=False, k8s=True):
     print("Fetching load balancer state from Redis for policy: {}".format(policy))
@@ -81,7 +79,6 @@ def get_load_balancer_state(policy, local=False, docker=False, k8s=True):
         return None
     
     serialied_obj = base64.b64decode(result_obj_str)
-    print(serialied_obj)
     return pickle.loads(serialied_obj)
 
 @task
