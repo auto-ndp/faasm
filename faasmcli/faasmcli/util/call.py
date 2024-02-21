@@ -6,6 +6,8 @@ from faasmcli.util.env import PYTHON_USER, PYTHON_FUNC, AVAILABLE_HOSTS_SET
 from faasmcli.util.http import do_post
 from faasmcli.util.endpoints import get_invoke_host_port
 from faasmcli.tasks.redis import _do_redis_command
+from faasmcli.util.load_balance_policy import RoundRobinLoadBalancerStrategy, WorkerHashLoadBalancerStrategy
+
 STATUS_SUCCESS = "SUCCESS"
 STATUS_FAILED = "FAILED"
 STATUS_RUNNING = "RUNNING"
@@ -15,6 +17,9 @@ POLL_INTERVAL_MS = 1000
 worker_address_cmd_str = _do_redis_command("smembers {}".format(AVAILABLE_HOSTS_SET), False, True, True)
 ret_list = list(filter(None, worker_address_cmd_str.split("\n")))
 print("WORKER_ADDRESSES: {}".format(ret_list))
+
+rr_strategy = RoundRobinLoadBalancerStrategy(ret_list)
+wh_strategy = WorkerHashLoadBalancerStrategy(ret_list)
 
 def _do_invoke(user, func, host, port, func_type, input=None):
     url = "http://{}:{}/{}/{}/{}".format(host, port, func_type, user, func)
@@ -138,8 +143,7 @@ def invoke_impl(
 
 def dispatch_impl(user,
                   func,
-                  host,
-                  port,
+                  policy="round_robin",
                   input=None,
                   py=False,
                   asynch=False,
@@ -151,6 +155,14 @@ def dispatch_impl(user,
                   graph=False,
                   forbid_ndp=False):
     
+    if policy == "round_robin":
+        host = rr_strategy.get_next_host(user, func)
+    elif policy == "worker_hash":
+        host = wh_strategy.get_next_host(user, func)
+    else:
+        host = rr_strategy.get_next_host(user, func)
+    
+    port = 8080 # default invoke port
     # Polling always requires asynch
     if poll:
         asynch = True

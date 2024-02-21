@@ -83,15 +83,10 @@ def dispatch(
     #     host = worker_hash_strategy.get_next_host(user, func)
     # else:
     #     host = round_robin_strategy.get_next_host(user, func)
-    
-    host="worker-0"
-    print("Dispatching to worker: {}".format(host))
-    port = 8080 # default invoke port
     res = dispatch_impl(
         user,
         func,
-        host,
-        port,
+        policy=policy,
         input=input,
         py=py,
         asynch=asynch,
