@@ -36,3 +36,4 @@ class WorkerHashLoadBalancerStrategy(ILoadBalanceStrategy):
 
         #Return the worker ID
         return self.workers[worker_index]
+

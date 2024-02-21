@@ -21,6 +21,15 @@ print("WORKER_ADDRESSES: {}".format(ret_list))
 rr_strategy = RoundRobinLoadBalancerStrategy(ret_list)
 wh_strategy = WorkerHashLoadBalancerStrategy(ret_list)
 
+
+def get_load_balance_strategy(policy):
+    if policy == "round_robin":
+        return rr_strategy
+    elif policy == "worker_hash":
+        return wh_strategy
+    else:
+        return rr_strategy
+
 def _do_invoke(user, func, host, port, func_type, input=None):
     url = "http://{}:{}/{}/{}/{}".format(host, port, func_type, user, func)
     print("Invoking {}".format(url))
@@ -155,12 +164,8 @@ def dispatch_impl(user,
                   graph=False,
                   forbid_ndp=False):
     
-    if policy == "round_robin":
-        host = rr_strategy.get_next_host(user, func)
-    elif policy == "worker_hash":
-        host = wh_strategy.get_next_host(user, func)
-    else:
-        host = rr_strategy.get_next_host(user, func)
+    balancer = get_load_balance_strategy(policy)
+    host = balancer.get_next_host(user, func)
     
     port = 8080 # default invoke port
     # Polling always requires asynch
