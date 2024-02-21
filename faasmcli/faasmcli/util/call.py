@@ -23,13 +23,25 @@ wh_strategy = WorkerHashLoadBalancerStrategy(workers=worker_list)
 def get_load_balance_strategy(policy):
     if policy == "round_robin":
         print("Using round robin strategy")
-        return get_load_balancer_state(policy, local=False, docker=True, k8s=True)
+        obj = get_load_balancer_state(policy, local=False, docker=True, k8s=True)
+        if obj is None:
+            return RoundRobinLoadBalancerStrategy(workers=worker_list)
+        else:
+            return obj
     elif policy == "worker_hash":
         print("Using worker hash strategy")
-        return get_load_balancer_state(policy, local=False, docker=True, k8s=True)
+        obj = get_load_balancer_state(policy, local=False, docker=True, k8s=True)
+        if obj is None:
+            return WorkerHashLoadBalancerStrategy(workers=worker_list)
+        else:
+            return obj
     else:
         print("Using round robin strategy as default")
-        return get_load_balancer_state("round_robin", local=False, docker=True, k8s=True)
+        obj = get_load_balancer_state("round_robin", local=False, docker=True, k8s=True)
+        if obj is None:
+            return RoundRobinLoadBalancerStrategy(workers=worker_list)
+        else:
+            return obj
 
 def _do_invoke(user, func, host, port, func_type, input=None):
     url = "http://{}:{}/{}/{}/{}".format(host, port, func_type, user, func)
