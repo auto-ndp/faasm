@@ -73,6 +73,7 @@ def get_load_balancer_state(policy, local=False, docker=False, k8s=True):
     result_obj_str = _do_redis_command(
         "get {}".format(policy), "REDIS_STATE_HOST", local, docker, k8s)
     
+    print(result_obj_str)
     return pickle.loads(result_obj_str)
 
 @task
