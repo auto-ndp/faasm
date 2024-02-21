@@ -77,6 +77,7 @@ def get_load_balancer_state(policy, local=False, docker=False, k8s=True):
     result_obj_str = _do_redis_command(
         "get {}".format(policy), "REDIS_STATE_HOST", local, docker, k8s)
     print(result_obj_str)
+    print("Length of result_obj_str: ", len(result_obj_str))
     serialied_obj = base64.b64decode(result_obj_str)
     print(serialied_obj)
     return pickle.loads(serialied_obj)
