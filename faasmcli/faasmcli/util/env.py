@@ -2,7 +2,7 @@ from os import makedirs, environ
 from os.path import dirname, realpath, join, exists, expanduser
 
 from faasmtools.build import FAASM_LOCAL_DIR
-from load_balance_policy import RoundRobinLoadBalancerStrategy, WorkerHashLoadBalancerStrategy
+from faasmcli.util.load_balance_policy import RoundRobinLoadBalancerStrategy, WorkerHashLoadBalancerStrategy
 from endpoints import get_worker_addresses
 
 def _get_dir(variable, default):
