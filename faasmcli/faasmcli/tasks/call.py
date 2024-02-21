@@ -18,7 +18,7 @@ worker_hash_strategy = WorkerHashLoadBalancerStrategy(WORKER_ADDRESSES) # Create
 
 
 
-@task(default=True)
+@task(default=True, name="invoke")
 def invoke(
     ctx,
     user,
