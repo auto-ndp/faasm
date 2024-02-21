@@ -117,7 +117,7 @@ def batch_execute(
     """
     Invoke a function
     """
-    for i in range(int(num_calls)):
+    for i in range(int(iters)):
         res = dispatch_impl(
             user,
             func,
