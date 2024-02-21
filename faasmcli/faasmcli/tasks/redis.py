@@ -27,7 +27,6 @@ def _do_redis_command(sub_cmd, host, local, docker, k8s):
         cmd = ["redis-cli", sub_cmd]
 
     cmd_string = " ".join(cmd)
-    print(cmd_string)
     try:
         output = check_output(cmd_string, shell=True, cwd=PROJ_ROOT)
         return output.decode('utf-8')
