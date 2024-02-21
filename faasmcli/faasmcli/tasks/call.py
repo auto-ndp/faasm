@@ -14,9 +14,6 @@ from faasmcli.util.env import AVAILABLE_HOSTS_SET
 
 LAST_CALL_ID_FILE = "/tmp/faasm_last_call.txt"
 
-worker_address_cmd_str = _do_redis_command("smembers {}".format(AVAILABLE_HOSTS_SET), False, True, True)
-ret_list = list(filter(None, worker_address_cmd_str.split("\n")))
-print("WORKER_ADDRESSES: {}".format(ret_list))
 # round_robin_strategy = RoundRobinLoadBalancerStrategy(WORKER_ADDRESSES) # Create a round robin load balancer strategy
 # worker_hash_strategy = WorkerHashLoadBalancerStrategy(WORKER_ADDRESSES) # Create a worker hash load balancer strategy
 
