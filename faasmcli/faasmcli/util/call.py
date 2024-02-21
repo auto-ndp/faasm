@@ -23,13 +23,13 @@ wh_strategy = WorkerHashLoadBalancerStrategy(workers=worker_list)
 def get_load_balance_strategy(policy):
     if policy == "round_robin":
         print("Using round robin strategy")
-        return get_load_balancer_state(policy, local=False, docker=True, k8s=True)
+        return get_load_balancer_state(policy,docker=True)
     elif policy == "worker_hash":
         print("Using worker hash strategy")
-        return get_load_balance_strategy(policy, local=False, docker=True, k8s=True)
+        return get_load_balance_strategy(policy, docker=True)
     else:
         print("Using round robin strategy as default")
-        return get_load_balance_strategy("round_robin", local=False, docker=True, k8s=True)
+        return get_load_balance_strategy("round_robin", docker=True)
 
 def _do_invoke(user, func, host, port, func_type, input=None):
     url = "http://{}:{}/{}/{}/{}".format(host, port, func_type, user, func)
@@ -168,7 +168,7 @@ def dispatch_impl(user,
     balancer = get_load_balance_strategy(policy)
     host = balancer.get_next_host(user, func)
     
-    upload_load_balancer_state(balancer, policy, local=False, docker=True, k8s=True) # Allows the load balancer to keep state between calls
+    upload_load_balancer_state(balancer, policy, docker=True) # Allows the load balancer to keep state between calls
     
     port = 8080 # default invoke port
     # Polling always requires asynch
