@@ -49,7 +49,9 @@ def all_workers(ctx, local=False, docker=False, k8s=True):
     ret_str = _do_redis_command(
         "smembers {}".format(AVAILABLE_HOSTS_SET), local, docker, k8s
     )
-    print("Available hosts: {}".format(ret_str))
+    # format the output into a list
+    ret_list = ret_str.split("\n")
+    print(ret_list)
 
 
 @task
