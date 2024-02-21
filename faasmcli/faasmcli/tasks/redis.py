@@ -1,5 +1,6 @@
 from subprocess import call
 import pickle
+import base64
 
 from invoke import task
 from os import environ
@@ -65,16 +66,19 @@ def upload_load_balancer_state(load_balance_obj, policy, local=False, docker=Fal
     
     # Serialize the object to a string
     load_balance_obj_str = pickle.dumps(load_balance_obj)
+    
+    serialised_obj_str = base64.b64encode(load_balance_obj_str).decode('utf-8')
+    
     result_obj_str = _do_redis_command(
-        "set {} {}".format(policy, load_balance_obj_str), "REDIS_STATE_HOST", local, docker, k8s
+        "set {} {}".format(policy, serialised_obj_str), "REDIS_STATE_HOST", local, docker, k8s
     )
 
 def get_load_balancer_state(policy, local=False, docker=False, k8s=True):
     result_obj_str = _do_redis_command(
         "get {}".format(policy), "REDIS_STATE_HOST", local, docker, k8s)
     
-    print(result_obj_str)
-    return pickle.loads(result_obj_str)
+    serialied_obj = base64.b64decode(result_obj_str)
+    return pickle.loads(serialied_obj)
 
 @task
 def func_workers(ctx, user, func, local=False, docker=False, k8s=True):
