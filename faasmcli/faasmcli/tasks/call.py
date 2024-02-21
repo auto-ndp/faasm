@@ -52,7 +52,7 @@ def dispatch(
     ctx,
     user,
     func,
-    dispatch_policy=None,
+    policy=None,
     input=None,
     py=False,
     asynch=False,
@@ -69,7 +69,7 @@ def dispatch(
     res = dispatch_impl(
         user,
         func,
-        dispatch_policy=dispatch_policy,
+        policy=policy,
         input=input,
         py=py,
         asynch=asynch,
