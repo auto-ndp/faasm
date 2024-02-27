@@ -4,10 +4,18 @@ from faasmcli.util.call import (
     invoke_impl,
     status_call_impl,
     exec_graph_call_impl,
-    dispatch_impl
+    dispatch_impl,
+    get_load_balance_strategy,
+    upload_load_balancer_state,
+    do_post,
 )
 from faasmcli.util.endpoints import get_invoke_host_port
 from faasmcli.util.exec_graph import parse_exec_graph_json, plot_exec_graph
+
+import time
+import aiohttp
+import asyncio
+import threading
 LAST_CALL_ID_FILE = "/tmp/faasm_last_call.txt"
 
 @task(default=True)
@@ -119,31 +127,80 @@ def batch_execute(
     sgx=False,
     graph=False,
 ):
-    """
-    Invoke a function
-    """
-    for i in range(int(iters)):
-        res = dispatch_impl(
-            user,
-            func,
-            policy=policy,
-            input=input,
-            py=py,
-            asynch=asynch,
-            poll=poll,
-            cmdline=cmdline,
-            mpi_world_size=mpi_world_size,
-            debug=debug,
-            sgx=sgx,
-            graph=graph,
-            forbid_ndp=forbid_ndp
-        )
 
-        if asynch:
-            print("Call ID: " + str(res))
-            with open(LAST_CALL_ID_FILE, "w") as fh:
-                fh.write(str(res))
+    if poll:
+        asynch = True
+        
+    msg = {
+        "user": user,
+        "function": func,
+        "async": asynch,
+    }
 
+    if sgx:
+        msg["sgx"] = sgx
+
+    if input:
+        msg["input_data"] = input
+
+    if cmdline:
+        msg["cmdline"] = cmdline
+
+    if mpi_world_size:
+        msg["mpi_world_size"] = int(mpi_world_size)
+
+    if graph:
+        msg["record_exec_graph"] = graph
+        
+    if forbid_ndp:
+        msg["forbid_ndp"] = forbid_ndp
+    print("Payload:")
+    return batch_async_aiohttp(msg, {"Content-Type": "application/json"}, policy, iters)
+
+def batch_async_aiohttp(msg, headers, selected_balancer, n):
+    ITERATIONS = int(n)
+    results = []
+    for i in range(1, ITERATIONS):
+        latencies = []
+        start_time = time.perf_counter()
+        print("Running a batch of size: ", i)
+        latencies = asyncio.run(batch_send(msg, headers, i, selected_balancer))
+        end_time = time.perf_counter()
+        print("Time taken to run batch: ", end_time - start_time)
+        
+        result_dict = {
+            "batch_size": i,
+            "mean_latency" : sum(latencies)/len(latencies),
+            "median_latency": sorted(latencies)[len(latencies)//2],
+            "time_taken": end_time - start_time            
+        }
+        
+        print("Result: ", result_dict)
+        results.append(result_dict)
+    print("Done running batches")
+    return results
+
+
+async def batch_send(data, headers, n, selected_balancer):
+    async with aiohttp.ClientSession() as session:
+        tasks = []
+        for _ in range(n):
+            with threading.Lock():
+                balancer = get_load_balance_strategy(selected_balancer)
+                worker_id = balancer.get_next_host(data["user"], data["function"])
+                url = "http://{}:{}/f/".format(worker_id, 8080)
+                tasks.append(dispatch_func_async(session, url, data, headers))
+                upload_load_balancer_state(balancer, selected_balancer, docker=True) # Allows the load balancer to keep state between calls
+            await asyncio.sleep(1/n)
+        responses= await asyncio.gather(*tasks)
+    return responses
+
+async def dispatch_func_async(session, url, data, headers):
+    start_time = time.perf_counter()
+    async with session.post(url, json=data, headers=headers) as response:
+        end_time = time.perf_counter()
+        await response.text()
+        return end_time - start_time
 
 @task
 def status(ctx, call_id=None):
