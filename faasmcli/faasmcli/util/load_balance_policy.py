@@ -7,6 +7,10 @@ class ILoadBalanceStrategy(ABC):
     def get_next_host(self, user=None, func_name=None):
         pass
     
+    @abstractmethod
+    def get_num_workers(self):
+        pass
+    
 
 class RoundRobinLoadBalancerStrategy(ILoadBalanceStrategy):
     def __init__(self, workers):
@@ -16,6 +20,9 @@ class RoundRobinLoadBalancerStrategy(ILoadBalanceStrategy):
         
     def get_next_host(self, user=None, func_name=None):
         return next(self.worker_iterator)
+    
+    def get_num_workers(self):
+        return len(self.workers)
     
 class WorkerHashLoadBalancerStrategy(ILoadBalanceStrategy):
     def __init__(self, workers):
@@ -31,3 +38,5 @@ class WorkerHashLoadBalancerStrategy(ILoadBalanceStrategy):
         #Return the worker ID
         return self.workers[worker_index]
 
+    def get_num_workers(self):
+        return len(self.workers)

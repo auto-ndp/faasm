@@ -28,6 +28,8 @@ def get_load_balance_strategy(policy):
         if obj is None:
             return rr_strategy
         else:
+            if obj.get_num_workers() != len(worker_list):
+                return rr_strategy # Use local strategy
             return obj
     elif policy == "worker_hash":
         print("Using worker hash strategy")
@@ -35,6 +37,8 @@ def get_load_balance_strategy(policy):
         if obj is None:
             return wh_strategy
         else:
+            if obj.get_num_workers() != len(worker_list):
+                return wh_strategy
             return obj
     else:
         print("Using round robin strategy as default")
