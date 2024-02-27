@@ -83,6 +83,7 @@ node7=$(docker node ls | grep -w 'node-7' | awk '{print $1;}')
 node8=$(docker node ls | grep -w 'node-8' | awk '{print $1;}')
 node9=$(docker node ls | grep -w 'node-9' | awk '{print $1;}')
 node10=$(docker node ls | grep -w 'node-10' | awk '{print $1;}')
+node11=$(docker node ls | grep -w 'node-11' | awk '{print $1;}')
 
 docker node update --label-add rank=leader ${node0}
 docker node update --label-add type=storage ${node0}
@@ -100,22 +101,25 @@ docker node update --label-add name=storage3 ${node3}
 docker node update --label-add type=storage ${node4}
 docker node update --label-add name=storage4 ${node4}
 
-docker node update --label-add type=compute ${node5}
-docker node update --label-add name=compute0 ${node5}
+docker node update --label-add type=storage ${node5}
+docker node update --label-add name=storage5 ${node5}
 
 docker node update --label-add type=compute ${node6}
-docker node update --label-add name=compute1 ${node6}
+docker node update --label-add name=compute0 ${node6}
 
 docker node update --label-add type=compute ${node7}
-docker node update --label-add name=compute2 ${node7}
+docker node update --label-add name=compute1 ${node7}
 
 docker node update --label-add type=compute ${node8}
-docker node update --label-add name=compute3 ${node8}
+docker node update --label-add name=compute2 ${node8}
 
 docker node update --label-add type=compute ${node9}
-docker node update --label-add name=compute4 ${node9}
+docker node update --label-add name=compute3 ${node9}
 
-docker node update --label-add type=loadgen ${node10}
+docker node update --label-add type=compute ${node10}
+docker node update --label-add name=compute4 ${node10}
+
+docker node update --label-add type=loadgen ${node11}
 ```
 
 Inspect the node labels to see if they have been labelled correctly.
