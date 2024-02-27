@@ -46,7 +46,7 @@ def clear_queue(ctx, local=False, docker=False, k8s=True):
 
 
 @task
-def all_workers(ctx, local=False, docker=False, k8s=True):
+def all_workers(local=False, docker=False, k8s=True):
     """
     List all available Faasm instances
     """
