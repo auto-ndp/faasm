@@ -798,8 +798,7 @@ int S3Wrapper::asyncNdpCall(const std::string& bucketName,
 
     rados_aio_wait_for_complete(completion);
     rados_aio_release(completion);
-
-    rados_ioctx_destroy(ioctx);
+    
     // return completion;
     return ec;
 }
