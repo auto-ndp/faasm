@@ -376,18 +376,6 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
 
         SPDLOG_DEBUG("[ndp_objects] Making async NDP call to Ceph");
         SPDLOG_DEBUG("[ndp_objects] S3 Args: user=faasm, key={}, bucket={}, function=maybe_exec_wasm_ro", keyStr, call->user());
-        // try {
-        //     cephEc = s3w.asyncNdpCall(call->user(),
-        //                               keyStr,
-        //                               "faasm",
-        //                               "maybe_exec_wasm_ro",
-        //                               inputSpan,
-        //                               cephOutput);
-// 
-        // } catch (const std::exception& e) {
-        //     SPDLOG_ERROR("asyncNdpCall threw exception: {}", e.what());
-        //     throw;
-        // }
         
         SPDLOG_DEBUG("asyncNdpCall returned {}", cephEc);
 

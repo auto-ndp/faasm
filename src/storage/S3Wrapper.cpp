@@ -742,25 +742,25 @@ int S3Wrapper::asyncNdpCall(const std::string& bucketName,
         throw std::runtime_error("Pool does not have an ioctx.");
     }   
 
-    rados_completion_t completion;
-    rados_aio_create_completion(nullptr, nullptr, completion_callback, &completion);
-    int ec = rados_aio_exec(pool->ioctx,
-                            keyName.c_str(),
-                            completion,
-                            funcClass.c_str(),
-                            funcName.c_str(),
-                            reinterpret_cast<const char*>(inputData.data()),
-                            inputData.size(),
-                            reinterpret_cast<char*>(outputBuffer.data()),
-                            outputBuffer.size());
-    // int ec = rados_exec(pool->ioctx,
-    //                     keyName.c_str(),
-    //                     funcClass.c_str(),
-    //                     funcName.c_str(),
-    //                     reinterpret_cast<const char*>(inputData.data()),
-    //                     inputData.size(),
-    //                     reinterpret_cast<char*>(outputBuffer.data()),
-    //                     outputBuffer.size());
+    // rados_completion_t completion;
+    // rados_aio_create_completion(nullptr, nullptr, completion_callback, &completion);
+    // int ec = rados_aio_exec(pool->ioctx,
+    //                         keyName.c_str(),
+    //                         completion,
+    //                         funcClass.c_str(),
+    //                         funcName.c_str(),
+    //                         reinterpret_cast<const char*>(inputData.data()),
+    //                         inputData.size(),
+    //                         reinterpret_cast<char*>(outputBuffer.data()),
+    //                         outputBuffer.size());
+    int ec = rados_exec(pool->ioctx,
+                        keyName.c_str(),
+                        funcClass.c_str(),
+                        funcName.c_str(),
+                        reinterpret_cast<const char*>(inputData.data()),
+                        inputData.size(),
+                        reinterpret_cast<char*>(outputBuffer.data()),
+                        outputBuffer.size());
 
     if (ec < 0) {
 
@@ -796,9 +796,8 @@ int S3Wrapper::asyncNdpCall(const std::string& bucketName,
         }
     }
 
-    rados_aio_wait_for_complete(completion);
-    rados_aio_release(completion);
-    
+    // rados_aio_wait_for_complete(completion);
+    // rados_aio_release(completion);
     // return completion;
     return ec;
 }
