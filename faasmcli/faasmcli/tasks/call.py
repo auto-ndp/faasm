@@ -156,9 +156,9 @@ def batch_execute(
         print("Forbid NDP: ", forbid_ndp)
         msg["forbid_ndp"] = forbid_ndp
     print("Payload:", msg)
-    return batch_async_aiohttp(msg, {"Content-Type": "application/json"}, policy, iters)
+    return batch_async_aiohttp(msg, {"Content-Type": "application/json"}, policy, iters, forbid_ndp)
 
-def batch_async_aiohttp(msg, headers, selected_balancer, n):
+def batch_async_aiohttp(msg, headers, selected_balancer, n, forbid_ndp):
     ITERATIONS = int(n)
     results = []
     for i in range(1, ITERATIONS):
@@ -179,9 +179,11 @@ def batch_async_aiohttp(msg, headers, selected_balancer, n):
         
         print("Result: ", result_dict)
         results.append(result_dict)
+    
+    result_name = "{}_{}_{}_ndp_{}.csv".format(msg["user"], msg["function"], selected_balancer, not forbid_ndp)
+    write_to_file("./experiments/data/" + result_name, result_dict)    
     print("Done running batches")
     return results
-
 
 async def batch_send(data, headers, n, selected_balancer):
     async with aiohttp.ClientSession() as session:
@@ -204,6 +206,15 @@ async def dispatch_func_async(session, url, data, headers):
         await response.text()
         return end_time - start_time
 
+def write_to_file(fp, dict):
+    with open(fp, "a") as f:
+        
+        f.write("Batch size,Mean Latency,Median Latency,Time taken\n")
+        f.write(str(dict["batch_size"]) + ",")
+        f.write(str(dict["mean_latency"]) + ",")
+        f.write(str(dict["median_latency"]) + ",")
+        f.write(str(dict["time_taken"]) + "\n")
+        f.write("\n")
 @task
 def status(ctx, call_id=None):
     """
