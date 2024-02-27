@@ -566,7 +566,7 @@ services:
     stdin_open: true
     tty: true
     deploy:
-      replicas: 11
+      replicas: 12
       # placement:
       #   constraints: [ node.labels.type == loadgen ]
     volumes:
@@ -593,7 +593,7 @@ services:
     tty: true
     privileged: true
     deploy:
-      replicas: 11
+      replicas: 12
     depends_on:
       - redis-state
       - redis-queue
