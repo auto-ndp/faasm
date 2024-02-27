@@ -184,7 +184,7 @@ def batch_async_aiohttp(msg, headers, selected_balancer, n, forbid_ndp):
     timestamp = time.strftime("%Y%m%d-%H%M%S")
     
     result_name = "{}_{}_{}_ndp_{}_iters_{}.csv".format(timestamp , msg["function"], selected_balancer, not forbid_ndp, n)
-    write_to_file("./experiments/data/" + result_name, results)    
+    write_to_file("./experiments/" + result_name, results)    
     print("Done running batches")
     return results
 
