@@ -23,7 +23,6 @@ wh_strategy = WorkerHashLoadBalancerStrategy(workers=worker_list)
 
 def get_load_balance_strategy(policy):
     if policy == "round_robin":
-        print("Using round robin strategy")
         obj = get_load_balancer_state(policy, local=False, docker=True, k8s=True)
         if obj is None:
             return rr_strategy
@@ -32,7 +31,6 @@ def get_load_balance_strategy(policy):
                 return rr_strategy # Use local strategy
             return obj
     elif policy == "worker_hash":
-        print("Using worker hash strategy")
         obj = get_load_balancer_state(policy, local=False, docker=True, k8s=True)
         if obj is None:
             return wh_strategy
