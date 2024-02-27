@@ -155,7 +155,7 @@ def batch_execute(
     if forbid_ndp:
         print("Forbid NDP: ", forbid_ndp)
         msg["forbid_ndp"] = forbid_ndp
-    print("Payload:")
+    print("Payload:", msg)
     return batch_async_aiohttp(msg, {"Content-Type": "application/json"}, policy, iters)
 
 def batch_async_aiohttp(msg, headers, selected_balancer, n):
