@@ -181,7 +181,7 @@ def batch_async_aiohttp(msg, headers, selected_balancer, n, forbid_ndp):
         results.append(result_dict)
     
     result_name = "{}_{}_{}_ndp_{}_iters_{}.csv".format(msg["user"], msg["function"], selected_balancer, not forbid_ndp, n)
-    write_to_file("./experiments/data/" + result_name, result_dict)    
+    write_to_file("./experiments/data/" + result_name, results)    
     print("Done running batches")
     return results
 
@@ -206,14 +206,15 @@ async def dispatch_func_async(session, url, data, headers):
         await response.text()
         return end_time - start_time
 
-def write_to_file(fp, dict):
+def write_to_file(fp, results):
     with open(fp, "a") as f:
         
         f.write("Batch size,Mean Latency,Median Latency,Time taken\n")
-        f.write(str(dict["batch_size"]) + ",")
-        f.write(str(dict["mean_latency"]) + ",")
-        f.write(str(dict["median_latency"]) + ",")
-        f.write(str(dict["time_taken"]) + "\n")
+        for dict in results:        
+            f.write(str(dict["batch_size"]) + ",")
+            f.write(str(dict["mean_latency"]) + ",")
+            f.write(str(dict["median_latency"]) + ",")
+            f.write(str(dict["time_taken"]) + "\n")
         f.write("\n")
 @task
 def status(ctx, call_id=None):
