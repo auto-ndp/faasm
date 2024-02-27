@@ -180,7 +180,7 @@ def batch_async_aiohttp(msg, headers, selected_balancer, n, forbid_ndp):
         print("Result: ", result_dict)
         results.append(result_dict)
     
-    result_name = "{}_{}_{}_ndp_{}.csv".format(msg["user"], msg["function"], selected_balancer, not forbid_ndp)
+    result_name = "{}_{}_{}_ndp_{}_iters_{}.csv".format(msg["user"], msg["function"], selected_balancer, not forbid_ndp, n)
     write_to_file("./experiments/data/" + result_name, result_dict)    
     print("Done running batches")
     return results
