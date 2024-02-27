@@ -112,8 +112,7 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
             SPDLOG_INFO("[ndp_endpoint::onFirstReceivable] Has thread capacity: {}", hasCapacity);
 
             auto& conf = faabric::util::getSystemConfig();
-            const bool should_offload = hasCapacity && 
-                                  stats.cpu_utilisation < conf.offload_cpu_threshold &&
+            const bool should_offload = stats.cpu_utilisation < conf.offload_cpu_threshold &&
                                   stats.ram_utilisation < conf.offload_ram_threshold && 
                                   stats.load_average < conf.offload_load_avg_threshold;
 
