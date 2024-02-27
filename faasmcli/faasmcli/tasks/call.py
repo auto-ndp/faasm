@@ -107,6 +107,7 @@ def batch_execute(
     user,
     func,
     iters=10,
+    forbid_ndp=False,
     policy="round_robin",
     input=None,
     py=False,
@@ -135,6 +136,7 @@ def batch_execute(
             debug=debug,
             sgx=sgx,
             graph=graph,
+            forbid_ndp=forbid_ndp
         )
 
         if asynch:
