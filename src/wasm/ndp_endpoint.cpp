@@ -102,7 +102,6 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
               this->ndpRequestData.data());
 
             auto& sch = faabric::scheduler::getScheduler();
-            const bool hasCapacity = sch.executionSlotsSemaphore.try_acquire();
             faabric::util::UtilisationStats stats = faabric::util::getSystemUtilisation();
 
             SPDLOG_INFO("[ndp_endpoint::onFirstReceivable] Number of usable cores: {}", faabric::util::getUsableCores());
@@ -119,7 +118,6 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
             auto ndpResult = should_offload ? ndpmsg::NdpResult_Ok : ndpmsg::NdpResult_ProcessLocally;
             std::string ndpError;
             if (should_offload) {
-                sch.executionSlotsSemaphore.release();
                 try {
 
                   if (!ndpSocketMap.tryEmplace(

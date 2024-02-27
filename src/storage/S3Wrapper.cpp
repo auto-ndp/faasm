@@ -742,7 +742,7 @@ int S3Wrapper::asyncNdpCall(const std::string& bucketName,
         throw std::runtime_error("Pool does not have an ioctx.");
     }   
 
-    // rados_completion_t completion;
+// rados_completion_t completion;
     // rados_aio_create_completion(nullptr, nullptr, completion_callback, &completion);
     // int ec = rados_aio_exec(pool->ioctx,
     //                         keyName.c_str(),
