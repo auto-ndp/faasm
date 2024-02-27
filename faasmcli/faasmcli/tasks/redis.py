@@ -64,14 +64,12 @@ def upload_load_balancer_state(load_balance_obj, policy, local=False, docker=Fal
     """
     
     # Serialize the object to a string
-    print("Updating load balancer state in Redis for policy: {}".format(policy))
     load_balance_obj_str = pickle.dumps(load_balance_obj)
     serialised_obj_str = base64.b64encode(load_balance_obj_str).decode('utf-8')
     with lock:
         _do_redis_command("set {} {}".format(policy, serialised_obj_str), "REDIS_STATE_HOST", local, docker, k8s)
 
 def get_load_balancer_state(policy, local=False, docker=False, k8s=True):
-    print("Fetching load balancer state from Redis for policy: {}".format(policy))
     result_obj_str = _do_redis_command("get {}".format(policy), "REDIS_STATE_HOST", local, docker, k8s)
     if (len(result_obj_str.strip()) == 0):
         print("Emtpy result from Redis. Returning None.")
