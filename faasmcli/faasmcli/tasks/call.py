@@ -165,6 +165,7 @@ def batch_async_aiohttp(msg, headers, selected_balancer, n):
         latencies = []
         start_time = time.perf_counter()
         print("Running a batch of size: ", i)
+        print("Selected balancer: ", selected_balancer)
         latencies = asyncio.run(batch_send(msg, headers, i, selected_balancer))
         end_time = time.perf_counter()
         print("Time taken to run batch: ", end_time - start_time)
