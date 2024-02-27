@@ -16,6 +16,7 @@ POLL_INTERVAL_MS = 1000
 #worker_list = all_workers(None, local=False, docker=True, k8s=True)
 
 worker_list = all_workers(local=False, docker=True, k8s=True)
+print(worker_list)
 rr_strategy = RoundRobinLoadBalancerStrategy(workers=worker_list)
 wh_strategy = WorkerHashLoadBalancerStrategy(workers=worker_list)
 
