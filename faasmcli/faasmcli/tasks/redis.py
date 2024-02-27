@@ -81,6 +81,14 @@ def get_load_balancer_state(policy, local=False, docker=False, k8s=True):
     return pickle.loads(serialied_obj)
 
 @task
+def reset_load_balancer(ctx, local=False, docker=False, k8s=True):
+    """
+    Reset the load balancer state in Redis
+    """
+    _do_redis_command("flushall", "REDIS_STATE_HOST", local, docker, k8s)
+    
+
+@task
 def func_workers(ctx, user, func, local=False, docker=False, k8s=True):
     """
     List all warm Faasm instances
