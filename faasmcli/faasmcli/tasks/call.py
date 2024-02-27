@@ -153,6 +153,7 @@ def batch_execute(
         msg["record_exec_graph"] = graph
         
     if forbid_ndp:
+        print("Forbid NDP: ", forbid_ndp)
         msg["forbid_ndp"] = forbid_ndp
     print("Payload:")
     return batch_async_aiohttp(msg, {"Content-Type": "application/json"}, policy, iters)
