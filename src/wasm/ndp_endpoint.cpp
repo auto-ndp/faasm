@@ -218,10 +218,10 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
 
             SPDLOG_DEBUG("[ndp_endpoint::onFirstReceivable] hasCapacity: {}", hasCapacity);
 
-            if (hasCapacity) {
+            //if (hasCapacity) {
                 SPDLOG_DEBUG("[ndp_endpoint::onFirstReceivable] Doing recv");
                 doRecv();
-            } 
+            //} 
         } else {
             SPDLOG_ERROR(
               "Error waiting for first recv on the ndp connection: {}",
