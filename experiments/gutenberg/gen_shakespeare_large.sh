@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Define the file paths
-source_file="complete_works_shakespeare.txt"
-destination_file="shakespeare_large.txt"
+source_file="./complete_works_shakespeare.txt"
+destination_file="./shakespeare_large.txt"
 
 # Define the number of times to append
 n=22
