@@ -1,5 +1,6 @@
 from invoke import Collection
 
+from . import benchmark
 from . import call
 from . import cluster
 from . import codegen
@@ -25,6 +26,7 @@ from . import wast
 
 # Default names
 ns = Collection(
+    benchmark,
     cluster,
     codegen,
     config,
