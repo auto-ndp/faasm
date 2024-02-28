@@ -25,6 +25,7 @@ from . import wast
 
 # Default names
 ns = Collection(
+    benchmarking,
     cluster,
     codegen,
     config,
