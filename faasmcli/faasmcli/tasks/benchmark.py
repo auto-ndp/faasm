@@ -4,7 +4,7 @@ from faasmcli.util.benchmarking import batch_async_aiohttp
 
 
 @task
-def batch_execute(
+def throughput_test(
     ctx,
     user,
     func,
