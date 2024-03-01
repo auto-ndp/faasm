@@ -84,10 +84,8 @@ def write_to_file(fp, results):
 # =============================================================================
 
 def post_request(url, data, headers):
-    print("Sending request to: ", url, " with data: ", data, " and headers: ", headers)
     with requests.post(url, json=data, headers=headers) as response:
         latency = response.elapsed.total_seconds()
-        print("Latency: ", latency)
         return response.text, latency
 
 def format_worker_url(worker_id):
@@ -111,8 +109,10 @@ def sliding_window_impl(msg, headers, selected_balancer, n, forbid_ndp):
         while not tasks.empty():
             task = tasks.get()
             _, latency = post_request(*task)
+            print("Lantecy: ", latency)
             latencies.append(latency)
             tasks.task_done()
+            print(f"Tasks left: {tasks.qsize()}")
 
     # Start max_parallel threads
     threads = []
