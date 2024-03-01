@@ -115,7 +115,7 @@ def sliding_window_impl(msg, headers, selected_balancer, n, forbid_ndp):
                 latencies.append(latency)
                 remaining_tasks = tasks.qsize()
             print("Lantecy: ", latency)
-            print("Response: ", text)
+            # print("Response: ", text)
             tasks.task_done()
             print(f"Tasks left: {tasks.qsize()}")
 
