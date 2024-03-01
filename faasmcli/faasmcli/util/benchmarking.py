@@ -100,6 +100,7 @@ def sliding_window_impl(msg, headers, selected_balancer, n, forbid_ndp):
     lock = threading.Lock()
 
     # Populate the queue with tasks
+    print("Populating queue with {} tasks".format(n))
     for _ in range(n):
         worker_id = balancer.get_next_host(forbid_ndp)
         url = format_worker_url(worker_id)
@@ -119,6 +120,7 @@ def sliding_window_impl(msg, headers, selected_balancer, n, forbid_ndp):
             print(f"Tasks left: {tasks.qsize()}")
 
     # Start max_parallel threads
+    print("Starting {} threads".format(max_parallel))
     threads = []
     for _ in range(max_parallel):
         t = threading.Thread(target=worker)
@@ -126,6 +128,7 @@ def sliding_window_impl(msg, headers, selected_balancer, n, forbid_ndp):
         threads.append(t)
 
     # Wait for all tasks to be processed
+    print("Waiting for tasks to finish")
     for t in threads:
         t.join()
 
