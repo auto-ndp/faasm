@@ -129,3 +129,5 @@ def sliding_window_impl(msg, headers, selected_balancer, n, forbid_ndp):
     tasks.join()
     
     print("Latencies: ", sum(latencies)/len(latencies))
+    print("Median Latency: ", sorted(latencies)[len(latencies)//2])
+    print("Responses received: ", len(latencies))
