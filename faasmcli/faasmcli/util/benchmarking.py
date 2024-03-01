@@ -83,7 +83,7 @@ def write_to_file(fp, results):
 
 def post_request(url, data, headers):
     with requests.post(url, json=data, headers=headers) as response:
-        return response.json()
+        return response.text()
 
 def format_worker_url(worker_id):
     return "http://{}:{}/f/".format(worker_id, 8080)
