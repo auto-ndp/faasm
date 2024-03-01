@@ -84,8 +84,9 @@ def write_to_file(fp, results):
 # =============================================================================
 
 def post_request(url, data, headers):
+    print("Sending request to: ", url, " with data: ", data, " and headers: ", headers)
     with requests.post(url, json=data, headers=headers) as response:
-        return response
+        return response.text
 
 def format_worker_url(worker_id):
     return "http://{}:{}/f/".format(worker_id, 8080)
@@ -106,7 +107,7 @@ def sliding_window_impl(msg, headers, selected_balancer, n, forbid_ndp):
     def worker():
         while not tasks.empty():
             task = tasks.get()
-            post_request(*task, msg, headers)
+            post_request(*task)
             tasks.task_done()
 
     # Start max_parallel threads
