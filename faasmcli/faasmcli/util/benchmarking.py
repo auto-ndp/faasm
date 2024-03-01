@@ -93,7 +93,7 @@ def format_worker_url(worker_id):
 
 def sliding_window_impl(msg, headers, selected_balancer, n, forbid_ndp):
     # Queue to hold the tasks
-    max_parallel = 20
+    max_parallel = 50
     balancer = get_load_balance_strategy(selected_balancer)
     tasks = Queue()
     latencies = []
