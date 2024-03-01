@@ -99,13 +99,12 @@ def sliding_window_impl(msg, headers, selected_balancer, n, forbid_ndp):
         for _ in range(num_parallel):
             worker_id = balancer.get_next_host(msg["user"], msg["function"])
             url = format_worker_url(worker_id)
-            url_queue.append(url)
             future = executor.submit(post_request, url, msg, headers)
             url_queue.append((url, future))
         
         while len(results) < n:
             # Wait for any of the futures to complete
-            done, _ = as_completed([future for _, future in url_queue]).__next__()
+            done, pending = as_completed([future for _, future in url_queue]).__next__()
             
             # Find the completed future and its corresponding URL
             for index, (url, future) in enumerate(url_queue):
