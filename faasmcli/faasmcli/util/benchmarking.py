@@ -91,25 +91,36 @@ def format_worker_url(worker_id):
 def sliding_window_impl(msg, headers, selected_balancer, n, forbid_ndp):
     results = []
     num_parallel = 20
-    workers = selected_balancer.get_workers()  # Assuming get_workers() returns a list of worker IDs
     
     with ThreadPoolExecutor(max_workers=num_parallel) as executor:
-        url_queue = deque([format_worker_url(worker_id) for worker_id in workers[:num_parallel]])
+        url_queue = deque()
+        balancer = get_load_balance_strategy(selected_balancer)
+        # Fill the initial sliding window
+        for _ in range(num_parallel):
+            worker_id = balancer.get_next_host(msg["user"], msg["function"])
+            url = format_worker_url(worker_id)
+            url_queue.append(url)
+            future = executor.submit(post_request, url, msg, headers)
+            url_queue.append((url, future))
         
-        futures = {executor.submit(post_request, url, msg, headers): url for url in url_queue}
-        
-        for future in as_completed(futures):
-            url = futures[future]
-            result = future.result()
-            results.append(result)
+        while len(results) < n:
+            # Wait for any of the futures to complete
+            done, _ = as_completed([future for _, future in url_queue]).__next__()
             
-            if len(results) < n:
-                # Replace completed request with a new one
-                new_url = format_worker_url(selected_balancer.get_next_host(msg["user"], msg["function"]))
-                new_future = executor.submit(post_request, new_url, msg, headers)
-                futures[new_future] = new_url
-                del futures[future]
-        
-    return results
-        
+            # Find the completed future and its corresponding URL
+            for index, (url, future) in enumerate(url_queue):
+                if future == done:
+                    # Store the result
+                    result = future.result()
+                    results.append(result)
+                    
+                    if len(results) < n:
+                        # Replace completed future with a new one
+                        worker_id = selected_balancer.get_next_host(msg["user"], msg["function"])
+                        new_url = format_worker_url(worker_id)
+                        new_future = executor.submit(post_request, new_url, msg, headers)
+                        url_queue[index] = (new_url, new_future)
+                    
+                    break  # Break out of loop once the completed future is found
+    
     return results
