@@ -10,6 +10,9 @@ import aiohttp
 import asyncio
 import threading
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from collections import deque
+
 def batch_async_aiohttp(msg, headers, selected_balancer, n, forbid_ndp):
     ITERATIONS = int(n)
     results = []
@@ -70,3 +73,37 @@ def write_to_file(fp, results):
             f.write(str(dict["median_latency"]) + ",")
             f.write(str(dict["time_taken"]) + "\n")
         f.write("\n")
+        
+        
+# =============================================================================
+# Sliding Window distribution
+# =============================================================================
+
+def post_request(url, data, headers):
+    with requests.post(url, json=data, headers=headers) as response:
+        return response.json()
+
+
+def sliding_window_impl(msg, headers, selected_balancer, n, forbid_ndp):
+    results = []
+    num_parallel = 20
+    with ThreadPoolExecutor(max_workers=num_parallel) as executor:
+        balancer = get_load_balance_strategy(selected_balancer)
+        url_queue = deque([balancer.get_next_host(msg["user"], msg["function"]) for _ in range(num_parallel)])
+        
+        futures = [executor.submit(post_request, url, msg, headers) for url in url_queue]
+        
+        # Submit the initial batch of requests
+        for future in as_completed(futures):
+            result = future.result()
+            results.append(result)
+            
+            if len(results) < n:
+                # Submit the next request
+                url = balancer.get_next_host(msg["user"], msg["function"])
+                future = executor.submit(post_request, url, msg, headers)
+                results[futures.index(future)] = future
+        
+        upload_load_balancer_state(balancer, selected_balancer, docker=True) # Allows the load balancer to keep state between calls
+                
+    return results
