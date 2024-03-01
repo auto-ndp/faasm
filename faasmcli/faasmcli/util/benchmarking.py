@@ -104,10 +104,11 @@ def sliding_window_impl(msg, headers, selected_balancer, n, forbid_ndp):
             
             if len(results) < n:
                 # Submit the next request
-                url = balancer.get_next_host(msg["user"], msg["function"])
-                future = executor.submit(post_request, url, msg, headers)
-                results[futures.index(future)] = future
-        
+                new_url = balancer.get_next_host(msg["user"], msg["function"])
+                new_future = executor.submit(post_request, new_url, msg, headers)
+                futures[new_future] = new_url
+                del futures[future]
+                
         upload_load_balancer_state(balancer, selected_balancer, docker=True) # Allows the load balancer to keep state between calls
                 
     return results
