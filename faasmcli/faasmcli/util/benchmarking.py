@@ -85,13 +85,15 @@ def post_request(url, data, headers):
     with requests.post(url, json=data, headers=headers) as response:
         return response.json()
 
+def format_worker_url(worker_id):
+    return "http://{}:{}/f/".format(worker_id, 8080)
 
 def sliding_window_impl(msg, headers, selected_balancer, n, forbid_ndp):
     results = []
     num_parallel = 20
     with ThreadPoolExecutor(max_workers=num_parallel) as executor:
         balancer = get_load_balance_strategy(selected_balancer)
-        url_queue = deque(["http://{}:{}/f/".format(balancer.get_next_host(msg["user"], msg["function"]), 8080) for _ in range(num_parallel)])
+        url_queue = deque([format_worker_url(balancer.get_next_host(msg["user"], msg["func"])) for _ in range(num_parallel)])
         
         futures = [executor.submit(post_request, url, msg, headers) for url in url_queue]
         
