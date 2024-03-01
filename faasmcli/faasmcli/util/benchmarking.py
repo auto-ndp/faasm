@@ -4,6 +4,8 @@ from faasmcli.util.call import (
     upload_load_balancer_state,
 )
 
+import requests
+
 # Create task for invoking a function asynchronously
 import time
 import aiohttp
