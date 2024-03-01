@@ -50,7 +50,7 @@ async def batch_send(data, headers, n, selected_balancer):
                 url = "http://{}:{}/f/".format(worker_id, 8080)
                 tasks.append(dispatch_func_async(session, url, data, headers))
                 upload_load_balancer_state(balancer, selected_balancer, docker=True) # Allows the load balancer to keep state between calls
-            await asyncio.sleep(1/n)
+            #await asyncio.sleep(1/n)
         responses= await asyncio.gather(*tasks)
     return responses
 
