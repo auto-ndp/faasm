@@ -91,24 +91,23 @@ def format_worker_url(worker_id):
 def sliding_window_impl(msg, headers, selected_balancer, n, forbid_ndp):
     results = []
     num_parallel = 20
+    workers = selected_balancer.get_workers()  # Assuming get_workers() returns a list of worker IDs
+    
     with ThreadPoolExecutor(max_workers=num_parallel) as executor:
-        balancer = get_load_balance_strategy(selected_balancer)
-        url_queue = deque([format_worker_url(balancer.get_next_host(msg["user"], msg["function"])) for _ in range(num_parallel)])
+        url_queue = deque([format_worker_url(worker_id) for worker_id in workers[:num_parallel]])
         
-        futures = [executor.submit(post_request, url, msg, headers) for url in url_queue]
+        futures = {executor.submit(post_request, url, msg, headers): url for url in url_queue}
         
-        # Submit the initial batch of requests
         for future in as_completed(futures):
+            url = futures[future]
             result = future.result()
             results.append(result)
             
             if len(results) < n:
-                # Submit the next request
-                new_url = balancer.get_next_host(msg["user"], msg["function"])
+                # Replace completed request with a new one
+                new_url = format_worker_url(selected_balancer.get_next_host(msg["user"], msg["function"]))
                 new_future = executor.submit(post_request, new_url, msg, headers)
                 futures[new_future] = new_url
                 del futures[future]
-                
-        upload_load_balancer_state(balancer, selected_balancer, docker=True) # Allows the load balancer to keep state between calls
-                
+        
     return results
