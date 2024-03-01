@@ -108,8 +108,9 @@ def sliding_window_impl(msg, headers, selected_balancer, n, forbid_ndp):
     def worker():
         while not tasks.empty():
             task = tasks.get()
-            _, latency = post_request(*task)
+            text, latency = post_request(*task)
             print("Lantecy: ", latency)
+            print("Response: ", text.join("\n"))
             latencies.append(latency)
             tasks.task_done()
             print(f"Tasks left: {tasks.qsize()}")
