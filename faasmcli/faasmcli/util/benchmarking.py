@@ -13,7 +13,7 @@ import threading
 def batch_async_aiohttp(msg, headers, selected_balancer, n, forbid_ndp):
     ITERATIONS = int(n)
     results = []
-    for i in range(1, ITERATIONS):
+    for i in range(ITERATIONS-1, ITERATIONS):
         latencies = []
         start_time = time.perf_counter()
         print("Running a batch of size: ", i)
@@ -21,7 +21,6 @@ def batch_async_aiohttp(msg, headers, selected_balancer, n, forbid_ndp):
         latencies = asyncio.run(batch_send(msg, headers, i, selected_balancer))
         end_time = time.perf_counter()
         print("Time taken to run batch: ", end_time - start_time)
-        
         result_dict = {
             "batch_size": i,
             "mean_latency" : sum(latencies)/len(latencies),
