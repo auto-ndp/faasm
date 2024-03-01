@@ -84,9 +84,9 @@ def write_to_file(fp, results):
 # =============================================================================
 
 def post_request(url, data, headers):
-    with requests.post(url, json=data, headers=headers) as response:
-        latency = response.elapsed.total_seconds()
-        return response.text(), latency
+    response = requests.post(url, json=data, headers=headers)
+    latency = response.elapsed.total_seconds()
+    return response.text, latency
 
 def format_worker_url(worker_id):
     return "http://{}:{}/f/".format(worker_id, 8080)
@@ -110,7 +110,7 @@ def sliding_window_impl(msg, headers, selected_balancer, n, forbid_ndp):
             task = tasks.get()
             text, latency = post_request(*task)
             print("Lantecy: ", latency)
-            print("Response: ", text.join("\n"))
+            print("Response: ", text)
             latencies.append(latency)
             tasks.task_done()
             print(f"Tasks left: {tasks.qsize()}")
