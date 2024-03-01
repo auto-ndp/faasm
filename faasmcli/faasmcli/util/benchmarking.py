@@ -97,6 +97,7 @@ def sliding_window_impl(msg, headers, selected_balancer, n, forbid_ndp):
     balancer = get_load_balance_strategy(selected_balancer)
     tasks = Queue()
     latencies = []
+    lock = threading.Lock()
 
     # Populate the queue with tasks
     for _ in range(n):
@@ -109,9 +110,11 @@ def sliding_window_impl(msg, headers, selected_balancer, n, forbid_ndp):
         while not tasks.empty():
             task = tasks.get()
             text, latency = post_request(*task)
+            with lock:
+                latencies.append(latency)
+                remaining_tasks = tasks.qsize()
             print("Lantecy: ", latency)
             print("Response: ", text)
-            latencies.append(latency)
             tasks.task_done()
             print(f"Tasks left: {tasks.qsize()}")
 
