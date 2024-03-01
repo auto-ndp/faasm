@@ -122,3 +122,10 @@ def sliding_window_impl(msg, headers, selected_balancer, n, forbid_ndp):
 
     # Wait for all threads to finish
     tasks.join()
+    
+    # Print the responses from the workers
+    print("Responses from workers")
+    while not tasks.empty():
+        print(tasks.get())
+        tasks.task_done()
+    print("Done running sliding window")
