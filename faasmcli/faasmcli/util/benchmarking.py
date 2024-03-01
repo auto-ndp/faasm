@@ -12,6 +12,8 @@ import aiohttp
 import asyncio
 import threading
 
+from queue import Queue
+
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from collections import deque
 
@@ -89,37 +91,34 @@ def format_worker_url(worker_id):
     return "http://{}:{}/f/".format(worker_id, 8080)
 
 def sliding_window_impl(msg, headers, selected_balancer, n, forbid_ndp):
-    results = []
-    num_parallel = 20
-    
-    with ThreadPoolExecutor(max_workers=num_parallel) as executor:
-        url_queue = deque()
-        balancer = get_load_balance_strategy(selected_balancer)
-        # Fill the initial sliding window
-        for _ in range(num_parallel):
-            worker_id = balancer.get_next_host(msg["user"], msg["function"])
-            url = format_worker_url(worker_id)
-            future = executor.submit(post_request, url, msg, headers)
-            url_queue.append((url, future))
-        
-        while len(results) < n:
-            # Wait for any of the futures to complete
-            done, pending = as_completed([future for _, future in url_queue]).__next__()
-            
-            # Find the completed future and its corresponding URL
-            for index, (url, future) in enumerate(url_queue):
-                if future == done:
-                    # Store the result
-                    result = future.result()
-                    results.append(result)
-                    
-                    if len(results) < n:
-                        # Replace completed future with a new one
-                        worker_id = selected_balancer.get_next_host(msg["user"], msg["function"])
-                        new_url = format_worker_url(worker_id)
-                        new_future = executor.submit(post_request, new_url, msg, headers)
-                        url_queue[index] = (new_url, new_future)
-                    
-                    break  # Break out of loop once the completed future is found
-    
-    return results
+    # Queue to hold the tasks
+    max_parallel = 20
+    balancer = get_load_balance_strategy(selected_balancer)
+    tasks = Queue()
+
+    # Populate the queue with tasks
+    for _ in range(n):
+        worker_id = balancer.get_next_host(forbid_ndp)
+        url = format_worker_url(worker_id)
+        tasks.put((url, msg, headers))
+
+    # Worker function to process tasks
+    def worker():
+        while not tasks.empty():
+            task = tasks.get()
+            post_request(*task)
+            tasks.task_done()
+
+    # Start max_parallel threads
+    threads = []
+    for _ in range(max_parallel):
+        t = threading.Thread(target=worker)
+        t.start()
+        threads.append(t)
+
+    # Wait for all tasks to be processed
+    for t in threads:
+        t.join()
+
+    # Wait for all threads to finish
+    tasks.join()
