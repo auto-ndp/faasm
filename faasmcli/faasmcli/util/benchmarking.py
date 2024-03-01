@@ -111,3 +111,5 @@ def sliding_window_impl(msg, headers, selected_balancer, n, forbid_ndp):
                 del futures[future]
         
     return results
+        
+    return results
