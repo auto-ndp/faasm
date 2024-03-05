@@ -122,6 +122,7 @@ def throughput_test_multiple_objects(
     user,
     func,
     iters=10,
+    max_parallel=20,
     forbid_ndp=False,
     policy="round_robin",
     inputs=None,
@@ -148,7 +149,7 @@ def throughput_test_multiple_objects(
         msg["sgx"] = sgx
 
     if input:
-        msg["input_data"] = input.split(",")
+        msg["input_data"] = "CHANGE_ME"
 
     if cmdline:
         msg["cmdline"] = cmdline
@@ -163,8 +164,19 @@ def throughput_test_multiple_objects(
         print("Forbid NDP: ", forbid_ndp)
         msg["forbid_ndp"] = forbid_ndp
     print("Payload:", msg)
-    return run_benchmark_multiple_objs(msg, {"Content-Type": "application/json"}, iters, policy, forbid_ndp)
-
+    
+    inputs_splitted = inputs.split(",")
+    
+    tasks = Queue()
+    headers = {"Content-Type": "application/json"}
+    balancer = get_load_balance_strategy(policy)
+    print("Populating queue with {} tasks".format(iters))
+    for i in range(iters):
+        worker = balancer.get_next_host(forbid_ndp)
+        url = format_worker_url(worker)
+        msg["input_data"] = inputs_splitted[i % len(inputs_splitted)]
+        tasks.put((url, msg, headers))
+    return sliding_window_impl(tasks, iters, max_parallel)
 
 def format_worker_url(worker_id):
     return "http://{}:{}/f/".format(worker_id, 8080)
