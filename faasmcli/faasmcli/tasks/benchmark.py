@@ -58,6 +58,7 @@ def latency_test(
     user,
     func,
     iters=10,
+    parallel=20,
     forbid_ndp=False,
     policy="round_robin",
     input=None,
@@ -99,7 +100,7 @@ def latency_test(
         print("Forbid NDP: ", forbid_ndp)
         msg["forbid_ndp"] = forbid_ndp
     print("Payload:", msg)
-    return sliding_window_impl(msg, {"Content-Type": "application/json"}, policy, iters, forbid_ndp)
+    return sliding_window_impl(msg, {"Content-Type": "application/json"}, policy, iters, parallel, forbid_ndp)
 
 
 @task

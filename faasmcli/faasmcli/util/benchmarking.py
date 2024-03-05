@@ -80,9 +80,7 @@ def post_request(url, data, headers):
 def format_worker_url(worker_id):
     return "http://{}:{}/f/".format(worker_id, 8080)
 
-def sliding_window_impl(msg, headers, selected_balancer, n, forbid_ndp):
-    # Queue to hold the tasks
-    max_parallel = 50
+def sliding_window_impl(msg, headers, selected_balancer, n, max_parallel, forbid_ndp):
     balancer = get_load_balance_strategy(selected_balancer)
     tasks = Queue()
     latencies = []
