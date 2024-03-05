@@ -92,7 +92,7 @@ def sliding_window_impl(tasks, n, max_parallel):
             with lock:
                 latencies.append(latency)
                 completed_tasks += 1
-                print(f"Progress: {completed_tasks}/{n}")
+                print(f"\rProgress: {completed_tasks}/{n}")
             tasks.task_done()
 
     batch_time_start = time.perf_counter()
