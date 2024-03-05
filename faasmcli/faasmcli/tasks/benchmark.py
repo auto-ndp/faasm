@@ -3,6 +3,7 @@ from invoke import task
 from faasmcli.util.benchmarking import batch_async_aiohttp, sliding_window_impl, run_benchmark_multiple_objs
 from faasmcli.util.call import get_load_balance_strategy
 
+from queue import Queue
 
 @task
 def throughput_test(
@@ -102,7 +103,7 @@ def latency_test(
         msg["forbid_ndp"] = forbid_ndp
     print("Payload:", msg)
     
-    tasks = []
+    tasks = Queue()
     headers = {"Content-Type": "application/json"}
     
     # Populate the queue with tasks
