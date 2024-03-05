@@ -107,7 +107,7 @@ def latency_test(
     
     # Populate the queue with tasks
     balancer = get_load_balance_strategy(policy)
-    print("Populating queue with {} tasks".format(n))
+    print("Populating queue with {} tasks".format(iters))
     for _ in range(iters):
         worker_id = balancer.get_next_host(forbid_ndp)
         url = format_worker_url(worker_id)
