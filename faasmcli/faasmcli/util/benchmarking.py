@@ -125,6 +125,9 @@ def sliding_window_impl(tasks, n, max_parallel):
     tasks.join()
     batch_time_end = time.perf_counter()
     
+    latencies = [result["Latency"] for result in results]
+    throughputs = [result["Throughput"] for result in results]
+    
     print("Total time taken: ", batch_time_end - batch_time_start)
     print("Throughput (requests/second): ", n/(batch_time_end - batch_time_start))
     print("Median Latency: ", sorted(latencies)[len(latencies)//2])
