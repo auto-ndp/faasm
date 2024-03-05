@@ -1,6 +1,6 @@
 from invoke import task
 
-from faasmcli.util.benchmarking import batch_async_aiohttp, sliding_window_impl, run_benchmark_multiple_objs
+from faasmcli.util.benchmarking import batch_async_aiohttp, sliding_window_impl
 from faasmcli.util.call import get_load_balance_strategy
 
 from queue import Queue
