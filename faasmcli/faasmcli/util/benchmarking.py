@@ -101,10 +101,9 @@ def sliding_window_impl(msg, headers, selected_balancer, n, max_parallel, forbid
             with lock:
                 latencies.append(latency)
                 remaining_tasks = tasks.qsize()
-            print("Lantecy: ", latency)
-            # print("Response: ", text)
+                print("Lantecy: ", latency)
+                print(f"Tasks left: {tasks.qsize()}")
             tasks.task_done()
-            print(f"Tasks left: {tasks.qsize()}")
 
     # Start max_parallel threads
     print("Starting {} threads".format(max_parallel))
