@@ -85,6 +85,7 @@ def sliding_window_impl(tasks, n, max_parallel):
     
     # Worker function to process tasks
     def worker():
+        nonlocal completed_tasks
         while not tasks.empty():
             task = tasks.get()
             text, latency = post_request(*task)
