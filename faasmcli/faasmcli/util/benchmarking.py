@@ -80,6 +80,7 @@ def post_request(url, data, headers):
 
 def sliding_window_impl(tasks, n, max_parallel):
     latencies = []
+    throughputs = []
     lock = threading.Lock()
     completed_tasks = 0
     
@@ -91,6 +92,7 @@ def sliding_window_impl(tasks, n, max_parallel):
             text, latency = post_request(*task)
             with lock:
                 latencies.append(latency)
+                throughputs.append(1/latency)
                 completed_tasks += 1
                 print(f"\rProgress: {completed_tasks}/{n}", end="")
             tasks.task_done()
@@ -117,4 +119,8 @@ def sliding_window_impl(tasks, n, max_parallel):
     print("Throughput (requests/second): ", n/(batch_time_end - batch_time_start))
     print("Median Latency: ", sorted(latencies)[len(latencies)//2])
     print("Mean latency: ", sum(latencies)/len(latencies))
+    
+    print("Median throughput: ", sorted(throughputs)[len(throughputs)//2])
+    print("Mean throughput: ", sum(throughputs)/len(throughputs))
+    
     print("Responses received: ", len(latencies))
