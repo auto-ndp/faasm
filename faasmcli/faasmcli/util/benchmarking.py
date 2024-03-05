@@ -12,6 +12,7 @@ import aiohttp
 import asyncio
 import threading
 
+
 from queue import Queue
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -80,7 +81,8 @@ def post_request(url, data, headers):
 def sliding_window_impl(tasks, n, max_parallel):
     latencies = []
     lock = threading.Lock()
-
+    completed_tasks = 0
+    
     # Worker function to process tasks
     def worker():
         while not tasks.empty():
@@ -88,9 +90,8 @@ def sliding_window_impl(tasks, n, max_parallel):
             text, latency = post_request(*task)
             with lock:
                 latencies.append(latency)
-                remaining_tasks = tasks.qsize()
-                print("Lantecy: ", latency)
-                print(f"Tasks left: {tasks.qsize()}")
+                completed_tasks += 1
+                print(f"Progress: {completed_tasks}/{n}")
             tasks.task_done()
 
     batch_time_start = time.perf_counter()
