@@ -6,19 +6,16 @@ from faasmcli.util.env import PYTHON_USER, PYTHON_FUNC, AVAILABLE_HOSTS_SET
 from faasmcli.util.http import do_post
 from faasmcli.util.endpoints import get_invoke_host_port
 from faasmcli.tasks.redis import all_workers, upload_load_balancer_state, get_load_balancer_state
-from faasmcli.util.load_balance_policy import RoundRobinLoadBalancerStrategy, WorkerHashLoadBalancerStrategy
+from faasmcli.util.load_balance_policy import RoundRobinLoadBalancerStrategy, FaasmDefaultLoadBalancerStrategy
 STATUS_SUCCESS = "SUCCESS"
 STATUS_FAILED = "FAILED"
 STATUS_RUNNING = "RUNNING"
 
 POLL_INTERVAL_MS = 1000
 
-#worker_list = all_workers(None, local=False, docker=True, k8s=True)
-
 worker_list = all_workers(local=False, docker=True, k8s=True)
-print(worker_list)
 rr_strategy = RoundRobinLoadBalancerStrategy(workers=worker_list)
-wh_strategy = WorkerHashLoadBalancerStrategy(workers=worker_list)
+wh_strategy = FaasmDefaultLoadBalancerStrategy(workers=worker_list)
 
 
 def get_load_balance_strategy(policy):

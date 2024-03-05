@@ -25,7 +25,7 @@ class RoundRobinLoadBalancerStrategy(ILoadBalanceStrategy):
     def get_num_workers(self):
         return len(self.workers)
     
-class FaasmDefault(ILoadBalanceStrategy):
+class FaasmDefaultLoadBalancerStrategy(ILoadBalanceStrategy):
     def __init__(self, workers):
         self.workers = workers
 
