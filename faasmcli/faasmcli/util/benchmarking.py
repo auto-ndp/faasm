@@ -105,6 +105,7 @@ def sliding_window_impl(msg, headers, selected_balancer, n, max_parallel, forbid
                 print(f"Tasks left: {tasks.qsize()}")
             tasks.task_done()
 
+    batch_time_start = time.perf_counter()
     # Start max_parallel threads
     print("Starting {} threads".format(max_parallel))
     threads = []
@@ -120,8 +121,11 @@ def sliding_window_impl(msg, headers, selected_balancer, n, max_parallel, forbid
 
     # Wait for all threads to finish
     tasks.join()
+    batch_time_end = time.perf_counter()
     
     print("Latencies: ", sum(latencies)/len(latencies))
+    print("Total time taken: ", batch_time_end - batch_time_start)
+    print("Throughput (requests/second): ", n/(batch_time_end - batch_time_start))
     print("Median Latency: ", sorted(latencies)[len(latencies)//2])
     print("Responses received: ", len(latencies))
     
