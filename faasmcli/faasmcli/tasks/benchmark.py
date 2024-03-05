@@ -1,7 +1,7 @@
 from invoke import task
 
 from faasmcli.util.benchmarking import batch_async_aiohttp, sliding_window_impl, run_benchmark_multiple_objs
-from faasmcli.util.load_balance_policy import get_load_balance_strategy
+from faasmcli.util.call import get_load_balance_strategy
 
 
 @task
@@ -112,7 +112,6 @@ def latency_test(
         worker_id = balancer.get_next_host(forbid_ndp)
         url = format_worker_url(worker_id)
         tasks.put((url, msg, headers))
-
     return sliding_window_impl(tasks, iters, parallel, forbid_ndp)
 
 
