@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 import itertools
-from faasmcli.util.endpoints import get_invoke_host
+from faasmcli.util.endpoints import get_invoke_host_port
 
 class ILoadBalanceStrategy(ABC):
     
@@ -30,7 +30,7 @@ class FaasmDefault(ILoadBalanceStrategy):
         self.workers = workers
 
     def get_next_host(self, user=None, func=None) -> str:
-        return get_invoke_host(user, func)
+        return get_invoke_host_port()[0] # Only return the worker host
 
     def get_num_workers(self):
         return len(self.workers)
