@@ -114,7 +114,7 @@ def sliding_window(
         url = format_worker_url(worker_id)
         tasks.put((url, msg, headers))
         
-    return sliding_window_impl(tasks, iters, parallel)
+    return sliding_window_impl(tasks, iters, parallel, policy)
 
 
 @task

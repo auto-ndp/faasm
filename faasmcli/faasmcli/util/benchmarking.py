@@ -78,7 +78,7 @@ def post_request(url, data, headers):
     latency = response.elapsed.total_seconds()
     return response.text, latency
 
-def sliding_window_impl(tasks, n, max_parallel):
+def sliding_window_impl(tasks, n, max_parallel, policy_name):
     latencies = []
     throughputs = []
     lock = threading.Lock()
@@ -141,7 +141,7 @@ def sliding_window_impl(tasks, n, max_parallel):
     # Generate a timestamp 
     timestamp = time.strftime("%Y%m%d-%H%M%S")
 
-    filename = "{}_{}_{}_ndp_{}_iters_{}.csv".format(timestamp , function_name, "sliding_window", not forbid_ndp, n)
+    filename = "{}_{}_{}_{}_ndp_{}_iters_{}.csv".format(timestamp , function_name, "sliding_window", policy_name ,not forbid_ndp, n)
     write_to_file(filename, results)
     
 def write_to_file(filename, results_dict):
