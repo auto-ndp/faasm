@@ -113,7 +113,7 @@ def latency_test(
         worker_id = balancer.get_next_host(forbid_ndp)
         url = format_worker_url(worker_id)
         tasks.put((url, msg, headers))
-    return sliding_window_impl(tasks, iters, parallel, forbid_ndp)
+    return sliding_window_impl(tasks, iters, parallel)
 
 
 @task
