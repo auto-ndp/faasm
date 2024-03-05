@@ -6,7 +6,7 @@ from faasmcli.util.call import get_load_balance_strategy
 from queue import Queue
 
 @task
-def throughput_test(
+def batch_test(
     ctx,
     user,
     func,
@@ -55,7 +55,7 @@ def throughput_test(
     return batch_async_aiohttp(msg, {"Content-Type": "application/json"}, policy, iters, forbid_ndp)
 
 @task
-def latency_test(
+def sliding_window(
         ctx,
     user,
     func,
@@ -113,11 +113,12 @@ def latency_test(
         worker_id = balancer.get_next_host(forbid_ndp)
         url = format_worker_url(worker_id)
         tasks.put((url, msg, headers))
+        
     return sliding_window_impl(tasks, iters, parallel)
 
 
 @task
-def throughput_test_multiple_objects(
+def multiple_objects(
     ctx,
     user,
     func,
@@ -175,8 +176,8 @@ def throughput_test_multiple_objects(
         worker = balancer.get_next_host(forbid_ndp)
         url = format_worker_url(worker)
         msg["input_data"] = inputs_splitted[i % len(inputs_splitted)]
-        print("Input data: ", msg["input_data"])
         tasks.put((url, msg, headers))
+        
     return sliding_window_impl(tasks, iters, max_parallel)
 
 def format_worker_url(worker_id):

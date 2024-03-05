@@ -465,6 +465,8 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
               std::span(BYTES_CONST(ndpResult.outputdata().data()),
                         ndpResult.outputdata().size());
             thisModule->deltaRestore(memoryDelta);
+
+
         }
     }
 
@@ -504,6 +506,7 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
     SPDLOG_DEBUG(" ========= EXITING storageCallAndAwaitImpl =========");
     return 0;
 }
+
 WAVM_DEFINE_INTRINSIC_FUNCTION(env,
                                "__faasmndp_storageCallAndAwait",
                                I32,
