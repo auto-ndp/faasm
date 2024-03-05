@@ -84,6 +84,11 @@ def sliding_window_impl(tasks, n, max_parallel):
     lock = threading.Lock()
     completed_tasks = 0
     
+    results = []
+    
+    function_name = tasks.queue[0][1]["function"]
+    forbid_ndp = tasks.queue[0][1].get("forbid_ndp", False)
+    
     # Worker function to process tasks
     def worker():
         nonlocal completed_tasks
@@ -91,9 +96,14 @@ def sliding_window_impl(tasks, n, max_parallel):
             task = tasks.get()
             text, latency = post_request(*task)
             with lock:
-                latencies.append(latency)
-                throughputs.append(1/latency)
                 completed_tasks += 1
+                
+                result_struct = {
+                    "Latency" : latency,
+                    "Throughput": 1/latency
+                }
+                
+                results.append(result_struct)
                 print(f"\rProgress: {completed_tasks}/{n}", end="")
             tasks.task_done()
 
@@ -122,5 +132,18 @@ def sliding_window_impl(tasks, n, max_parallel):
     
     print("Median throughput: ", sorted(throughputs)[len(throughputs)//2])
     print("Mean throughput: ", sum(throughputs)/len(throughputs))
-    
+
     print("Responses received: ", len(latencies))
+    
+    # Generate a timestamp 
+    timestamp = time.strftime("%Y%m%d-%H%M%S")
+
+    filename = "{}_{}_{}_ndp_{}_iters_{}.csv".format(timestamp , function_name, "sliding_window", not forbid_ndp, n)
+    write_to_file(filename, results)
+    
+def write_to_file(filename, results_dict):
+    headers = list(results_dict[0].keys())
+    with open('./experiments/results/' + filename, 'a') as f:
+        f.write(','.join(headers) + '\n')
+        for result in results_dict:
+            f.write(','.join([str(result[header]) for header in headers]) + '\n')
