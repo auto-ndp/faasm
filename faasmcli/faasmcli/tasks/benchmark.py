@@ -175,6 +175,7 @@ def throughput_test_multiple_objects(
         worker = balancer.get_next_host(forbid_ndp)
         url = format_worker_url(worker)
         msg["input_data"] = inputs_splitted[i % len(inputs_splitted)]
+        print("Input data: ", msg["input_data"])
         tasks.put((url, msg, headers))
     return sliding_window_impl(tasks, iters, max_parallel)
 
