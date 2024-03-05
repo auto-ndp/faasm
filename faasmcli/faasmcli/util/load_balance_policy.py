@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import itertools
+from faasmcli.util.endpoints import get_invoke_host
 
 class ILoadBalanceStrategy(ABC):
     
@@ -24,19 +25,12 @@ class RoundRobinLoadBalancerStrategy(ILoadBalanceStrategy):
     def get_num_workers(self):
         return len(self.workers)
     
-class WorkerHashLoadBalancerStrategy(ILoadBalanceStrategy):
+class FaasmDefault(ILoadBalanceStrategy):
     def __init__(self, workers):
         self.workers = workers
 
     def get_next_host(self, user=None, func=None) -> str:
-        # Calculate the hash of the task ID
-        #hash_value = hash(user + func)
-
-        # Get the index of the worker based on the hash value
-        #worker_index = hash_value % len(self.workers)
-
-        #Return the worker ID
-        return self.workers[0]
+        return get_invoke_host(user, func)
 
     def get_num_workers(self):
         return len(self.workers)

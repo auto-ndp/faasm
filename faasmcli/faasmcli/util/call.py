@@ -30,7 +30,7 @@ def get_load_balance_strategy(policy):
             if obj.get_num_workers() != len(worker_list):
                 return rr_strategy # Use local strategy
             return obj
-    elif policy == "worker_hash":
+    elif policy == "faasm_default":
         obj = get_load_balancer_state(policy, local=False, docker=True, k8s=True)
         if obj is None:
             return wh_strategy
