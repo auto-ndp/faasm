@@ -723,36 +723,43 @@ int S3Wrapper::asyncNdpCall(const std::string& bucketName,
                                         std::span<const uint8_t> inputData,
                                         std::span<uint8_t> outputBuffer)
 {
-    SPDLOG_DEBUG(
-      "Async Rados NDP call of {}:{} at {}/{} with {} bytes of input",
+    SPDLOG_DEBUG("Async Rados NDP call of {}:{} at {}/{} with {} bytes of input",
       funcClass,
       funcName,
       bucketName,
       keyName,
       inputData.size());
+      
     auto pool = RadosState::instance().getPool(bucketName);
     
-    if (pool == nullptr) {
+    if (pool == nullptr)
+    {
         SPDLOG_ERROR("Pool {} does not exist", bucketName);
         throw std::runtime_error("Pool does not exist.");
     }
 
-    if (pool->ioctx == nullptr) {
+    if (pool->ioctx == nullptr)
+    {
         SPDLOG_ERROR("Pool {} does not have an ioctx", bucketName);
         throw std::runtime_error("Pool does not have an ioctx.");
     }   
 
     rados_completion_t completion;
     rados_aio_create_completion(nullptr, nullptr, completion_callback, &completion);
-    int ec = rados_aio_exec(pool->ioctx,
-                            keyName.c_str(),
-                            completion,
-                            funcClass.c_str(),
-                            funcName.c_str(),
-                            reinterpret_cast<const char*>(inputData.data()),
-                            inputData.size(),
-                            reinterpret_cast<char*>(outputBuffer.data()),
-                            outputBuffer.size());
+    rados_aio_exec(pool->ioctx,
+                    keyName.c_str(),
+                    completion,
+                    funcClass.c_str(),
+                    funcName.c_str(),
+                    reinterpret_cast<const char*>(inputData.data()),
+                    inputData.size(),
+                    reinterpret_cast<char*>(outputBuffer.data()),
+                    outputBuffer.size());
+
+    rados_aio_wait_for_complete(completion);
+    int ec = rados_aio_get_return_value(completion);
+    rados_aio_release(completion);
+
     //int ec = rados_exec(pool->ioctx,
     //                    keyName.c_str(),
     //                    funcClass.c_str(),
@@ -762,41 +769,40 @@ int S3Wrapper::asyncNdpCall(const std::string& bucketName,
     //                    reinterpret_cast<char*>(outputBuffer.data()),
     //                    outputBuffer.size());
 
-    //if (ec < 0) {
-//
-    //    switch(ec)
-    //    {
-    //        case -ERANGE:
-    //            SPDLOG_ERROR("[S3Wrapper.cpp] rados_exec failed with ERANGE. "
-    //                         "Output buffer too small for {}:{}",
-    //                         funcClass,
-    //                         funcName);
-//
-    //            throw std::runtime_error("Output buffer too small for NDP call.");
-    //        case -ENOENT:
-    //            SPDLOG_ERROR("[S3Wrapper.cpp] rados_exec failed with ENOENT. Specified object does not exist.");
-    //            throw file_not_found_error("Specified object does not exist.");
-    //        case -EPERM:
-    //            SPDLOG_ERROR("[S3Wrapper.cpp] The operation is not permitted, possibly due to insufficient permissions.");
-    //            throw std::runtime_error("rados_exec failed with EPERM. The operation is not permitted, possibly due to insufficient permissions.");
-    //        case -EIO:
-    //            SPDLOG_ERROR("[S3Wrapper.cpp] rados_exec failed with EIO. An lower-level I/O Error occurred! Possibly with OSD or network");
-    //            throw std::runtime_error("rados_exec failed with EIO. An I/O error occurred.");
-    //        case -EINVAL:
-    //            SPDLOG_ERROR("[S3Wrapper.cpp] rados_exec failed with EINVAL. Invalid argument passed to rados_exec");
-    //            throw std::runtime_error("rados_exec failed with EINVAL. Invalid argument.");   
-    //        default:
-    //            SPDLOG_ERROR("[S3Wrapper.cpp] Key {}/{} cannot run {}:{}: {}",
-    //                         bucketName,
-    //                         keyName,
-    //                         funcClass,
-    //                         funcName,
-    //                         strerror(-ec));
-    //            throw std::runtime_error("Key cannot run an NDP call.");
-    //    }
+    if (ec < 0) 
+    {
+        switch(ec)
+        {
+            case -ERANGE:
+                SPDLOG_ERROR("[S3Wrapper.cpp] rados_exec failed with ERANGE. "
+                             "Output buffer too small for {}:{}",
+                             funcClass,
+                             funcName);
+
+                throw std::runtime_error("Output buffer too small for NDP call.");
+            case -ENOENT:
+                SPDLOG_ERROR("[S3Wrapper.cpp] rados_exec failed with ENOENT. Specified object does not exist.");
+                throw file_not_found_error("Specified object does not exist.");
+            case -EPERM:
+                SPDLOG_ERROR("[S3Wrapper.cpp] The operation is not permitted, possibly due to insufficient permissions.");
+                throw std::runtime_error("rados_exec failed with EPERM. The operation is not permitted, possibly due to insufficient permissions.");
+            case -EIO:
+                SPDLOG_ERROR("[S3Wrapper.cpp] rados_exec failed with EIO. An lower-level I/O Error occurred! Possibly with OSD or network");
+                throw std::runtime_error("rados_exec failed with EIO. An I/O error occurred.");
+            case -EINVAL:
+                SPDLOG_ERROR("[S3Wrapper.cpp] rados_exec failed with EINVAL. Invalid argument passed to rados_exec");
+                throw std::runtime_error("rados_exec failed with EINVAL. Invalid argument.");   
+            default:
+                SPDLOG_ERROR("[S3Wrapper.cpp] Key {}/{} cannot run {}:{}: {}",
+                             bucketName,
+                             keyName,
+                             funcClass,
+                             funcName,
+                             strerror(-ec));
+                throw std::runtime_error("Key cannot run an NDP call.");
+        }
     }
-    rados_aio_wait_for_complete(completion);
-    rados_aio_release(completion);
+
     return ec;
-}
+    }
 }

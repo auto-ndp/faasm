@@ -369,11 +369,11 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
                                                inputSpan,
                                                cephOutput);
         
-        while (!cephCompletion.isComplete()) {
-            cephCompletion.wait();
-        }
+        // while (!cephCompletion.isComplete()) {
+        //     cephCompletion.wait();
+        // }
         
-        int cephEc = cephCompletion.getReturnValue();
+        //int cephEc = cephCompletion.getReturnValue();
 
         SPDLOG_DEBUG("[ndp_objects] Making async NDP call to Ceph");
         SPDLOG_DEBUG("[ndp_objects] S3 Args: user=faasm, key={}, bucket={}, function=maybe_exec_wasm_ro", keyStr, call->user());
