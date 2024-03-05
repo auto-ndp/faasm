@@ -77,21 +77,9 @@ def post_request(url, data, headers):
     latency = response.elapsed.total_seconds()
     return response.text, latency
 
-def format_worker_url(worker_id):
-    return "http://{}:{}/f/".format(worker_id, 8080)
-
-def sliding_window_impl(msg, headers, selected_balancer, n, max_parallel, forbid_ndp):
-    balancer = get_load_balance_strategy(selected_balancer)
-    tasks = Queue()
+def sliding_window_impl(tasks, n, max_parallel):
     latencies = []
     lock = threading.Lock()
-
-    # Populate the queue with tasks
-    print("Populating queue with {} tasks".format(n))
-    for _ in range(n):
-        worker_id = balancer.get_next_host(forbid_ndp)
-        url = format_worker_url(worker_id)
-        tasks.put((url, msg, headers))
 
     # Worker function to process tasks
     def worker():

@@ -1,6 +1,7 @@
 from invoke import task
 
 from faasmcli.util.benchmarking import batch_async_aiohttp, sliding_window_impl, run_benchmark_multiple_objs
+from faasmcli.util.load_balance_policy import get_load_balance_strategy
 
 
 @task
@@ -100,7 +101,19 @@ def latency_test(
         print("Forbid NDP: ", forbid_ndp)
         msg["forbid_ndp"] = forbid_ndp
     print("Payload:", msg)
-    return sliding_window_impl(msg, {"Content-Type": "application/json"}, policy, iters, parallel, forbid_ndp)
+    
+    tasks = []
+    headers = {"Content-Type": "application/json"}
+    
+    # Populate the queue with tasks
+    balancer = get_load_balance_strategy(policy)
+    print("Populating queue with {} tasks".format(n))
+    for _ in range(iters):
+        worker_id = balancer.get_next_host(forbid_ndp)
+        url = format_worker_url(worker_id)
+        tasks.put((url, msg, headers))
+
+    return sliding_window_impl(tasks, iters, parallel, forbid_ndp)
 
 
 @task
@@ -151,3 +164,7 @@ def throughput_test_multiple_objects(
         msg["forbid_ndp"] = forbid_ndp
     print("Payload:", msg)
     return run_benchmark_multiple_objs(msg, {"Content-Type": "application/json"}, iters, policy, forbid_ndp)
+
+
+def format_worker_url(worker_id):
+    return "http://{}:{}/f/".format(worker_id, 8080)
