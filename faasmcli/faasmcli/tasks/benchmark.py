@@ -175,7 +175,10 @@ def multiple_objects(
         worker = balancer.get_next_host(forbid_ndp)
         url = format_worker_url(worker)
         msg["input_data"] = inputs_splitted[i % len(inputs_splitted)]
-        print("Payload:", msg)
+        
+        if debug:
+            print("Task {} - {}".format(i, msg))
+            
         tasks.put((url, msg, headers))
         
     return sliding_window_impl(tasks, iters, max_parallel, policy)
