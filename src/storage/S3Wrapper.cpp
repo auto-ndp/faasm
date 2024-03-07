@@ -730,23 +730,39 @@ int S3Wrapper::asyncNdpCall(const std::string& bucketName,
       keyName,
       inputData.size());
       
-    auto pool = RadosState::instance().getPool(bucketName);
-    
-    if (pool == nullptr)
+    // auto pool = RadosState::instance().getPool(bucketName);
+    // 
+    // if (pool == nullptr)
+    // {
+    //     SPDLOG_ERROR("Pool {} does not exist", bucketName);
+    //     throw std::runtime_error("Pool does not exist.");
+    // }
+// 
+    // if (pool->ioctx == nullptr)
+    // {
+    //     SPDLOG_ERROR("Pool {} does not have an ioctx", bucketName);
+    //     throw std::runtime_error("Pool does not have an ioctx.");
+    // }   
+
+    rados_t cluster;
+    rados_create(&cluster, nullptr);
+    rados_conf_read_file(cluster, "/etc/ceph/ceph.conf");
+    rados_conf_parse_env(cluster, "CEPH_ARGS");
+    rados_connect(cluster);
+
+    rados_ioctx_t ioctx;
+    rados_ioctx_create(cluster, bucketName.c_str(), &ioctx);
+
+    if (ioctx == nullptr)
     {
-        SPDLOG_ERROR("Pool {} does not exist", bucketName);
-        throw std::runtime_error("Pool does not exist.");
+        SPDLOG_ERROR("ioctx is null");
+        throw std::runtime_error("ioctx is null.");
     }
 
-    if (pool->ioctx == nullptr)
-    {
-        SPDLOG_ERROR("Pool {} does not have an ioctx", bucketName);
-        throw std::runtime_error("Pool does not have an ioctx.");
-    }   
 
     rados_completion_t completion;
     rados_aio_create_completion(nullptr, nullptr, completion_callback, &completion);
-    rados_aio_exec(pool->ioctx,
+    rados_aio_exec(ioctx,
                     keyName.c_str(),
                     completion,
                     funcClass.c_str(),
@@ -803,6 +819,9 @@ int S3Wrapper::asyncNdpCall(const std::string& bucketName,
         }
     }
 
+    rados_ioctx_destroy(ioctx);
+    rados_shutdown(cluster);
+    
     return ec;
     }
 }
