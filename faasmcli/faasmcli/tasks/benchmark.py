@@ -178,7 +178,7 @@ def multiple_objects(
         msg["input_data"] = inputs_splitted[i % len(inputs_splitted)]
         tasks.put((url, msg, headers))
         
-    return sliding_window_impl(tasks, iters, max_parallel)
+    return sliding_window_impl(tasks, iters, max_parallel, policy)
 
 def format_worker_url(worker_id):
     return "http://{}:{}/f/".format(worker_id, 8080)
