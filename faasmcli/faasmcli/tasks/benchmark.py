@@ -164,7 +164,6 @@ def multiple_objects(
     if forbid_ndp:
         print("Forbid NDP: ", forbid_ndp)
         msg["forbid_ndp"] = forbid_ndp
-    print("Payload:", msg)
     
     inputs_splitted = inputs.split(",")
     
