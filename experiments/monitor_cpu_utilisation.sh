@@ -13,13 +13,13 @@ if [ $# -ne 1 ]; then
 fi
 
 # Start sar in the background to monitor CPU utilization
-sar -u 1 > cpu_utilization.log &
+sar -u 2 > cpu_utilization.log &
 
 # Get the process ID of sar
 sar_pid=$!
 
 # Run fio without displaying output
-fio --profile=tiobench > /dev/null 2>&1 &
+fio --profile=tiobench --numjobs=12 --blocksize=8k --iodepth=32 > /dev/null 2>&1 &
 
 # Get the process ID of fio
 fio_pid=$!

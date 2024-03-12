@@ -19,7 +19,7 @@ iostat -dkx 1 > disk_throughput.log &
 iostat_pid=$!
 
 # Run fio without displaying output
-fio --profile=tiobench > /dev/null 2>&1 &
+fio --profile=tiobench --numjobs=12 --blocksize=8k --iodepth=32 > /dev/null 2>&1 &
 
 # Get the process ID of fio
 fio_pid=$!
