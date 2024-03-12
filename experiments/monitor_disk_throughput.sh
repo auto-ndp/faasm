@@ -1,54 +1,43 @@
 #!/bin/bash
 
-# Function to display usage information
-usage() {
-    echo "Usage: $0 <time_interval>"
-    echo "Example: $0 60   # Kills iostat after 60 seconds"
-    exit 1
+# Define the size of the block (in bytes)
+block_size=1048576  # 1 MB
+
+# Generate a block of variable size filled with random data
+generate_random_block() {
+    dd if=/dev/urandom bs="$block_size" count=1 status=none
 }
 
-# Check if the user provided the time interval argument
-if [ $# -ne 1 ]; then
-    usage
-fi
+# Read block traces from the dataset
+read_traces() {
+    cat "$1"
+}
 
-# Start iostat in the background to monitor disk throughput
-iostat -dkx 1 > disk_throughput.log &
+# Parse block traces and perform operations on the block
+parse_and_apply_traces() {
+    local block="$1"
+    while IFS=, read -r operation offset size; do
+        if [[ "$operation" == "read" ]]; then
+            echo -n "Performing read operation at offset $offset with size $size... "
+            echo "$block" | dd bs=1 count="$size" skip="$offset" 2>/dev/null
+        elif [[ "$operation" == "write" ]]; then
+            echo -n "Performing write operation at offset $offset with size $size... "
+            echo "$block" | dd of=/dev/null bs=1 count="$size" seek="$offset" 2>/dev/null
+        fi
+    done < "$2"
+}
 
-# Get the process ID of iostat
-iostat_pid=$!
+# Main function
+main() {
+    # Create a block of random data
+    echo "Generating block of size $block_size..."
+    block=$(generate_random_block)
+    
+    # Apply block traces to the block
+    traces_file="block_traces.csv"  # Path to block traces dataset
+    echo "Applying block traces from $traces_file..."
+    parse_and_apply_traces "$block" "$traces_file"
+}
 
-# Run fio without displaying output
-fio --profile=tiobench --threads=24 --numruns=4096 --size=32 --block=32768 --output-format=json > fio_disk_output.json &
-
-# Get the process ID of fio
-fio_pid=$!
-
-# Ask the user for the time interval to run iostat
-time_interval=$1
-
-# Start the countdown
-echo "Experiment will end in $time_interval seconds."
-
-# Sleep for the specified time interval
-for ((i=$time_interval; i>0; i--)); do
-    echo -ne "\rTime remaining: $i seconds"
-    sleep 1
-done
-echo -ne "\n"
-
-# Kill iostat after the specified time interval
-pkill -P $iostat_pid iostat
-
-echo "iostat process has been terminated."
-
-# Kill fio after the specified time interval
-kill $fio_pid
-
-echo "fio process has been terminated."
-
-# Calculate and print the average disk throughput
-avg_disk_throughput=$(awk '/^sda/ {sum += $6} END {print "Average Disk Throughput:", sum/NR}' disk_throughput.log)
-echo $avg_disk_throughput
-
-exit 0
+# Run the main function
+main
