@@ -34,7 +34,7 @@ main() {
     block=$(generate_random_block)
     
     # Apply block traces to the block
-    traces_file="block_traces.csv"  # Path to block traces dataset
+    traces_file="test_read.csv"  # Path to block traces dataset
     echo "Applying block traces from $traces_file..."
     parse_and_apply_traces "$block" "$traces_file"
 }
