@@ -18,18 +18,36 @@ iostat -dkx 1 > disk_throughput.log &
 # Get the process ID of iostat
 iostat_pid=$!
 
-# Run fio
+# Run fio without displaying output
 fio --profile=tiobench > /dev/null 2>&1 &
+
+# Get the process ID of fio
+fio_pid=$!
 
 # Ask the user for the time interval to run iostat
 time_interval=$1
 
+# Start the countdown
+echo "Experiment will end in $time_interval seconds."
+
 # Sleep for the specified time interval
-sleep $time_interval
+for ((i=$time_interval; i>0; i--)); do
+    echo "Time remaining: $i seconds"
+    sleep 1
+done
 
 # Kill iostat after the specified time interval
 pkill -P $iostat_pid iostat
 
 echo "iostat process has been terminated."
+
+# Kill fio after the specified time interval
+kill $fio_pid
+
+echo "fio process has been terminated."
+
+# Calculate and print the average disk throughput
+avg_disk_throughput=$(awk '/^sda/ {sum += $6} END {print "Average Disk Throughput:", sum/NR}' disk_throughput.log)
+echo $avg_disk_throughput
 
 exit 0
