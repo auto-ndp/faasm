@@ -19,7 +19,7 @@ sar -u 1 > cpu_utilization.log &
 sar_pid=$!
 
 # Run fio
-fio --profile=tiobench
+fio --profile=tiobench > /dev/null 2>&1 &
 
 # Ask the user for the time interval to run sar
 time_interval=$1

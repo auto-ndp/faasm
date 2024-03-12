@@ -19,7 +19,7 @@ iostat -dkx 1 > disk_throughput.log &
 iostat_pid=$!
 
 # Run fio
-fio --profile=tiobench
+fio --profile=tiobench > /dev/null 2>&1 &
 
 # Ask the user for the time interval to run iostat
 time_interval=$1
