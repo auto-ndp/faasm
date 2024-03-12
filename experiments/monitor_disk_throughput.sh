@@ -32,9 +32,10 @@ echo "Experiment will end in $time_interval seconds."
 
 # Sleep for the specified time interval
 for ((i=$time_interval; i>0; i--)); do
-    echo "Time remaining: $i seconds"
+    echo -ne "\rTime remaining: $i seconds"
     sleep 1
 done
+echo -ne "\n"
 
 # Kill iostat after the specified time interval
 pkill -P $iostat_pid iostat
