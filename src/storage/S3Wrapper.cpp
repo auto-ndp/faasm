@@ -301,10 +301,22 @@ void S3Wrapper::createBucket(const std::string& bucketName)
     if (err < 0) {
         if (err == -EEXIST) {
             SPDLOG_DEBUG("Bucket already exists {}", bucketName);
+        } else if (err == -EINVAL) {
+            SPDLOG_ERROR("Bucket {} creation failed with EINVAL: {}",
+                         bucketName,
+                         strerror(-err));
+        } else if (err == -EPERM) {
+            SPDLOG_ERROR("Bucket {} creation failed with EPERM: {}",
+                         bucketName,
+                         strerror(-err));
+        } else if (err == -ENAMETOOLONG) {
+            SPDLOG_ERROR("Bucket {} creation failed with ENAMETOOLONG: {}",
+                         bucketName,
+                         strerror(-err));
         } else {
-            SPDLOG_ERROR(
-              "Bucket {} cannot be created: {}", bucketName, strerror(-err));
-            throw std::runtime_error("Bucket cannot be created.");
+            auto errString = fmt::format("Bucket {} cannot be created: Error {} ({})", bucketName, -err, strerror(-err));
+            SPDLOG_ERROR(errString.c_str());
+            throw std::runtime_error(errString.c_str());
         }
     }
 }
@@ -415,6 +427,7 @@ std::vector<std::string> S3Wrapper::listKeys(const std::string& bucketName)
     */
     std::vector<std::string> keys;
     auto pool = RadosState::instance().getPool(bucketName);
+
     rados_list_ctx_t lst = nullptr;
     int err = rados_nobjects_list_open(pool->ioctx, &lst);
     if (err < 0) {
@@ -710,42 +723,70 @@ int S3Wrapper::asyncNdpCall(const std::string& bucketName,
                                         std::span<const uint8_t> inputData,
                                         std::span<uint8_t> outputBuffer)
 {
-    SPDLOG_DEBUG(
-      "Async Rados NDP call of {}:{} at {}/{} with {} bytes of input",
+    SPDLOG_DEBUG("Async Rados NDP call of {}:{} at {}/{} with {} bytes of input",
       funcClass,
       funcName,
       bucketName,
       keyName,
       inputData.size());
-    auto pool = RadosState::instance().getPool(bucketName);
+      
+    // auto pool = RadosState::instance().getPool(bucketName);
+    // 
+    // if (pool == nullptr)
+    // {
+    //     SPDLOG_ERROR("Pool {} does not exist", bucketName);
+    //     throw std::runtime_error("Pool does not exist.");
+    // }
+// 
+    // if (pool->ioctx == nullptr)
+    // {
+    //     SPDLOG_ERROR("Pool {} does not have an ioctx", bucketName);
+    //     throw std::runtime_error("Pool does not have an ioctx.");
+    // }   
 
-    if (pool->ioctx == nullptr) {
-        SPDLOG_ERROR("Key {}/{} cannot be run: no pool", bucketName, keyName);
-        throw std::runtime_error("Key cannot be run.");
+    rados_t cluster;
+    rados_create(&cluster, nullptr);
+    rados_conf_read_file(cluster, "/etc/ceph/ceph.conf");
+    rados_conf_parse_env(cluster, "CEPH_ARGS");
+    rados_connect(cluster);
+
+    rados_ioctx_t ioctx;
+    rados_ioctx_create(cluster, bucketName.c_str(), &ioctx);
+
+    if (ioctx == nullptr)
+    {
+        SPDLOG_ERROR("ioctx is null");
+        throw std::runtime_error("ioctx is null.");
     }
-    
+
+
     rados_completion_t completion;
     rados_aio_create_completion(nullptr, nullptr, completion_callback, &completion);
-    int ec = rados_aio_exec(pool->ioctx,
-                            keyName.c_str(),
-                            completion,
-                            funcClass.c_str(),
-                            funcName.c_str(),
-                            reinterpret_cast<const char*>(inputData.data()),
-                            inputData.size(),
-                            reinterpret_cast<char*>(outputBuffer.data()),
-                            outputBuffer.size());
-    // int ec = rados_exec(pool->ioctx,
-    //                     keyName.c_str(),
-    //                     funcClass.c_str(),
-    //                     funcName.c_str(),
-    //                     reinterpret_cast<const char*>(inputData.data()),
-    //                     inputData.size(),
-    //                     reinterpret_cast<char*>(outputBuffer.data()),
-    //                     outputBuffer.size());
+    rados_aio_exec(ioctx,
+                    keyName.c_str(),
+                    completion,
+                    funcClass.c_str(),
+                    funcName.c_str(),
+                    reinterpret_cast<const char*>(inputData.data()),
+                    inputData.size(),
+                    reinterpret_cast<char*>(outputBuffer.data()),
+                    outputBuffer.size());
 
-    if (ec < 0) {
+    rados_aio_wait_for_complete(completion);
+    int ec = rados_aio_get_return_value(completion);
+    rados_aio_release(completion);
 
+    //int ec = rados_exec(pool->ioctx,
+    //                    keyName.c_str(),
+    //                    funcClass.c_str(),
+    //                    funcName.c_str(),
+    //                    reinterpret_cast<const char*>(inputData.data()),
+    //                    inputData.size(),
+    //                    reinterpret_cast<char*>(outputBuffer.data()),
+    //                    outputBuffer.size());
+
+    if (ec < 0) 
+    {
         switch(ec)
         {
             case -ERANGE:
@@ -778,9 +819,9 @@ int S3Wrapper::asyncNdpCall(const std::string& bucketName,
         }
     }
 
-    rados_aio_wait_for_complete(completion);
-    rados_aio_release(completion);
-    // return completion;
+    rados_ioctx_destroy(ioctx);
+    rados_shutdown(cluster);
+    
     return ec;
-}
+    }
 }

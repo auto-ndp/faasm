@@ -139,3 +139,5 @@ callgrind.*
 *.svg
 
 .fsid*
+
+*_large.txt

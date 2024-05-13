@@ -368,26 +368,15 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
                                                "maybe_exec_wasm_ro",
                                                inputSpan,
                                                cephOutput);
+        
         // while (!cephCompletion.isComplete()) {
         //     cephCompletion.wait();
         // }
-        // 
-        // int cephEc = cephCompletion.getReturnValue();
+        
+        //int cephEc = cephCompletion.getReturnValue();
 
         SPDLOG_DEBUG("[ndp_objects] Making async NDP call to Ceph");
         SPDLOG_DEBUG("[ndp_objects] S3 Args: user=faasm, key={}, bucket={}, function=maybe_exec_wasm_ro", keyStr, call->user());
-        // try {
-        //     cephEc = s3w.asyncNdpCall(call->user(),
-        //                               keyStr,
-        //                               "faasm",
-        //                               "maybe_exec_wasm_ro",
-        //                               inputSpan,
-        //                               cephOutput);
-// 
-        // } catch (const std::exception& e) {
-        //     SPDLOG_ERROR("asyncNdpCall threw exception: {}", e.what());
-        //     throw;
-        // }
         
         SPDLOG_DEBUG("asyncNdpCall returned {}", cephEc);
 
@@ -476,6 +465,8 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
               std::span(BYTES_CONST(ndpResult.outputdata().data()),
                         ndpResult.outputdata().size());
             thisModule->deltaRestore(memoryDelta);
+
+
         }
     }
 
@@ -515,6 +506,7 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
     SPDLOG_DEBUG(" ========= EXITING storageCallAndAwaitImpl =========");
     return 0;
 }
+
 WAVM_DEFINE_INTRINSIC_FUNCTION(env,
                                "__faasmndp_storageCallAndAwait",
                                I32,

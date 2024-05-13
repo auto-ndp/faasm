@@ -24,3 +24,5 @@ requests==2.25.1
 setuptools==57.0.0
 sphinx-rtd-theme==1.0.0
 wheel==0.36.2
+aiohttp==3.9.3
+```

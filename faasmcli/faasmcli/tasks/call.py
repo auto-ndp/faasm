@@ -4,10 +4,11 @@ from faasmcli.util.call import (
     invoke_impl,
     status_call_impl,
     exec_graph_call_impl,
-    dispatch_impl
+    dispatch_impl,
 )
 from faasmcli.util.endpoints import get_invoke_host_port
 from faasmcli.util.exec_graph import parse_exec_graph_json, plot_exec_graph
+
 LAST_CALL_ID_FILE = "/tmp/faasm_last_call.txt"
 
 @task(default=True)
@@ -24,6 +25,7 @@ def invoke(
     debug=False,
     sgx=False,
     graph=False,
+    forbid_ndp=False
 ):
     """
     Invoke a function
@@ -40,6 +42,7 @@ def invoke(
         debug=debug,
         sgx=sgx,
         graph=graph,
+        forbid_ndp=forbid_ndp
     )
 
     if asynch:
@@ -62,6 +65,7 @@ def dispatch(
     debug=False,
     sgx=False,
     graph=False,
+    forbid_ndp=False
 ):
     """
     Invoke a function
@@ -79,6 +83,7 @@ def dispatch(
         debug=debug,
         sgx=sgx,
         graph=graph,
+        forbid_ndp=forbid_ndp
     )
 
     if asynch:
@@ -96,48 +101,6 @@ def get_call_id(call_id):
             exit(1)
 
     return call_id
-
-@task
-def batch_execute(
-    ctx,
-    user,
-    func,
-    iters=10,
-    policy="round_robin",
-    input=None,
-    py=False,
-    asynch=False,
-    poll=False,
-    cmdline=None,
-    mpi_world_size=None,
-    debug=False,
-    sgx=False,
-    graph=False,
-):
-    """
-    Invoke a function
-    """
-    for i in range(int(iters)):
-        res = dispatch_impl(
-            user,
-            func,
-            policy=policy,
-            input=input,
-            py=py,
-            asynch=asynch,
-            poll=poll,
-            cmdline=cmdline,
-            mpi_world_size=mpi_world_size,
-            debug=debug,
-            sgx=sgx,
-            graph=graph,
-        )
-
-        if asynch:
-            print("Call ID: " + str(res))
-            with open(LAST_CALL_ID_FILE, "w") as fh:
-                fh.write(str(res))
-
 
 @task
 def status(ctx, call_id=None):

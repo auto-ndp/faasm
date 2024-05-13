@@ -109,13 +109,11 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
             SPDLOG_INFO("[ndp_endpoint::onFirstReceivable] CPU utilisation: {}", stats.cpu_utilisation);
             SPDLOG_INFO("[ndp_endpoint::onFirstReceivable] RAM utilisation: {}", stats.ram_utilisation);
             SPDLOG_INFO("[ndp_endpoint::onFirstReceivable] Load average: {}", stats.load_average);
-            SPDLOG_INFO("[ndp_endpoint::onFirstReceivable] Has thread capacity: {}", hasCapacity);
 
             auto& conf = faabric::util::getSystemConfig();
-            const bool should_offload = hasCapacity && 
-                                  stats.cpu_utilisation < conf.offload_cpu_threshold &&
+            const bool should_offload = stats.cpu_utilisation < conf.offload_cpu_threshold &&
                                   stats.ram_utilisation < conf.offload_ram_threshold && 
-                                  stats.load_average < conf.offload_load_avg_threshold;
+                                  stats.load_average < faabric::util::getUsableCores() * conf.offload_load_avg_threshold;
 
             auto ndpResult = should_offload ? ndpmsg::NdpResult_Ok : ndpmsg::NdpResult_ProcessLocally;
             std::string ndpError;
@@ -220,10 +218,10 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
 
             SPDLOG_DEBUG("[ndp_endpoint::onFirstReceivable] hasCapacity: {}", hasCapacity);
 
-            if (hasCapacity) {
+            //if (hasCapacity) {
                 SPDLOG_DEBUG("[ndp_endpoint::onFirstReceivable] Doing recv");
                 doRecv();
-            } 
+            //} 
         } else {
             SPDLOG_ERROR(
               "Error waiting for first recv on the ndp connection: {}",
