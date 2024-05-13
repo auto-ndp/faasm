@@ -17,6 +17,7 @@
 #include <faabric/util/snapshot.h>
 #include <faabric/util/timing.h>
 #include <memory>
+
 #include <stdexcept>
 #include <storage/S3Wrapper.h>
 #include <wasm/WasmExecutionContext.h>
@@ -52,26 +53,27 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
     if (keyPtr <= 0 || keyLen <= 0 || dataPtr <= 0 || dataLen <= 0) {
         return -1;
     }
-    const faabric::util::SystemConfig& config =
-      faabric::util::getSystemConfig();
 
-    faabric::Message* executingCall =
-      &faabric::scheduler::ExecutorContext::get()->getMsg();
+    SPDLOG_DEBUG("[ndp_objects::__faasmndp_put] Fetching system config and retrieving executing call");
+    const faabric::util::SystemConfig& config = faabric::util::getSystemConfig();
+    faabric::Message* executingCall = &faabric::scheduler::ExecutorContext::get()->getMsg();
+    
+    SPDLOG_DEBUG("[ndp_objects::__faasmndp_put] Fetching executing WASM module and memory pointer");
     WAVMWasmModule* module_ = getExecutingWAVMModule();
     Runtime::Memory* memoryPtr = module_->defaultMemory;
-    U8* key =
-      Runtime::memoryArrayPtr<U8>(memoryPtr, (Uptr)keyPtr, (Uptr)keyLen);
+    
+    SPDLOG_DEBUG("[ndp_objects::__faasmndp_put] Fetching key and data pointers");
+    U8* key = Runtime::memoryArrayPtr<U8>(memoryPtr, (Uptr)keyPtr, (Uptr)keyLen);
     std::string_view keyStr(reinterpret_cast<char*>(key), keyLen);
-    U8* data =
-      Runtime::memoryArrayPtr<U8>(memoryPtr, (Uptr)dataPtr, (Uptr)dataLen);
+    U8* data = Runtime::memoryArrayPtr<U8>(memoryPtr, (Uptr)dataPtr, (Uptr)dataLen);
 
-    SPDLOG_DEBUG(
-      "S - __faasmndp_put - {} {} {} {}", keyPtr, keyLen, dataPtr, dataLen);
+    SPDLOG_DEBUG("S - __faasmndp_put - {} {} {} {}", keyPtr, keyLen, dataPtr, dataLen);
 
     try {
         using namespace faasm;
         if (config.isStorageNode &&
             keyStr == executingCall->ndpcallobjectname()) {
+            SPDLOG_DEBUG("[ndp_objects::__faasmndp_put] Requesting NDP socket for write call");
             auto sock = getNdpSocketFromCall(executingCall->id());
 
             flatbuffers::FlatBufferBuilder builder(256);
@@ -87,6 +89,7 @@ WAVM_DEFINE_INTRINSIC_FUNCTION(env,
             auto msgOffset = msgBuilder.Finish();
             builder.Finish(msgOffset);
 
+            SPDLOG_DEBUG("[ndp_objects::__faasmndp_put] Sending NDP write request");
             sock->sendMessage(builder.GetBufferPointer(), builder.GetSize());
             sock = nullptr;
             auto maybeResponse = awaitNdpResponse(executingCall->id());
@@ -259,83 +262,80 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
                             std::span<I32> extraArgs)
 {
     ZoneScopedN("storageCallAndAwaitImpl");
+    SPDLOG_DEBUG(" ========= EXECUTING STORAGE CALL AND AWAIT IMPL =========");
+    SPDLOG_DEBUG("[ndp_objects] storageCallAndAwaitImpl entered");
     static storage::S3Wrapper s3w;
-    if (keyPtr <= 0 || keyLen <= 0) {
-        return 0;
-    }
-    const faabric::util::SystemConfig& config =
-      faabric::util::getSystemConfig();
+    if (keyPtr <= 0 || keyLen <= 0) { return 0; }
+    const faabric::util::SystemConfig& config = faabric::util::getSystemConfig();
+
+    // Extract python function name
     const bool isPython = pyFuncNamePtr != 0;
-    const std::string pyFuncName =
-      isPython ? getStringFromWasm(pyFuncNamePtr) : "";
-    SPDLOG_DEBUG("S - storageCallAndAwaitImpl - {} {} #{}",
+    const std::string pyFuncName = isPython ? getStringFromWasm(pyFuncNamePtr) : "";
+    SPDLOG_DEBUG("S - storageCallAndAwaitImpl - WASM Func ptr={} Python Func name={} #{}",
                  wasmFuncPtr,
                  pyFuncName,
                  extraArgs.size());
 
-    faabric::Message* call =
-      &faabric::scheduler::ExecutorContext::get()->getMsg();
-
+    faabric::Message* call = &faabric::scheduler::ExecutorContext::get()->getMsg();
     WAVMWasmModule* thisModule = static_cast<WAVMWasmModule*>(
-      getCurrentWasmExecutionContext()->executingModule);
+        getCurrentWasmExecutionContext()->executingModule); // ptr to current WASM Module
 
     Runtime::Memory* memoryPtr = thisModule->defaultMemory;
-    U8* key =
-      Runtime::memoryArrayPtr<U8>(memoryPtr, (Uptr)keyPtr, (Uptr)keyLen);
+    U8* key = Runtime::memoryArrayPtr<U8>(memoryPtr, (Uptr)keyPtr, (Uptr)keyLen);
     std::string keyStr(reinterpret_cast<char*>(key), keyLen);
 
     // Validate function signature
     if (!isPython) {
+        SPDLOG_DEBUG("[ndp_objects::storageCallAndAwaitImpl] Extracting function signature for C++ program");
         auto* funcInstance = thisModule->getFunctionFromPtr(wasmFuncPtr);
         auto funcType = Runtime::getFunctionType(funcInstance);
-        if (funcType.results().size() != 1 ||
-            funcType.params().size() != extraArgs.size()) {
-            throw std::invalid_argument(
-              "Wrong function signature for storageCallAndAwait");
+
+        // If extracted function signature does not match the actual function signature
+        if (funcType.results().size() != 1 || funcType.params().size() != extraArgs.size())
+        {
+            throw std::invalid_argument("Wrong function signature for storageCallAndAwait");
         }
-        for (const auto& param : funcType.params()) {
-            if (param != IR::ValueType::i32) {
+
+        // Ensure function argument are i32's
+        for (const auto& param : funcType.params())
+        {
+            if (param != IR::ValueType::i32)
+            {
                 throw std::invalid_argument("Function argument not i32");
             }
         }
     }
 
-    bool callLocally = true;
+    bool callLocally = true; // flag set to true when function should be called on current node, false when offloaded
     if (!call->forbidndp() && !config.isStorageNode) {
+        SPDLOG_INFO("[ndp_objects::storageCallAndAwaitImpl] NDP Call detected, offloading funclets to the relevant storage node");
         using namespace faasm;
         callLocally = false;
 
         std::vector<int32_t> wasmGlobals = thisModule->getGlobals();
 
-        const int ndpCallId = faabric::util::generateGid() & 0xFFFF'FFFF;
-
-        faabric::scheduler::FunctionCallServer::registerNdpDeltaHandler(
-          ndpCallId, [thisModule, callId = call->id()]() {
-              auto zygoteSnapshotKV = thisModule->getZygoteSnapshot();
-              const std::span<const uint8_t> zygoteSnapshot{
-                  zygoteSnapshotKV->get(), zygoteSnapshotKV->size()
-              };
-              auto zygoteDelta = thisModule->deltaSnapshot(zygoteSnapshot);
-
-              SPDLOG_INFO("{} - NDP sending snapshot of {} bytes",
-                          callId,
-                          zygoteDelta.size());
-              return zygoteDelta;
-          });
+        const int ndpCallId = faabric::util::generateGid() & 0xFFFF'FFFF;        
+        faabric::scheduler::FunctionCallServer::registerNdpDeltaHandler(ndpCallId, [thisModule, callId = call->id()]()
+        {
+            std::shared_ptr<faabric::state::StateKeyValue> zygoteSnapshotKV = thisModule->getZygoteSnapshot();
+            const std::span<const uint8_t> zygoteSnapshot{ zygoteSnapshotKV->get(), zygoteSnapshotKV->size() };
+            std::vector<uint8_t> zygoteDelta = thisModule->deltaSnapshot(zygoteSnapshot);
+            SPDLOG_INFO("{} - NDP sending snapshot of {} bytes", callId, zygoteDelta.size());
+            return zygoteDelta;
+        });
         faabric::scheduler::getScheduler().addLocalResultSlot(ndpCallId);
 
         // begin ceph aio
         flatbuffers::FlatBufferBuilder builder(256);
         {
-            auto fBucket = builder.CreateString(call->user());
+            auto fBucket   = builder.CreateString(call->user());
             auto fFunction = builder.CreateString(call->function());
-            auto fKey = builder.CreateString(keyStr);
-            auto fObjInfo = ndpmsg::CreateObjectInfo(builder, fBucket, fKey);
+            auto fKey      = builder.CreateString(keyStr);
+            auto fObjInfo  = ndpmsg::CreateObjectInfo(builder, fBucket, fKey);
 
-            auto fPyPtr = builder.CreateString(pyFuncName);
-            auto fGlobals = builder.CreateVector(wasmGlobals);
-            auto fArgs =
-              builder.CreateVector(extraArgs.data(), extraArgs.size());
+            auto fPyPtr    = builder.CreateString(pyFuncName);
+            auto fGlobals  = builder.CreateVector(wasmGlobals);
+            auto fArgs     = builder.CreateVector(extraArgs.data(), extraArgs.size());
             auto fWasmInfo = ndpmsg::CreateWasmInfo(builder,
                                                     fBucket,
                                                     fFunction,
@@ -343,45 +343,59 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
                                                     fPyPtr,
                                                     fGlobals,
                                                     fArgs);
-
+            
+            SPDLOG_DEBUG("[ndp_objects] Making NDP request with call id {}", ndpCallId);
             auto fOriginHost = builder.CreateString(config.endpointHost);
-            auto ndpRequest = ndpmsg::CreateNdpRequest(
-              builder, ndpCallId, fWasmInfo, fObjInfo, fOriginHost);
-
+            auto ndpRequest  = ndpmsg::CreateNdpRequest(builder, ndpCallId, fWasmInfo, fObjInfo, fOriginHost);
             builder.Finish(ndpRequest);
         }
+
+        SPDLOG_DEBUG("Sent storage request to bucket={}, key={}, function={}, call_id={}, origin_host={}",
+                     call->user(),
+                     keyStr,
+                     call->function(),
+                     ndpCallId,
+                     config.endpointHost);
+                     
         const std::span<const uint8_t> inputSpan(builder.GetBufferPointer(),
                                                  builder.GetSize());
 
         std::vector<uint8_t> cephOutput(1024);
 
-        // auto cephCompletion = s3w.asyncNdpCall(call->user(),
-        //                                        keyStr,
-        //                                        "faasm",
-        //                                        "maybe_exec_wasm_ro",
-        //                                        inputSpan,
-        //                                        cephOutput);
-
+        int cephEc = s3w.asyncNdpCall(call->user(),
+                                               keyStr,
+                                               "faasm",
+                                               "maybe_exec_wasm_ro",
+                                               inputSpan,
+                                               cephOutput);
         // while (!cephCompletion.isComplete()) {
         //     cephCompletion.wait();
         // }
+        // 
         // int cephEc = cephCompletion.getReturnValue();
 
-        int cephEc = s3w.asyncNdpCall(call->user(),
-                                      keyStr,
-                                      "faasm",
-                                      "maybe_exec_wasm_ro",
-                                      inputSpan,
-                                      cephOutput);
-
+        SPDLOG_DEBUG("[ndp_objects] Making async NDP call to Ceph");
+        SPDLOG_DEBUG("[ndp_objects] S3 Args: user=faasm, key={}, bucket={}, function=maybe_exec_wasm_ro", keyStr, call->user());
+        // try {
+        //     cephEc = s3w.asyncNdpCall(call->user(),
+        //                               keyStr,
+        //                               "faasm",
+        //                               "maybe_exec_wasm_ro",
+        //                               inputSpan,
+        //                               cephOutput);
+// 
+        // } catch (const std::exception& e) {
+        //     SPDLOG_ERROR("asyncNdpCall threw exception: {}", e.what());
+        //     throw;
+        // }
+        
         SPDLOG_DEBUG("asyncNdpCall returned {}", cephEc);
 
-        if (cephEc < 0) {
+        if (cephEc < 0) { // if error occurred
             std::string cephErrStr = "<? ";
             try {
                 verifyFlatbuf<ndpmsg::NdpResponse>(cephOutput);
-                const auto* ndpResponse =
-                  flatbuffers::GetRoot<ndpmsg::NdpResponse>(cephOutput.data());
+                const auto* ndpResponse = flatbuffers::GetRoot<ndpmsg::NdpResponse>(cephOutput.data());
                 cephErrStr = ndpResponse->error_msg()->str();
             } catch (std::exception& e) {
                 cephErrStr = fmt::format(
@@ -401,13 +415,16 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
         }
 
         verifyFlatbuf<ndpmsg::NdpResponse>(cephOutput);
-        const auto* ndpResponse =
-          flatbuffers::GetRoot<ndpmsg::NdpResponse>(cephOutput.data());
-        if (ndpResponse->call_id() != ndpCallId) {
+        const auto* ndpResponse = flatbuffers::GetRoot<ndpmsg::NdpResponse>(cephOutput.data()); // Construct response based on Ceph output buffer
+        if (ndpResponse->call_id() != ndpCallId) 
+        {
             throw std::runtime_error("Mismatched call ids in storage message!");
         }
+
+        // State Machine for NDP Response codes
         switch (ndpResponse->result()) {
             case ndpmsg::NdpResult_Ok:
+                SPDLOG_INFO("Ceph NDP result for {}/{} returned OK", call->user(), call->function());
                 break;
             case ndpmsg::NdpResult_Error: {
                 SPDLOG_ERROR("Ceph NDP call {} for {}/{} returned error {}",
@@ -418,22 +435,24 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
                 throw std::runtime_error("Ceph NDP call returned an error.");
             }
             case ndpmsg::NdpResult_ProcessLocally: {
+                SPDLOG_INFO("Ceph NDP call returned ProcessLocally, calling locally");
                 callLocally = true;
                 break;
             }
             default:
                 throw std::runtime_error("Invalid NDP result code");
         }
+
         if (!callLocally) {
+            SPDLOG_DEBUG("[ndp_objects] Awaiting chained NDP call");
             faabric::Message ndpResult = awaitChainedCallMessage(ndpCallId);
 
-            faabric::scheduler::FunctionCallServer::removeNdpDeltaHandler(
-              ndpCallId);
+            faabric::scheduler::FunctionCallServer::removeNdpDeltaHandler(ndpCallId); // clear after function called
 
-            if (ndpResult.returnvalue() != 0) {
+            if (ndpResult.returnvalue() != 0) // error occurred
+            {
                 call->set_outputdata(ndpResult.outputdata());
-                SPDLOG_DEBUG("Chained NDP resulted in error code {}",
-                             ndpResult.returnvalue());
+                SPDLOG_DEBUG("Chained NDP resulted in error code {}", ndpResult.returnvalue());
                 return ndpResult.returnvalue();
             }
 
@@ -449,9 +468,7 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
                 }
             }
 
-            SPDLOG_INFO("{} - NDP delta restore from {} bytes",
-                        call->id(),
-                        ndpResult.outputdata().size());
+            SPDLOG_INFO("{} - NDP delta restore from {} bytes", call->id(), ndpResult.outputdata().size());
             // faabric::util::writeBytesToFile(
             //   "/usr/local/faasm/debug_shared_store/debug_delta.bin",
             //   faabric::util::stringToBytes(ndpResult.outputdata()));
@@ -461,31 +478,43 @@ I32 storageCallAndAwaitImpl(I32 keyPtr,
             thisModule->deltaRestore(memoryDelta);
         }
     }
+
+    // if calling locally
     if (callLocally) {
         ZoneScopedN("call locally");
+        SPDLOG_DEBUG("[ndp_objects] Calling locally");
         if (isPython) {
             return -0x12345678;
         }
+
+        // Initialise function with arguments
         auto* funcInstance = thisModule->getFunctionFromPtr(wasmFuncPtr);
         auto funcType = Runtime::getFunctionType(funcInstance);
         std::vector<IR::UntaggedValue> funcArgs;
         funcArgs.reserve(extraArgs.size() + 1);
-        for (I32 param : extraArgs) {
+        for (I32 param : extraArgs) 
+        {
             funcArgs.push_back(param);
         }
         funcArgs.push_back(0);
         IR::UntaggedValue result;
-        Runtime::invokeFunction(thisModule->executionContext,
-                                funcInstance,
-                                funcType,
-                                funcArgs.data(),
-                                &result);
+
+        // Invoke function on the current faasm runtime
+        try {
+            Runtime::invokeFunction(thisModule->executionContext,
+                                    funcInstance,
+                                    funcType,
+                                    funcArgs.data(),
+                                    &result);
+        } catch (std::exception& e) {
+            SPDLOG_ERROR("Caught exception: {}", e.what());
+            return -0x12345678;
+        }  
         return result.i32;
     }
-
+    SPDLOG_DEBUG(" ========= EXITING storageCallAndAwaitImpl =========");
     return 0;
 }
-
 WAVM_DEFINE_INTRINSIC_FUNCTION(env,
                                "__faasmndp_storageCallAndAwait",
                                I32,

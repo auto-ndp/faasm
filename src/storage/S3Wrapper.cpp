@@ -4,6 +4,7 @@
 
 #include <faabric/util/bytes.h>
 #include <faabric/util/logging.h>
+#include <errno.h>
 
 #include <absl/container/flat_hash_map.h>
 
@@ -693,12 +694,15 @@ std::string S3Wrapper::getKeyStr(const std::string& bucketName,
       getKeyBytes(bucketName, keyName, false));
 }
 
-// RadosCompletion S3Wrapper::asyncNdpCall(const std::string& bucketName,
-//                                         const std::string& keyName,
-//                                         const std::string& funcClass,
-//                                         const std::string& funcName,
-//                                         std::span<const uint8_t> inputData,
-//                                         std::span<uint8_t> outputBuffer)
+void completion_callback(rados_completion_t completion, void *arg) {
+    int result = rados_aio_get_return_value(completion);
+    if (result < 0) {
+        SPDLOG_ERROR("NDP call failed with error: {}", result);
+    } else {
+        SPDLOG_DEBUG("NDP call completed successfully");
+    }
+}
+
 int S3Wrapper::asyncNdpCall(const std::string& bucketName,
                                         const std::string& keyName,
                                         const std::string& funcClass,
@@ -714,34 +718,68 @@ int S3Wrapper::asyncNdpCall(const std::string& bucketName,
       keyName,
       inputData.size());
     auto pool = RadosState::instance().getPool(bucketName);
-    RadosCompletion completion(pool);
-    // int ec = rados_aio_exec(pool->ioctx,
-    //                         keyName.c_str(),
-    //                         completion.completion,
-    //                         funcClass.c_str(),
-    //                         funcName.c_str(),
-    //                         reinterpret_cast<const char*>(inputData.data()),
-    //                         inputData.size(),
-    //                         reinterpret_cast<char*>(outputBuffer.data()),
-    //                         outputBuffer.size());
 
-    int ec = rados_exec(pool->ioctx,
-                        keyName.c_str(),
-                        funcClass.c_str(),
-                        funcName.c_str(),
-                        reinterpret_cast<const char*>(inputData.data()),
-                        inputData.size(),
-                        reinterpret_cast<char*>(outputBuffer.data()),
-                        outputBuffer.size());
-    if (ec < 0) {
-        SPDLOG_ERROR("Key {}/{} cannot run {}:{}: {}",
-                     bucketName,
-                     keyName,
-                     funcClass,
-                     funcName,
-                     strerror(-ec));
-        throw std::runtime_error("Key cannot run an NDP call.");
+    if (pool->ioctx == nullptr) {
+        SPDLOG_ERROR("Key {}/{} cannot be run: no pool", bucketName, keyName);
+        throw std::runtime_error("Key cannot be run.");
     }
+    
+    rados_completion_t completion;
+    rados_aio_create_completion(nullptr, nullptr, completion_callback, &completion);
+    int ec = rados_aio_exec(pool->ioctx,
+                            keyName.c_str(),
+                            completion,
+                            funcClass.c_str(),
+                            funcName.c_str(),
+                            reinterpret_cast<const char*>(inputData.data()),
+                            inputData.size(),
+                            reinterpret_cast<char*>(outputBuffer.data()),
+                            outputBuffer.size());
+    // int ec = rados_exec(pool->ioctx,
+    //                     keyName.c_str(),
+    //                     funcClass.c_str(),
+    //                     funcName.c_str(),
+    //                     reinterpret_cast<const char*>(inputData.data()),
+    //                     inputData.size(),
+    //                     reinterpret_cast<char*>(outputBuffer.data()),
+    //                     outputBuffer.size());
+
+    if (ec < 0) {
+
+        switch(ec)
+        {
+            case -ERANGE:
+                SPDLOG_ERROR("[S3Wrapper.cpp] rados_exec failed with ERANGE. "
+                             "Output buffer too small for {}:{}",
+                             funcClass,
+                             funcName);
+
+                throw std::runtime_error("Output buffer too small for NDP call.");
+            case -ENOENT:
+                SPDLOG_ERROR("[S3Wrapper.cpp] rados_exec failed with ENOENT. Specified object does not exist.");
+                throw file_not_found_error("Specified object does not exist.");
+            case -EPERM:
+                SPDLOG_ERROR("[S3Wrapper.cpp] The operation is not permitted, possibly due to insufficient permissions.");
+                throw std::runtime_error("rados_exec failed with EPERM. The operation is not permitted, possibly due to insufficient permissions.");
+            case -EIO:
+                SPDLOG_ERROR("[S3Wrapper.cpp] rados_exec failed with EIO. An lower-level I/O Error occurred! Possibly with OSD or network");
+                throw std::runtime_error("rados_exec failed with EIO. An I/O error occurred.");
+            case -EINVAL:
+                SPDLOG_ERROR("[S3Wrapper.cpp] rados_exec failed with EINVAL. Invalid argument passed to rados_exec");
+                throw std::runtime_error("rados_exec failed with EINVAL. Invalid argument.");   
+            default:
+                SPDLOG_ERROR("[S3Wrapper.cpp] Key {}/{} cannot run {}:{}: {}",
+                             bucketName,
+                             keyName,
+                             funcClass,
+                             funcName,
+                             strerror(-ec));
+                throw std::runtime_error("Key cannot run an NDP call.");
+        }
+    }
+
+    rados_aio_wait_for_complete(completion);
+    rados_aio_release(completion);
     // return completion;
     return ec;
 }

@@ -233,6 +233,8 @@ class CephFaasmSocket
             if (result < 0) {
                 if (errno == EINTR) {
                     continue;
+                } else if (errno == EAGAIN) {
+                    continue;
                 }
                 perror("Couldn't recv cephcomm data");
                 throw std::runtime_error("Couldn't recv cephcomm data");

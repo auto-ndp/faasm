@@ -91,24 +91,28 @@ int32_t Faaslet::executeTask(int threadPoolIdx,
     // operations being thread-safe.
 
     if (!threadIsIsolated) {
+        SPDLOG_INFO("Thread is not isolated");
         // Add this thread to the cgroup
         CGroup cgroup(BASE_CGROUP_NAME);
         cgroup.addCurrentThread();
 
         // Set up network namespace
         ns = claimNetworkNamespace();
+        SPDLOG_INFO("Claimed network namespace");
         ns->addCurrentThread();
 
         threadIsIsolated = true;
-    }
+    }   
 
+    SPDLOG_INFO("Executing task");
     int32_t returnValue = module->executeTask(threadPoolIdx, msgIdx, req);
-
+    SPDLOG_INFO("Finished executing task");
     return returnValue;
 }
 
 void Faaslet::reset(faabric::Message& msg)
 {
+    SPDLOG_INFO("[Faaslet.cpp] Resetting faaslet");
     if (module->isBound()) {
         module->reset(msg, localResetSnapshotKey);
     } else {

@@ -18,7 +18,6 @@ def _get_config_value(env_var, key, default_value):
 
     return default_value
 
-
 def get_upload_host_port():
     host = _get_config_value("UPLOAD_HOST", "upload_host", "127.0.0.1")
     port = _get_config_value("UPLOAD_PORT", "upload_port", 8002)

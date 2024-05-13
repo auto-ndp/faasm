@@ -541,9 +541,11 @@ int32_t WasmModule::executeTask(
           std::span(BYTES_CONST(zygoteDelta.data()), zygoteDelta.size()));
     } else if (msg.isstorage()) {
         ZoneNamedN(_zone_fetch, "Fetch NDP delta", true);
+        SPDLOG_DEBUG("Fetching NDP delta for {}", funcStr);
         auto recvDelta = faabric::scheduler::getScheduler()
                            .getFunctionCallClient(msg.directresulthost())
                            ->requestNdpDelta(msg.id());
+        SPDLOG_DEBUG("Received NDP delta for {}", funcStr);
         ZoneNamedN(_zone_apply, "Apply NDP delta", true);
         this->zygoteDeltaRestore(std::span(
           BYTES_CONST(recvDelta.delta().data()), recvDelta.delta().size()));
@@ -594,6 +596,8 @@ int32_t WasmModule::executeTask(
         returnValue = executeFunction(msg);
     }
 
+    SPDLOG_INFO("Returned from function");
+
     if (returnValue != 0 && !msg.isstorage()) {
         msg.set_outputdata(
           fmt::format("Call failed (return value={})", returnValue));
@@ -601,9 +605,12 @@ int32_t WasmModule::executeTask(
 
     // Add captured stdout if necessary
     conf::FaasmConfig& conf = conf::getFaasmConfig();
+    SPDLOG_INFO("Adding captured STDOUT");
     if (conf.captureStdout == "on" && !msg.isstorage()) {
+        SPDLOG_INFO("Capturing STDOUT");
         std::string moduleStdout = getCapturedStdout();
         if (!moduleStdout.empty()) {
+            SPDLOG_INFO("STDOUT Empty");
             std::string newOutput = moduleStdout + "\n" + msg.outputdata();
             msg.set_outputdata(newOutput);
 

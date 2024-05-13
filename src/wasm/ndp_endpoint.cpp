@@ -7,10 +7,15 @@
 #include <boost/system/detail/error_code.hpp>
 #include <condition_variable>
 #include <exception>
+#include <faabric/util/logging.h>
 #include <flatbuffers/flatbuffer_builder.h>
 #include <functional>
 #include <future>
 #include <memory>
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <fstream>
 #include <stdexcept>
 
 #include <cephcomm_generated.h>
@@ -19,6 +24,8 @@
 #include <faabric/util/concurrent_map.h>
 #include <faabric/util/func.h>
 #include <faabric/util/logging.h>
+#include <faabric/util/environment.h>
+#include <faabric/util/system_metrics.h>
 #include <wasm/ndp.h>
 
 namespace faasm {
@@ -26,8 +33,7 @@ namespace faasm {
 class NdpEndpoint;
 class NdpConnection;
 
-static faabric::util::ConcurrentMap<uint64_t, std::weak_ptr<NdpConnection>>
-  ndpSocketMap;
+static faabric::util::ConcurrentMap<uint64_t, std::shared_ptr<NdpConnection>> ndpSocketMap;
 
 class NdpConnection : public std::enable_shared_from_this<NdpConnection>
 {
@@ -86,7 +92,7 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
     // Handles one message
     void onFirstReceivable(const boost::system::error_code& ec)
     {
-        SPDLOG_DEBUG("DING DONG");
+        SPDLOG_DEBUG("[ndp_endpoint] onFirstReceivable [{}]", ec.message());
         namespace fbs = flatbuffers;
         if (!ec) {
             auto msgData = connection->recvMessageVector();
@@ -97,16 +103,27 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
 
             auto& sch = faabric::scheduler::getScheduler();
             const bool hasCapacity = sch.executionSlotsSemaphore.try_acquire();
-            auto ndpResult = hasCapacity ? ndpmsg::NdpResult_Ok
-                                         : ndpmsg::NdpResult_ProcessLocally;
+            faabric::util::UtilisationStats stats = faabric::util::getSystemUtilisation();
+
+            SPDLOG_INFO("[ndp_endpoint::onFirstReceivable] Number of usable cores: {}", faabric::util::getUsableCores());
+            SPDLOG_INFO("[ndp_endpoint::onFirstReceivable] CPU utilisation: {}", stats.cpu_utilisation);
+            SPDLOG_INFO("[ndp_endpoint::onFirstReceivable] RAM utilisation: {}", stats.ram_utilisation);
+            SPDLOG_INFO("[ndp_endpoint::onFirstReceivable] Load average: {}", stats.load_average);
+            SPDLOG_INFO("[ndp_endpoint::onFirstReceivable] Has thread capacity: {}", hasCapacity);
+
+            auto& conf = faabric::util::getSystemConfig();
+            const bool should_offload = hasCapacity && 
+                                  stats.cpu_utilisation < conf.offload_cpu_threshold &&
+                                  stats.ram_utilisation < conf.offload_ram_threshold && 
+                                  stats.load_average < conf.offload_load_avg_threshold;
+
+            auto ndpResult = should_offload ? ndpmsg::NdpResult_Ok : ndpmsg::NdpResult_ProcessLocally;
             std::string ndpError;
-            if (hasCapacity) {
-                // TODO: Keep a token until claimed by the runtime to prevent
-                // oversubscription
+            if (should_offload) {
                 sch.executionSlotsSemaphore.release();
                 try {
 
-                    if (!ndpSocketMap.tryEmplace(
+                  if (!ndpSocketMap.tryEmplace(
                           ndpRequest->request_nested_root()->call_id(),
                           this->shared_from_this())) {
                         throw std::runtime_error("Duplicate NDP call id");
@@ -117,7 +134,7 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
                       ndpRequest->request_nested_root()
                         ->wasm()
                         ->function()
-                        ->str());
+                        ->str());                
                     msg.set_id(ndpRequest->request_nested_root()->call_id());
                     msg.set_appid(ndpRequest->request_nested_root()->call_id());
 
@@ -160,6 +177,15 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
                                                 ->object()
                                                 ->key()
                                                 ->str());
+
+
+                    SPDLOG_DEBUG("[ndp_endpoint::onFirstReceivable] msg id: {}", msg.id());
+                    SPDLOG_DEBUG("[ndp_endpoint::onFirstReceivable] msg user: {}", msg.user());
+                    SPDLOG_DEBUG("[ndp_endpoint::onFirstReceivable] msg function: {}", msg.function());
+                    SPDLOG_DEBUG("[ndp_endpoint::onFirstReceivable] msg isasync: {}", msg.isasync());
+                    SPDLOG_DEBUG("[ndp_endpoint::onFirstReceivable] msg isstorage: {}", msg.isstorage());
+
+                    SPDLOG_DEBUG("[ndp_endpoint::onFirstReceivable] Schduling NDP function");
                     sch.callFunction(
                       msg,
                       true,
@@ -175,12 +201,12 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
                     ndpResult = ndpmsg::NdpResult_Error;
                 }
             }
-            SPDLOG_DEBUG("Handling request {} near-storage from OSD {}: {}",
+            SPDLOG_DEBUG("Handling request {} near-storage from OSD {}: Should Offload={}",
                          ndpRequest->request_nested_root()->call_id(),
                          ndpRequest->osd_name()->str(),
-                         hasCapacity);
+                         should_offload);
 
-            auto flatBuilder = fbs::FlatBufferBuilder(128);
+            auto flatBuilder = fbs::FlatBufferBuilder();
             auto responseError = flatBuilder.CreateString(ndpError);
             auto responseBuilder = ndpmsg::NdpResponseBuilder(flatBuilder);
             responseBuilder.add_call_id(
@@ -192,9 +218,12 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
             connection->sendMessage(flatBuilder.GetBufferPointer(),
                                     flatBuilder.GetSize());
 
+            SPDLOG_DEBUG("[ndp_endpoint::onFirstReceivable] hasCapacity: {}", hasCapacity);
+
             if (hasCapacity) {
+                SPDLOG_DEBUG("[ndp_endpoint::onFirstReceivable] Doing recv");
                 doRecv();
-            }
+            } 
         } else {
             SPDLOG_ERROR(
               "Error waiting for first recv on the ndp connection: {}",
@@ -212,9 +241,8 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
                              asio::buffer(nextMsg.data(), nextMsg.size()),
                              std::bind_front(&NdpConnection::onReceivable,
                                              this->shared_from_this()));
-        } else if (ec.value() != boost::system::errc::operation_canceled) {
-            SPDLOG_ERROR("Error waiting for recv on the ndp connection: {}",
-                         ec.to_string());
+        } else if (errno != EAGAIN){
+            SPDLOG_ERROR("[ndp_endpoint::recvMsgContent] Error waiting for recv on the ndp connection: {} - {}", ec.to_string(), strerror(errno));
         }
     }
 
@@ -237,8 +265,8 @@ class NdpConnection : public std::enable_shared_from_this<NdpConnection>
             lastMessageFlag.notify_one();
 
             doRecv();
-        } else if (ec.value() != boost::system::errc::operation_canceled) {
-            SPDLOG_ERROR("Error waiting for recv on the ndp connection: {}",
+        } else {
+            SPDLOG_ERROR("[ndp_endpoint::onReceivable] Error waiting for recv on the ndp connection: {}",
                          ec.to_string());
         }
     }
@@ -297,10 +325,11 @@ class NdpEndpoint : public std::enable_shared_from_this<NdpEndpoint>
 
     void onAcceptable(const boost::system::error_code& ec)
     {
+        // If no error occurs
         if (!ec) {
             try {
-                auto connection =
-                  std::make_shared<CephFaasmSocket>(socket.accept());
+                // Accept the connection and launch the session
+                auto connection = std::make_shared<CephFaasmSocket>(socket.accept());
                 std::shared_ptr connHandler = std::make_shared<NdpConnection>(
                   ioc, std::move(connection), this->shared_from_this());
                 connHandler->run();
@@ -333,16 +362,27 @@ std::function<void(asio::io_context&)> getNdpEndpoint()
 
 std::shared_ptr<CephFaasmSocket> getNdpSocketFromCall(uint64_t id)
 {
-    auto weak = ndpSocketMap.get(id).value();
-    return std::shared_ptr(weak)->connection;
+    std::optional<std::shared_ptr<NdpConnection>> sock_optional = ndpSocketMap.get(id);
+    if (!sock_optional.has_value()) {
+        throw std::runtime_error("No NDP socket found for call id " +
+                                 std::to_string(id));
+    }
+    std::shared_ptr<NdpConnection> sock = sock_optional.value();
+    return sock->connection;
 }
 
 tl::expected<std::vector<uint8_t>, std::exception_ptr> awaitNdpResponse(
   uint64_t id)
 {
-    auto weak = ndpSocketMap.get(id).value();
-    auto sock = std::shared_ptr(weak);
+    std::optional<std::shared_ptr<NdpConnection>> sock_optional = ndpSocketMap.get(id);
     while (true) {
+        if (!sock_optional.has_value()) {
+            throw std::runtime_error("No NDP socket found for call id " +
+                                     std::to_string(id));
+        }
+
+        std::shared_ptr<NdpConnection> sock = sock_optional.value();
+
         sock->lastMessageFlag.wait(false);
         {
             faabric::util::UniqueLock lock{ sock->lastMessageMx };
@@ -357,22 +397,23 @@ tl::expected<std::vector<uint8_t>, std::exception_ptr> awaitNdpResponse(
 
 CephSocketCloser::~CephSocketCloser()
 {
-    if (socket != nullptr) {
-        SPDLOG_DEBUG("Closing Ceph socket for {}", id);
-        flatbuffers::FlatBufferBuilder builder(64);
-        auto endField = ndpmsg::CreateNdpEnd(builder);
-        auto endMsg = ndpmsg::CreateStorageMessage(
-          builder, id, ndpmsg::TypedStorageMessage_NdpEnd, endField.Union());
-        builder.Finish(endMsg);
-        socket->sendMessage(builder.GetBufferPointer(), builder.GetSize());
+    try {
+        if (socket != nullptr) {
+            SPDLOG_DEBUG("Closing Ceph socket for {}", id);
+            flatbuffers::FlatBufferBuilder builder(64);
+            auto endField = ndpmsg::CreateNdpEnd(builder);
+            auto endMsg = ndpmsg::CreateStorageMessage(
+              builder, id, ndpmsg::TypedStorageMessage_NdpEnd, endField.Union());
+            builder.Finish(endMsg);
 
-        auto conn = ndpSocketMap.get(id)->lock();
-        if (conn != nullptr) {
-            conn->sockConn.cancel();
+            SPDLOG_DEBUG("Sending NdpEnd message for {}", id);
+            socket->sendMessage(builder.GetBufferPointer(), builder.GetSize());
         }
-
-        ::shutdown(socket->getFd(), SHUT_RDWR);
-        socket = nullptr;
+    } catch (const std::exception& e) {
+        // Handle exception here
+        SPDLOG_ERROR("Exception when closing ndp socket: {}", e.what());
+    } catch (...) {
+        SPDLOG_ERROR("Unknown exception when closing ndp socket");
     }
 }
 
